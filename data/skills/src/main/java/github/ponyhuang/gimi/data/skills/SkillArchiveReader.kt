@@ -4,6 +4,8 @@ import github.ponyhuang.gimi.domain.skills.model.SkillImportFailure
 import github.ponyhuang.gimi.domain.skills.model.SkillImportSource
 import java.io.IOException
 import java.io.InputStream
+import java.net.SocketTimeoutException
+import javax.net.ssl.SSLException
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -50,13 +52,29 @@ internal class SkillArchiveReader(
                 SkillImportFailure.Reason.DownloadFailed,
                 "The skill archive could not be downloaded.",
                 error,
+                downloadIssue = when (error) {
+                    is SocketTimeoutException -> SkillImportFailure.DownloadIssue.TimedOut
+                    is SSLException -> SkillImportFailure.DownloadIssue.TlsFailed
+                    else -> SkillImportFailure.DownloadIssue.ConnectionFailed
+                },
             )
         }
-        if (!response.isSuccessful || !response.request.url.isHttps) {
+        if (!response.request.url.isHttps) {
             response.close()
             throw SkillImportFailure(
                 SkillImportFailure.Reason.DownloadFailed,
                 "The skill archive could not be downloaded securely.",
+                downloadIssue = SkillImportFailure.DownloadIssue.InsecureRedirect,
+            )
+        }
+        if (!response.isSuccessful) {
+            val status = response.code
+            response.close()
+            throw SkillImportFailure(
+                SkillImportFailure.Reason.DownloadFailed,
+                "The archive request returned HTTP $status.",
+                downloadIssue = SkillImportFailure.DownloadIssue.HttpError,
+                httpStatus = status,
             )
         }
         val body = response.body ?: run {
@@ -64,6 +82,7 @@ internal class SkillArchiveReader(
             throw SkillImportFailure(
                 SkillImportFailure.Reason.DownloadFailed,
                 "The skill archive response was empty.",
+                downloadIssue = SkillImportFailure.DownloadIssue.EmptyResponse,
             )
         }
         if (body.contentLength() > MAX_ARCHIVE_BYTES) {

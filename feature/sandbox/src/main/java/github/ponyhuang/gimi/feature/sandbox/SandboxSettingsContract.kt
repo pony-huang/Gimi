@@ -19,12 +19,11 @@ data class SandboxEnvironmentDraft(
 )
 
 /**
- * 沙盒页唯一展示状态；连接字段是草稿，开关和 configured 来自成功保存的设置。
+ * 沙盒页唯一展示状态；连接字段是草稿，开关由上一级运行环境页持有，本页只承担配置。
  * @property apiUrl 管理 API 的完整地址，保留端口及路径大小写。
  * @property sandboxUrl 可选沙箱代理完整地址，留空时使用服务端返回的域名。
  * @property idleTimeoutSeconds 秒数字符串，保留输入中的空值以提供校验反馈。
- * @property configurationExpanded 配置区独立展开态，与 E2B 是否启用无关。
- * @property busy 正在提交设置，期间禁止修改连接字段或开关。
+ * @property busy 正在提交设置，期间禁止修改连接字段。
  * @property dirty 草稿是否存在未保存的修改。
  * @property errors 可定位到输入框的业务校验错误。
  * @property templates 当前草稿凭据查询到的完整列表，仅保存在页面状态中。
@@ -39,7 +38,6 @@ data class SandboxSettingsUiState(
     val template: String = "code-interpreter-v1",
     val idleTimeoutSeconds: String = "300",
     val environment: List<SandboxEnvironmentDraft> = emptyList(),
-    val configurationExpanded: Boolean = false,
     val keyVisible: Boolean = false,
     val busy: Boolean = false,
     val dirty: Boolean = false,
@@ -47,15 +45,13 @@ data class SandboxSettingsUiState(
     val templates: List<SandboxTemplate> = emptyList(),
     val templateLoadState: SandboxTemplateLoadState = SandboxTemplateLoadState.IDLE,
 ) {
-    /** 即时开关独立于草稿保存；已配置且无修改时不重复提交。 */
-    val canSave: Boolean get() = enabled && !busy && (dirty || !configured)
+    /** 已配置且无修改时不重复提交；E2B 未启用时仍允许保存配置供以后使用。 */
+    val canSave: Boolean get() = !busy && (dirty || !configured)
     override fun toString(): String = "SandboxSettingsUiState(enabled=$enabled, configured=$configured, busy=$busy, credentials=<redacted>)"
 }
 
 /** 设置页意图；仅显式加载和刷新模板触发网络查询。 */
 sealed interface SandboxSettingsAction {
-    /** 即时保存 E2B 开关，保留已保存连接参数。 */
-    data class SetEnabled(val enabled: Boolean) : SandboxSettingsAction
     /** 修改完整 API 地址草稿。 */
     data class SetApiUrl(val value: String) : SandboxSettingsAction
     /** 修改可选沙箱代理地址草稿。 */
@@ -80,8 +76,6 @@ sealed interface SandboxSettingsAction {
     data class ToggleEnvironment(val id: Long) : SandboxSettingsAction
     /** 添加允许空值的环境变量编辑行。 */
     data object AddEnvironment : SandboxSettingsAction
-    /** 展开或收起连接、运行配置和环境变量，不修改启用状态。 */
-    data object ToggleConfiguration : SandboxSettingsAction
     /** 切换密钥遮罩，仅影响展示。 */
     data object ToggleKeyVisibility : SandboxSettingsAction
     /** 校验并保存连接草稿。 */

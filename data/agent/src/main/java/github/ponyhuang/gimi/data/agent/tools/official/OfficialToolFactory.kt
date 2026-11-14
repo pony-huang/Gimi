@@ -4,19 +4,18 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.UrlContextTool
-import github.ponyhuang.gimi.data.agent.tools.official.deepseek.DeepSeekWebTool
-import github.ponyhuang.gimi.data.agent.tools.official.deepseek.DeepSeekWebToolApi
-import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
-import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
-import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
-import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiWebTool
-import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiWebToolApi
-import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationApi
-import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationTool
+import github.ponyhuang.gimi.data.modelaccess.deepseek.tool.DeepSeekWebTool
+import github.ponyhuang.gimi.data.modelaccess.deepseek.tool.DeepSeekWebToolApi
+import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmReaderTool
+import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebSearchTool
+import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebToolApi
+import github.ponyhuang.gimi.data.modelaccess.kimi.tool.KimiWebTool
+import github.ponyhuang.gimi.data.modelaccess.kimi.tool.KimiWebToolApi
+import github.ponyhuang.gimi.data.modelaccess.minimax.tool.MinimaxImageGenerationApi
+import github.ponyhuang.gimi.data.modelaccess.minimax.tool.MinimaxImageGenerationTool
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
-import github.ponyhuang.gimi.domain.modelcatalog.model.canProvideOfficialTools
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,29 +40,36 @@ class OfficialToolFactory @Inject constructor(
             },
         )
         OfficialToolBinding.LocalFunctions -> {
-            val service = modelServices.currentServices().firstOrNull {
-                it.id == spec.serviceId && it.canProvideOfficialTools()
+            // 独立 API 工具的凭据归属实例的对话连接；同模板多实例时任取一个已启用实例。
+            val instance = modelServices.currentInstances().firstOrNull {
+                it.templateId == spec.templateId && it.canProvideOfficialTools()
             }
-            if (service == null) emptyList() else when (spec.toolId) {
-                OfficialToolIds.DEEPSEEK_WEB_SEARCH,
-                OfficialToolIds.DEEPSEEK_WEB_FETCH,
-                -> listOf(DeepSeekWebTool(spec.toolId, DeepSeekWebToolApi(service.apiKey, httpClient)))
-                OfficialToolIds.MINIMAX_IMAGE_GENERATION -> {
-                    val api = MinimaxImageGenerationApi(service.apiKey, httpClient)
-                    listOf(
-                        MinimaxImageGenerationTool.textToImage(api),
-                        MinimaxImageGenerationTool.imageToImage(api),
-                    )
+            if (instance == null) {
+                emptyList()
+            } else {
+                val conversation = checkNotNull(instance.conversationConnection)
+                val apiKey = instance.effectiveApiKey(conversation)
+                when (spec.toolId) {
+                    OfficialToolIds.DEEPSEEK_WEB_SEARCH,
+                    OfficialToolIds.DEEPSEEK_WEB_FETCH,
+                    -> listOf(DeepSeekWebTool(spec.toolId, DeepSeekWebToolApi(apiKey, httpClient)))
+                    OfficialToolIds.MINIMAX_IMAGE_GENERATION -> {
+                        val api = MinimaxImageGenerationApi(apiKey, httpClient)
+                        listOf(
+                            MinimaxImageGenerationTool.textToImage(api),
+                            MinimaxImageGenerationTool.imageToImage(api),
+                        )
+                    }
+                    OfficialToolIds.GLM_WEB_SEARCH -> {
+                        val api = GlmWebToolApi(apiKey, conversation.endpoint, httpClient)
+                        listOf(GlmWebSearchTool(api), GlmReaderTool(api))
+                    }
+                    OfficialToolIds.KIMI_WEB_TOOLS -> {
+                        val api = KimiWebToolApi(apiKey, httpClient)
+                        spec.staticFunctionIds.map { KimiWebTool(it, api) }
+                    }
+                    else -> error("No local tool factory for ${spec.toolId}")
                 }
-                OfficialToolIds.GLM_WEB_SEARCH -> {
-                    val api = GlmWebToolApi(service.apiKey, service.activeApiBaseUrl, httpClient)
-                    listOf(GlmWebSearchTool(api), GlmReaderTool(api))
-                }
-                OfficialToolIds.KIMI_WEB_TOOLS -> {
-                    val api = KimiWebToolApi(service.apiKey, httpClient)
-                    spec.staticFunctionIds.map { KimiWebTool(it, api) }
-                }
-                else -> error("No local tool factory for ${spec.toolId}")
             }
         }
     }

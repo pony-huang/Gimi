@@ -1,0 +1,6 @@
+<resources>
+    <string name="runtime_documents_title">Gimi 本地环境</string>
+    <string name="runtime_active">本地运行组件正在运行</string>
+    <string name="runtime_stop">停止并关闭</string>
+    <string name="runtime_name">Gimi 运行组件</string>
+</resources>

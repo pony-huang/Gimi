@@ -5,7 +5,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -201,7 +201,7 @@ internal class ChatToolConfigurationCoordinator(
         val available = availableOfficialTools(selection)
         if (available.isEmpty()) return emptyList()
         val existingById = existing.associateBy { it.id }
-        val services = modelServices.currentServices().associateBy(LLMModelSetting::id)
+        val services = modelServices.currentInstances().associateBy(ModelServiceInstance::id)
         return available.map { tool ->
             existingById[tool.toolId]
                 ?.takeIf { it.sourceServiceId == tool.serviceId }
@@ -251,11 +251,11 @@ internal class ChatToolConfigurationCoordinator(
         selection: ModelSelection?,
     ): List<OfficialToolAvailability> {
         val current = selection ?: return emptyList()
-        val service = modelServices.currentServices()
-            .firstOrNull { it.id == current.serviceId }
+        val instance = modelServices.currentInstances()
+            .firstOrNull { it.id == current.instanceId }
             ?: return emptyList()
         return officialFunctionCatalog.availableTools(
-            activeService = service,
+            activeInstance = instance,
             activeModelId = current.modelId,
         )
     }

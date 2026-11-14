@@ -4,7 +4,7 @@ import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.tools.ToolContext
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
@@ -61,7 +61,7 @@ class MobileUseAvailabilityTest {
         every { runConfig } returns RunConfig(
             customMetadata = ToolRunMetadata.of(
                 ModelRuntimeMetadata(
-                    "service", ApiProtocol.OpenaiChatcompletions, "model", "https://example.com", supportsImages,
+                    "service", null, ApiProtocol.OpenaiChatcompletions, "model", "https://example.com", supportsImages,
                 ),
                 null,
                 true,

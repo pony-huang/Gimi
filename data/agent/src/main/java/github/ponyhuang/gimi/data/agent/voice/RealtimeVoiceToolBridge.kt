@@ -20,14 +20,16 @@ import com.google.gson.Gson
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.contribution.GuardedAppFunctionToolset
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import java.util.UUID
@@ -36,22 +38,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-
-/**
- * Realtime 协议的工具回写通道：由各厂商 [com.google.adk.kt.models.LiveConnection] 实现，
- * 门面的工具轮据此把执行结果写回服务端上下文并触发二轮推理。
- *
- * 两条厂商链路的事件语义一致（GA Realtime 与 Qwen-Audio 同源）：先
- * `conversation.item.create`（`function_call_output`）写回结果，再 `response.create`
- * 触发模型基于结果继续生成；发送失败静默降级并记日志，不向会话层暴露瞬时抖动。
- */
-internal interface RealtimeFunctionCallSink {
-    /** 写回一次工具执行结果；[outputJson] 为 JSON 字符串（含错误对象）。 */
-    suspend fun sendFunctionResult(callId: String, outputJson: String)
-
-    /** 触发服务端基于已写回的工具结果继续生成（二轮推理）。 */
-    suspend fun sendResponseTrigger()
-}
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
 
 /**
  * 实时助手模式的工具桥（已解析、可直接下发与执行）。
@@ -129,6 +117,7 @@ class RealtimeVoiceToolBridge(
 class RealtimeAssistantTools @Inject constructor(
     private val contributions: AgentContributionRegistry,
     private val modelServices: AgentModelConfigurationSource,
+    private val modelCatalog: ModelCatalogRepository,
     private val pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
 ) {
 
@@ -222,7 +211,8 @@ class RealtimeAssistantTools @Inject constructor(
     private suspend fun realtimeModelRuntime(selection: ModelSelection?): ModelRuntimeMetadata {
         // 兜底只作标识，不据此发起聊天请求；协议取 OpenAI 兼容枚举的默认值即可。
         val fallback = ModelRuntimeMetadata(
-            serviceId = selection?.serviceId.orEmpty(),
+            serviceId = selection?.instanceId.orEmpty(),
+            templateId = null,
             baseType = ApiProtocol.OpenaiChatcompletions,
             modelId = selection?.modelId.orEmpty(),
             fullBaseUrl = "",
@@ -230,26 +220,22 @@ class RealtimeAssistantTools @Inject constructor(
         val chosen = selection ?: return fallback
         val resolved = cancellationAwareRunCatching {
             modelServices.awaitReady()
-            val service = modelServices.currentServices().firstOrNull { it.id == chosen.serviceId }
-            val model = service?.groups
-                ?.firstOrNull { it.id == chosen.groupId }?.models
-                ?.firstOrNull { it.id == chosen.modelId }
-            if (service != null && model != null) {
-                ModelRuntimeMetadata(
-                    serviceId = service.id,
-                    baseType = service.apiProtocol,
-                    modelId = model.id,
-                    // 语音服务的 apiBaseUrl 是 wss 接入端点，不能直接当 http(s) 端点写进工具元数据。
-                    fullBaseUrl = realtimeModelBaseUrl(service.apiBaseUrl),
-                    supportsImages = model.multimodal.supportsImages,
-                )
-            } else {
-                null
-            }
+            modelCatalog.resolveConnection(chosen)
+                ?.takeIf { ModelCapability.Realtime in it.model.capabilities }
         }.onFailure {
             Log.w(TAG, "Realtime 模型运行元数据解析失败，工具仍按选择下发", it)
         }.getOrNull()
-        return resolved ?: fallback
+        return resolved?.let { view ->
+            ModelRuntimeMetadata(
+                serviceId = view.instanceId,
+                templateId = view.templateId,
+                baseType = view.protocol,
+                modelId = view.modelId,
+                // 语音连接的端点可能是 wss 接入端点，不能直接当 http(s) 端点写进工具元数据。
+                fullBaseUrl = realtimeModelBaseUrl(view.endpoint),
+                supportsImages = view.model.multimodal.supportsImages,
+            )
+        } ?: fallback
     }
 
     /** 构造一次通话专用的最小 InvocationContext；无 Runner、无会话持久化。 */

@@ -32,6 +32,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
 
 class ToolSearchToolsetTest {
 
@@ -40,8 +43,8 @@ class ToolSearchToolsetTest {
         val readonly = spyk(context())
         every { readonly.runConfig } returns RunConfig(customMetadata =
             github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata.of(
-                github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
-                    "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                ModelRuntimeMetadata(
+                    "deepseek", "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
                     "deepseek-flash", "https://api.deepseek.com/anthropic",
                 ), null, true,
             ),
@@ -58,8 +61,8 @@ class ToolSearchToolsetTest {
         val readonly = spyk(context())
         every { readonly.runConfig } returns RunConfig(customMetadata =
             github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata.of(
-                github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
-                    "minimax", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                ModelRuntimeMetadata(
+                    "minimax", "minimax", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
                     "MiniMax-M3", "https://api.minimax.io/anthropic",
                 ), null, true,
             ),

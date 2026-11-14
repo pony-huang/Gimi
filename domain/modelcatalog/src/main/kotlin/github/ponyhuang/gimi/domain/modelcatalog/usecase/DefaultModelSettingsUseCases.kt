@@ -2,6 +2,8 @@ package github.ponyhuang.gimi.domain.modelcatalog.usecase
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.combine
@@ -11,13 +13,13 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
 ) {
     operator fun invoke() = combine(
         combine(
-            repository.observeServices(),
+            repository.observeInstances(),
             repository.observeAssistantSelection(),
             repository.observeFastSelection(),
             repository.observeSpeechSelection(),
             repository.observeTtsSelection(),
-        ) { services, assistant, fast, speech, tts ->
-            PartialSettings(services, assistant, fast, speech, tts)
+        ) { instances, assistant, fast, speech, tts ->
+            PartialSettings(instances, assistant, fast, speech, tts)
         },
         combine(
             repository.observeTtsVoice(),
@@ -28,7 +30,7 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
         },
     ) { partial, (voiceId, realtime, realtimeVoice) ->
         DefaultModelSettings(
-            services = partial.services,
+            instances = partial.instances,
             assistantSelection = partial.assistant,
             fastSelection = partial.fast,
             speechSelection = partial.speech,
@@ -40,7 +42,7 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
     }
 
     private data class PartialSettings(
-        val services: List<github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting>,
+        val instances: List<ModelServiceInstance>,
         val assistant: ModelSelection?,
         val fast: ModelSelection?,
         val speech: ModelSelection?,
@@ -61,6 +63,5 @@ class UpdateDefaultModelSettingsUseCase @Inject constructor(
     fun realtimeModel(selection: ModelSelection?) = repository.selectRealtimeModel(selection)
 
     /** 设置 Realtime 音色覆盖；null 表示回到模型缺省音色。 */
-    fun realtimeVoice(override: github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride?) =
-        repository.selectRealtimeVoice(override)
+    fun realtimeVoice(override: RealtimeVoiceOverride?) = repository.selectRealtimeVoice(override)
 }

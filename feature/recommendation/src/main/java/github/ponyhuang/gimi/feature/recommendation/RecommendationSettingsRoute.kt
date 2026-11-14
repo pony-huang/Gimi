@@ -9,12 +9,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
-/** 「个性化选项」页：承载提示词、对话界面、工具加载与设备控制等偏好开关。 */
+/** 「个性化选项」页：承载提示词、对话界面与工具加载等偏好开关；设备控制已迁至设置一级页。 */
 @Composable
 fun RecommendationSettingsRoute(
     onBack: () -> Unit,
     onOpenSimpleChatPromptSettings: () -> Unit = {},
-    onOpenMobileUse: () -> Unit = {},
     onOpenRecommendationUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: RecommendationSettingsViewModel = hiltViewModel(),
@@ -29,7 +28,6 @@ fun RecommendationSettingsRoute(
             state = state,
             onAction = viewModel::onAction,
             onOpenSimpleChatPromptSettings = onOpenSimpleChatPromptSettings,
-            onOpenMobileUse = onOpenMobileUse,
             onOpenRecommendationUpdate = onOpenRecommendationUpdate,
             modifier = scaffoldModifier,
         )

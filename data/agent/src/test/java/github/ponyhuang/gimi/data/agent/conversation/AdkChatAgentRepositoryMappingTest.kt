@@ -65,7 +65,7 @@ class AdkChatAgentRepositoryMappingTest {
         coEvery { createExecution(any(), any(), any(), any(), any(), any()) } returns execution
     }
     private val repository = AdkChatAgentRepository(runner)
-    private val selection = ModelSelection(serviceId = "svc", groupId = "grp", modelId = "mdl")
+    private val selection = ModelSelection(instanceId = "svc", connectionId = "grp", modelId = "mdl")
 
     @Test
     fun sendDelegatesWithFixedUserIdAndMapsEvent() = runTest {

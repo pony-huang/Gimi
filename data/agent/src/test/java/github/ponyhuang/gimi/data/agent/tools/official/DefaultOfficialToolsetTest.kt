@@ -4,14 +4,13 @@ import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.UrlContextTool
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
-import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmReaderTool
+import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
@@ -415,19 +414,17 @@ class DefaultOfficialToolsetTest {
         credential: String = "key",
         officialToolsEnabled: Boolean,
     ): AgentModelConfigurationSource {
-        val serviceIds = listOf("deepseek", "openai", "anthropic", "minimax", "mimo", "gemini", "glm", "kimi")
-        val services = serviceIds.map { serviceId ->
-            mockk<LLMModelSetting> {
-                every { id } returns serviceId
-                every { isEnabled } returns true
-                every { isOfficialToolsEnabled } returns officialToolsEnabled
-                every { apiKey } returns credential
-                every { apiProtocol } returns ApiProtocol.OpenaiChatcompletions
-                every { activeApiBaseUrl } returns "https://example.com"
-            }
+        // 实例 ID 与模板 ID 同值:厂商工具矩阵按模板身份匹配,凭据归属实例的对话连接。
+        val templateIds = listOf("deepseek", "openai", "anthropic", "minimax", "mimo", "gemini", "glm", "kimi")
+        val instances = templateIds.map { templateId ->
+            officialToolsInstance(
+                templateId = templateId,
+                apiKey = credential,
+                isOfficialToolsEnabled = officialToolsEnabled,
+            )
         }
         return mockk {
-            every { currentServices() } returns services
+            every { currentInstances() } returns instances
         }
     }
 
@@ -437,6 +434,7 @@ class DefaultOfficialToolsetTest {
         modelId: String = "model",
     ) = ModelRuntimeMetadata(
         serviceId = serviceId,
+        templateId = serviceId,
         baseType = baseType,
         modelId = modelId,
         fullBaseUrl = "https://example.com",

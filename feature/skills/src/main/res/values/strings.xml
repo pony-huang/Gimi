@@ -1,14 +1,14 @@
 <resources>
     <string name="skills_screen_title">Skills</string>
-    <string name="skills_import_section">安装 Skill</string>
+    <string name="skills_add">添加技能</string>
     <string name="skills_import_url">从 URL 安装</string>
-    <string name="skills_import_url_subtitle">下载公开的 HTTPS ZIP 压缩包</string>
     <string name="skills_import_local">选择本地 ZIP</string>
-    <string name="skills_import_local_subtitle">从设备文件中选择 Skill 压缩包</string>
     <string name="skills_importing">正在校验并安装…</string>
     <string name="skills_installed_section">已安装</string>
     <string name="skills_empty">尚未安装 Skill</string>
     <string name="skills_remove">删除 %1$s</string>
+    <string name="skills_row_more">更多操作</string>
+    <string name="skills_enable">启用 %1$s</string>
 
     <string name="skills_url_dialog_title">从 URL 安装</string>
     <string name="skills_url_label">HTTPS ZIP 地址</string>

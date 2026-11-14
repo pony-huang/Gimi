@@ -29,6 +29,8 @@ fun <T> SearchablePickerSingleChoiceDialog(
     onDismiss: () -> Unit,
     /** 该选项是否可选；不可选的选项仍然显示，但不可点击。 */
     enabled: (T) -> Boolean = { true },
+    /** 自定义空态（例如空目录下的行动出口）；缺省为纯文案 [emptyText]。 */
+    emptyContent: (@Composable () -> Unit)? = null,
 ) {
     val normalizedQuery = query.trim()
     val filtered = options.filter {
@@ -48,6 +50,7 @@ fun <T> SearchablePickerSingleChoiceDialog(
         onPick = onPick,
         onDismiss = onDismiss,
         enabled = enabled,
+        emptyContent = emptyContent,
         searchField = {
             GimiSearchField(
                 value = query,

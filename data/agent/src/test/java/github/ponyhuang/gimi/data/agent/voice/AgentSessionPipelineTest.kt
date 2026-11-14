@@ -65,7 +65,8 @@ class AgentSessionPipelineTest {
     }
 
     private fun scriptedRunner(execution: AgentChatExecution): AgentChatRunner = mockk {
-        coEvery { createExecution(any(), any(), any(), any(), any(), any(), any()) } returns execution
+        // 语音会话以 voiceResponse = true 建立执行句柄,全参数宽松匹配。
+        coEvery { createExecution(any(), any(), any(), any(), any(), any(), any(), any()) } returns execution
     }
 
     /** 会话式合成假件：send 缓存文本，flush 后一次性下发全部句子。 */

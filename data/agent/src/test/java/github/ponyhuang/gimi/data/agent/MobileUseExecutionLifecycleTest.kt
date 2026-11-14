@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 
 class MobileUseExecutionLifecycleTest {
     private val repository = mockk<MobileUseController>(relaxed = true)
@@ -27,7 +28,7 @@ class MobileUseExecutionLifecycleTest {
         val runner = mockk<InMemoryRunner>()
         coEvery { runner.runAsync(any(), any(), any(), any(), any(), any()) } returns events
         val metadata = ToolRunMetadata.of(
-            ModelRuntimeMetadata("service", ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
+            ModelRuntimeMetadata("service", null, ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
             null, true, mobileUseOwner = "turn",
         )
         return AgentChatExecution("user", "chat", runner, metadata, repository)

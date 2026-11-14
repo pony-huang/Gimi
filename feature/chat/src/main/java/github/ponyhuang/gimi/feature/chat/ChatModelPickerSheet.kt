@@ -57,9 +57,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiPickerItemRow
@@ -112,7 +111,7 @@ internal fun ChatModelPickerSheet(
                     ChatModelPickerTitle(
                         serviceId = serviceId,
                         serviceName = serviceId?.let { id ->
-                            options.firstOrNull { it.service.id == id }?.service?.name
+                            options.firstOrNull { it.instance.id == id }?.instance?.name
                         },
                         // 备注跟着当前模型协议走：一级页标题下说明为何没有思考强度控件。
                         showReasoningNotice = !reasoningSupported,
@@ -188,9 +187,9 @@ private fun ChatModelPickerTitle(
     }
 }
 
-/** 一级页的一行厂商：所属服务 + 该服务下可用的聊天模型数。 */
+/** 一级页的一行实例：所属模型服务 + 该实例下可用的聊天模型数。 */
 private data class ProviderOption(
-    val service: LLMModelSetting,
+    val instance: ModelServiceInstance,
     val modelCount: Int,
 )
 
@@ -209,8 +208,8 @@ private fun ChatModelPickerBody(
     modifier: Modifier = Modifier,
 ) {
     val providers = options
-        .groupBy { it.service.id }
-        .map { (_, rows) -> ProviderOption(rows.first().service, rows.size) }
+        .groupBy { it.instance.id }
+        .map { (_, rows) -> ProviderOption(rows.first().instance, rows.size) }
     BackHandler(enabled = selectedServiceId != null) { onSelectService(null) }
 
     // 高度上限来自抽屉自身拿到的窗口约束；若改用 LocalConfiguration.screenHeightDp，
@@ -237,7 +236,7 @@ private fun ChatModelPickerBody(
                 options = options,
                 selection = selection,
                 showReasoning = reasoningSupported && toolConfiguration != null &&
-                    serviceId == selection?.serviceId,
+                    serviceId == selection?.instanceId,
                 reasoningSupported = reasoningSupported,
                 toolConfiguration = toolConfiguration,
                 reasoningEnabled = reasoningEnabled,
@@ -293,22 +292,22 @@ private fun ProviderListContent(
             )
         }
         providers.forEach { provider ->
-            val containsCurrent = selection?.serviceId == provider.service.id
+            val containsCurrent = selection?.instanceId == provider.instance.id
             GimiPickerItemRow(
-                title = provider.service.name,
+                title = provider.instance.name,
                 subtitle = stringResource(
                     R.string.chat_model_picker_provider_model_count,
                     provider.modelCount,
                 ),
                 selected = false,
-                onClick = { onOpenProvider(provider.service.id) },
+                onClick = { onOpenProvider(provider.instance.id) },
                 modifier = Modifier.padding(
                     horizontal = GimiListDefaults.HorizontalPadding,
                     vertical = 4.dp,
                 ),
                 leading = {
                     LLMModelServiceIcon(
-                        serviceId = provider.service.id,
+                        serviceId = provider.instance.templateId.orEmpty(),
                         modifier = Modifier.size(28.dp),
                         contentPadding = 3.dp,
                     )
@@ -352,7 +351,7 @@ private fun ProviderModelListContent(
     onPick: (EnabledModelRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val models = options.filter { it.service.id == serviceId }
+    val models = options.filter { it.instance.id == serviceId }
     // 同一级页：可滚动的 Column 贴内容长，超过主体上限时自己滚动。
     Column(
         modifier = modifier
@@ -371,17 +370,12 @@ private fun ProviderModelListContent(
         }
         models.forEach { row ->
             val selected = selection?.let {
-                it.serviceId == row.service.id && it.groupId == row.group.id && it.modelId == row.model.id
+                it.instanceId == row.instance.id && it.connectionId == row.connection.id && it.modelId == row.model.id
             } ?: false
             GimiPickerItemRow(
                 title = row.model.name,
-                subtitle = if (
-                    row.service.groups.count { group -> group.models.any(Model::isChatModel) } > 1
-                ) {
-                    row.group.name
-                } else {
-                    ""
-                },
+                // 同一实例的对话模型是单一列表；副标题不再按分组展示。
+                subtitle = "",
                 selected = selected,
                 onClick = { onPick(row) },
                 modifier = Modifier.padding(
@@ -566,8 +560,8 @@ private fun ChatModelPickerLevel2LightPreview() {
             PreferenceStyleScope(PreferenceStyle.Compact) {
                 Column {
                     ChatModelPickerTitle(
-                        serviceId = "openai",
-                        serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        serviceId = "instance-openai",
+                        serviceName = previewModelRows().first { it.instance.id == "instance-openai" }.instance.name,
                         showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
@@ -599,8 +593,8 @@ private fun ChatModelPickerLevel2DarkPreview() {
             PreferenceStyleScope(PreferenceStyle.Compact) {
                 Column {
                     ChatModelPickerTitle(
-                        serviceId = "openai",
-                        serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        serviceId = "instance-openai",
+                        serviceName = previewModelRows().first { it.instance.id == "instance-openai" }.instance.name,
                         showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
@@ -632,8 +626,8 @@ private fun ChatModelPickerReasoningUnsupportedPreview() {
             PreferenceStyleScope(PreferenceStyle.Compact) {
                 Column {
                     ChatModelPickerTitle(
-                        serviceId = "openai",
-                        serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        serviceId = "instance-openai",
+                        serviceName = previewModelRows().first { it.instance.id == "instance-openai" }.instance.name,
                         showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
@@ -732,8 +726,8 @@ private fun ChatModelPickerManyModelsLightPreview() {
             PreferenceStyleScope(PreferenceStyle.Compact) {
                 Column {
                     ChatModelPickerTitle(
-                        serviceId = "openai",
-                        serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        serviceId = "instance-openai",
+                        serviceName = previewModelRows().first { it.instance.id == "instance-openai" }.instance.name,
                         showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
@@ -757,18 +751,15 @@ private fun ChatModelPickerManyModelsLightPreview() {
     }
 }
 
-private fun previewModelRows(): List<EnabledModelRow> = previewModelServices().flatMap { service ->
-    service.groups.flatMap { group -> group.models.map { EnabledModelRow(service, group, it) } }
+private fun previewModelRows(): List<EnabledModelRow> = previewModelInstances().flatMap { instance ->
+    instance.chatRows()
 }
 
 private fun previewManyModelRows(): List<EnabledModelRow> {
-    val service = previewModelServices().first()
+    val instance = previewModelInstances().first()
+    val connection = instance.conversationConnection ?: return emptyList()
     return (1..24).map { index ->
-        val group = ModelGroup(
-            id = "gpt",
-            name = "GPT",
-            models = listOf(Model(id = "gpt-4o-variant-$index", name = "GPT-4o variant $index")),
-        )
-        EnabledModelRow(service, group, group.models.first())
+        val model = Model(id = "gpt-4o-variant-$index", name = "GPT-4o variant $index")
+        EnabledModelRow(instance, connection, model)
     }
 }

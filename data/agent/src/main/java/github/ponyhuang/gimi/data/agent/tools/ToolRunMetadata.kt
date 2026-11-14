@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.agent.tools
 
 import com.google.adk.kt.agents.ReadonlyContext
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 
@@ -22,6 +22,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
  */
 object ToolRunMetadata {
     private const val KEY_MODEL_SERVICE_ID = "gimi.model.service_id"
+    private const val KEY_MODEL_TEMPLATE_ID = "gimi.model.template_id"
     private const val KEY_MODEL_PROTOCOL = "gimi.model.protocol"
     private const val KEY_MODEL_ID = "gimi.model.id"
     private const val KEY_MODEL_BASE_URL = "gimi.model.base_url"
@@ -41,6 +42,7 @@ object ToolRunMetadata {
     ): Map<String, Any> {
         val metadata = mutableMapOf<String, Any>(
             KEY_MODEL_SERVICE_ID to modelRuntime.serviceId,
+            KEY_MODEL_TEMPLATE_ID to modelRuntime.templateId.orEmpty(),
             KEY_MODEL_PROTOCOL to modelRuntime.baseType.name,
             KEY_MODEL_ID to modelRuntime.modelId,
             KEY_MODEL_BASE_URL to modelRuntime.fullBaseUrl,
@@ -67,6 +69,7 @@ object ToolRunMetadata {
         val baseUrl = metadata[KEY_MODEL_BASE_URL] as? String ?: return null
         return ModelRuntimeMetadata(
             serviceId = serviceId,
+            templateId = (metadata[KEY_MODEL_TEMPLATE_ID] as? String)?.ifEmpty { null },
             baseType = protocol,
             modelId = modelId,
             fullBaseUrl = baseUrl,

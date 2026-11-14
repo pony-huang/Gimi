@@ -6,12 +6,13 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.data.agent.tools.toolConfigurationOrNull
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
 
 /**
  * Request-scoped official tools integrated through ADK's [Toolset] lifecycle.

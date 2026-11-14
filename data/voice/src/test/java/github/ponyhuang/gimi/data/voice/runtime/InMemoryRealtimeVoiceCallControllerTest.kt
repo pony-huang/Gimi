@@ -2,10 +2,12 @@ package github.ponyhuang.gimi.data.voice.runtime
 
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -132,7 +134,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
                 configurations += configuration
                 return sessions.removeFirst()
             }
-        }, realtimeCatalog(null), RealtimeCapable("qwen-audio"), RecordingForeground())
+        }, realtimeCatalog(null), RealtimeCapable("qwen"), RecordingForeground())
         // 未绑定会话时预选助手模式：回落轻聊，避免带着非法配置起会话。
         controller.start(null, null, "", RealtimeVoiceMode.Chat)
         advanceUntilIdle()
@@ -223,15 +225,17 @@ class InMemoryRealtimeVoiceCallControllerTest {
             } else null
     }
 
-    /** 带有原生 Realtime 模型的语音服务。 */
-    private fun realtimeService(id: String = "qwen-audio") = LLMModelSetting(
-        id = id, name = id, isEnabled = true, apiKey = "sk-$id",
-        apiBaseUrl = "wss://example.test", apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                "qwen-audio-realtime", "实时语音对话",
-                listOf(Model("qwen-audio-3.1-realtime-plus", "qwen-audio-3.1-realtime-plus",
+    /** 带有原生 Realtime 模型的语音服务实例。 */
+    private fun realtimeInstance(id: String = "instance-qwen", templateId: String = "qwen") = ModelServiceInstance(
+        id = id, name = id, templateId = templateId,
+        isEnabled = true, isOfficialToolsEnabled = false, sharedApiKey = "sk-$id",
+        connections = listOf(
+            ServiceConnection(
+                id = "$id-realtime",
+                capability = ServiceCapability.Realtime,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "wss://example.test",
+                models = listOf(Model("qwen-audio-3.1-realtime-plus", "qwen-audio-3.1-realtime-plus",
                     capabilities = setOf(ModelCapability.Realtime))),
             ),
         ),
@@ -242,24 +246,26 @@ class InMemoryRealtimeVoiceCallControllerTest {
         selection: ModelSelection?,
         override: RealtimeVoiceOverride? = null,
     ): ModelCatalogRepository {
-        val service = realtimeService()
+        val instance = realtimeInstance()
         val catalog = mockk<ModelCatalogRepository>()
-        every { catalog.observeServices() } returns MutableStateFlow(listOf(service))
+        every { catalog.observeInstances() } returns MutableStateFlow(listOf(instance))
         every { catalog.observeRealtimeSelection() } returns MutableStateFlow(selection)
         every { catalog.observeRealtimeVoice() } returns MutableStateFlow(override)
         every { catalog.currentRealtimeSelection() } returns selection
         every { catalog.currentRealtimeVoice() } returns override
-        every { catalog.currentService(service.id) } returns service
-        every { catalog.currentServices() } returns listOf(service)
+        every { catalog.currentInstances() } returns listOf(instance)
         every { catalog.currentTtsSelection() } returns null
         every { catalog.currentSpeechSelection() } returns null
+        every { catalog.resolveConnection(any()) } answers {
+            listOf(instance).resolveConnection(firstArg())
+        }
         coEvery { catalog.awaitReady() } returns Unit
         return catalog
     }
 
     @Test
     fun realtimeModeUsesTheConfiguredDefaultSelectionAndVoice() = runTest {
-        val selection = ModelSelection("qwen-audio", "qwen-audio-realtime", "qwen-audio-3.1-realtime-plus")
+        val selection = ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-audio-3.1-realtime-plus")
         val voice = RealtimeVoiceOverride(selection, "cloned_voice_id")
         val configurations = mutableListOf<RealtimeVoiceConfiguration>()
         val sessions = ArrayDeque<RealtimeVoiceSession>(listOf(FakeSession(), FakeSession()))
@@ -268,7 +274,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
                 configurations += configuration
                 return sessions.removeFirst()
             }
-        }, realtimeCatalog(selection, voice), RealtimeCapable("qwen-audio"), RecordingForeground())
+        }, realtimeCatalog(selection, voice), RealtimeCapable("qwen"), RecordingForeground())
         controller.start(null, null, "", RealtimeVoiceMode.Simple)
         advanceUntilIdle()
         assertTrue(controller.state.value.realtimeAvailable)
@@ -290,7 +296,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
                 configurations += configuration
                 return sessions.removeFirst()
             }
-        }, realtimeCatalog(null), RealtimeCapable("qwen-audio"), RecordingForeground())
+        }, realtimeCatalog(null), RealtimeCapable("qwen"), RecordingForeground())
         controller.start(null, null, "", RealtimeVoiceMode.Simple)
         advanceUntilIdle()
         assertFalse(controller.state.value.realtimeAvailable)
@@ -305,7 +311,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
 
     @Test
     fun realtimeAssistantModeUsesTheConfiguredDefaultSelectionAndVoice() = runTest {
-        val selection = ModelSelection("qwen-audio", "qwen-audio-realtime", "qwen-audio-3.1-realtime-plus")
+        val selection = ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-audio-3.1-realtime-plus")
         val voice = RealtimeVoiceOverride(selection, "cloned_voice_id")
         val configurations = mutableListOf<RealtimeVoiceConfiguration>()
         val sessions = ArrayDeque<RealtimeVoiceSession>(listOf(FakeSession(), FakeSession()))
@@ -314,7 +320,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
                 configurations += configuration
                 return sessions.removeFirst()
             }
-        }, realtimeCatalog(selection, voice), RealtimeCapable("qwen-audio"), RecordingForeground())
+        }, realtimeCatalog(selection, voice), RealtimeCapable("qwen"), RecordingForeground())
         controller.start(null, null, "", RealtimeVoiceMode.Simple)
         advanceUntilIdle()
         assertTrue(controller.state.value.realtimeAvailable)
@@ -337,7 +343,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
                 configurations += configuration
                 return sessions.removeFirst()
             }
-        }, realtimeCatalog(null), RealtimeCapable("qwen-audio"), RecordingForeground())
+        }, realtimeCatalog(null), RealtimeCapable("qwen"), RecordingForeground())
         controller.start(null, null, "", RealtimeVoiceMode.Simple)
         advanceUntilIdle()
         assertFalse(controller.state.value.realtimeAvailable)

@@ -22,7 +22,7 @@ import github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot
 import github.ponyhuang.gimi.data.agent.AgentStorage
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentFactory
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin

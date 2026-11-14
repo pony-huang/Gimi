@@ -7,10 +7,11 @@ import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistant
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
@@ -26,12 +27,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DefaultConversationSessionResolverTest {
-    private val selection = ModelSelection("service", "chat", "model")
+    private val selection = ModelSelection("instance", "connection", "model")
     private val conversations = mockk<ConversationRepository>(relaxed = true)
     private val modelCatalog = mockk<ModelCatalogRepository> {
         coEvery { awaitReady() } returns Unit
         every { currentAssistantSelection() } returns selection
-        every { currentServices() } returns listOf(service())
+        every { currentInstances() } returns listOf(instance())
     }
     private val mcpRepository = mockk<McpRepository>(relaxed = true) {
         every { currentServers() } returns listOf(
@@ -124,7 +125,7 @@ class DefaultConversationSessionResolverTest {
     @Test
     fun createWithoutUsableModelThrowsTypedConfigurationFailure() = runTest {
         every { modelCatalog.currentAssistantSelection() } returns null
-        every { modelCatalog.currentServices() } returns emptyList()
+        every { modelCatalog.currentInstances() } returns emptyList()
 
         val failure = runCatching { resolver.createAndActivate() }.exceptionOrNull()
 
@@ -132,18 +133,19 @@ class DefaultConversationSessionResolverTest {
         coVerify(exactly = 0) { conversations.createConversation(any(), any(), any()) }
     }
 
-    private fun service() = LLMModelSetting(
-        id = "service",
+    private fun instance() = ModelServiceInstance(
+        id = "instance",
         name = "Service",
+        templateId = "openai",
         isEnabled = true,
-        apiKey = "key",
-        apiBaseUrl = "https://example.test",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "chat",
-                name = "Chat",
+        isOfficialToolsEnabled = false,
+        sharedApiKey = "key",
+        connections = listOf(
+            ServiceConnection(
+                id = "connection",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://example.test",
                 models = listOf(Model(id = "model", name = "Model")),
             ),
         ),

@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.agent.tools.official
 
 import com.google.adk.kt.tools.BaseTool
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
@@ -36,7 +36,7 @@ class DefaultOfficialToolset @Inject constructor(
     ): List<BaseTool> {
         val onDemand = toolAccessRepository.defaultToolAccessMode.value == ToolAccessMode.ON_DEMAND
         return catalog.availableSpecsFor(
-            serviceId = config.serviceId,
+            templateId = config.templateId.orEmpty(),
             protocol = config.baseType,
             modelId = config.modelId,
         )

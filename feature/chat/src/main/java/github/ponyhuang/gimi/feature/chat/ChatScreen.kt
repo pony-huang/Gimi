@@ -167,13 +167,10 @@ fun ChatScaffold(
         state.availableLLMModelSettings,
         state.currentModelSelection,
     ) {
-        val selection = state.currentModelSelection
+        val selection = state.currentModelSelection ?: return@remember MultimodalCapabilities()
         state.availableLLMModelSettings
-            .firstOrNull { it.id == selection?.serviceId }
-            ?.groups
-            ?.firstOrNull { it.id == selection?.groupId }
-            ?.models
-            ?.firstOrNull { it.id == selection?.modelId }
+            .firstOrNull { it.id == selection.instanceId }
+            ?.findModel(selection)
             ?.multimodal
             ?: MultimodalCapabilities()
     }
@@ -405,7 +402,7 @@ fun ChatScaffold(
                                 retainExpanded = isModelPickerVisible,
                                 modelSelectorContent = {
                                     ModelTitleAndPicker(
-                                        services = state.availableLLMModelSettings,
+                                        instances = state.availableLLMModelSettings,
                                         currentSelection = state.currentModelSelection,
                                         loadState = state.modelCatalogLoadState,
                                         isAgentRunning = isAgentRunning,

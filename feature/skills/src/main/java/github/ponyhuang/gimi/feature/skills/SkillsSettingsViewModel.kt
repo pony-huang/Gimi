@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.skills.usecase.DiscardSkillImportUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.ObserveInstalledSkillsUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.PrepareSkillImportUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.RemoveSkillUseCase
+import github.ponyhuang.gimi.domain.skills.usecase.SetSkillEnabledUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,7 @@ class SkillsSettingsViewModel @Inject constructor(
     private val commitImport: CommitSkillImportUseCase,
     private val discardImport: DiscardSkillImportUseCase,
     private val removeSkill: RemoveSkillUseCase,
+    private val setSkillEnabled: SetSkillEnabledUseCase,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(SkillsSettingsUiState())
     val uiState: StateFlow<SkillsSettingsUiState> = mutableState.asStateFlow()
@@ -68,6 +70,7 @@ class SkillsSettingsViewModel @Inject constructor(
             SkillsSettingsAction.CancelReplacement -> cancelReplacement()
             is SkillsSettingsAction.RequestRemove ->
                 mutableState.update { it.copy(pendingRemoval = action.skill) }
+            is SkillsSettingsAction.ToggleSkill -> toggleSkill(action)
             SkillsSettingsAction.ConfirmRemoval -> confirmRemoval()
             SkillsSettingsAction.CancelRemoval ->
                 mutableState.update { it.copy(pendingRemoval = null) }
@@ -137,6 +140,15 @@ class SkillsSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             cancellationAwareRunCatching { discardImport(pending.id) }
                 .onFailure(::publishFailure)
+        }
+    }
+
+    private fun toggleSkill(action: SkillsSettingsAction.ToggleSkill) {
+        viewModelScope.launch {
+            // 列表状态由仓储流驱动，开关先保持原值，持久化成功后随流刷新。
+            cancellationAwareRunCatching {
+                setSkillEnabled(action.skill.name, action.enabled)
+            }.onFailure(::publishFailure)
         }
     }
 

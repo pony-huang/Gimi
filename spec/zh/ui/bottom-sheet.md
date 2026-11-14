@@ -22,7 +22,10 @@
 | `GimiSheetBase` | 模态外壳、拖动横杆、连续高度、插槽骨架、inset |
 | `GimiSheet` | 派生：标题行 + 主体 + 可选底部操作区 |
 | `GimiSearchSheet` | 派生：可选标题行 + 搜索行 + 主体 + 可选底部操作区 |
-| `GimiSheetOptionRow` / `GimiSheetSwitchRow` | 抽屉内的选项行（从旧的 `GimiBottomSheet` 挪出来的） |
+| `GimiSheetOptionRow` | 抽屉内的互斥选项行（从旧的 `GimiBottomSheet` 挪出来的） |
+
+抽屉内的开关行统一用 `PreferenceSwitchRow`（`core/designsystem/.../ui/preference`），
+与设置页共用同一组件与几何，整行承担开关交互。
 
 三个组件都在 `core/designsystem/.../ui/components`。`GimiSheetBase` 负责布局，
 两个派生组件只决定标题、搜索、底部各放什么。

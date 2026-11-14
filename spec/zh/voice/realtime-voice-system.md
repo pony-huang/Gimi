@@ -51,8 +51,9 @@ VAD 逐 32 ms 帧给语音概率
 |---|---|---|
 | `domain:voice` | 会话契约、状态快照、失败分类、能力解析接口、会话式合成接口 | 任何 Android / ADK / Compose 类型 |
 | `core:audio` | 录音、Silero VAD、软 AEC（speexdsp JNI）、播放参考缓冲、音频格式契约 | 业务语义 |
-| `data:voice` | 会话装配、AEC/VAD 编排、PCM 播放、设备路由、各厂商协议、前台服务、进程级控制器 | 模型选择、Agent 执行 |
-| `data:agent`/`voice` | 把 ASR + 文字模型 + TTS 组装成 ADK 官方 `Model`/`LiveConnection`；聊天模式接完整 Agent | 设备、AEC、播放 |
+| `data:voice` | 会话装配、AEC/VAD 编排、PCM 播放、设备路由、能力注册表、前台服务、进程级控制器 | 模型选择、Agent 执行、厂商适配器 |
+| `:data:modelaccess` | 厂商模型/语音适配器：实时（`OpenAiRealtimeModel`/`QwenRealtimeModel`）、级联（`CascadedVoiceModel`）、ASR/TTS 协议与探针、`VoiceLiveModelFactory` 装配 | 设备、AEC、播放、会话所有权 |
+| `data:agent`/`voice` | 语音会话运行时：`AdkVoiceAudioBackend`、双工门面（`NativeRealtimeDuplexSession`）、实时工具桥；聊天模式接完整 Agent | 厂商模型适配器（已迁 `:data:modelaccess`） |
 | `feature:chat`/`realtime` | 界面状态映射与用户意图转发 | 会话所有权、生命周期结束 |
 | `:app` | 清单声明、权限、通知权限引导、导航回跳 | — |
 
@@ -67,7 +68,7 @@ VAD 逐 32 ms 帧给语音概率
 
 1. `data:voice` 编译期只依赖 `VoiceAudioBackend` 接口，实现由 `data:agent` 的
    `VoiceAudioModule` 提供（`AdkVoiceAudioBackend`）。所以「`data:voice` 里没有
-   模型推理」不是偶然，是分层强制的。
+   模型推理」不是偶然，是分层强制的。（适配器拆分后，`data:voice` 另有对 `:data:modelaccess` 的编译依赖——厂商端点解析助手。）
 2. `RealtimeVoiceRepository` 本身**不是单例**（每次注入新实例），单例的是
    `RealtimeVoiceCallController`。控制器在应用级 `CoroutineScope` 上持有会话，
    这才是「离开页面不中断」的真正原因。
@@ -158,8 +159,8 @@ Realtime 模型与 Realtime 音色。
 唯一入口。
 
 适配器事实收在 `domain:voice` 的 `RealtimeVoiceSupport` 契约后面（服务标识、上行契约、
-缺省音色、内置音色表、自定义音色策略），由 `data:agent` 的每个原生适配器各自贡献，
-再由 `VoiceCapabilityRegistry` 汇总。因此 `VoiceLiveModelFactory` 是从适配器读上行采样率
+缺省音色、内置音色表、自定义音色策略），由 `:data:modelaccess` 的每个原生适配器各自贡献，
+再由 `VoiceCapabilityRegistry`（`:data:voice`）汇总。因此 `VoiceLiveModelFactory` 是从适配器读上行采样率
 与缺省音色，而不是按 serviceId 分支。
 
 ### 模式切换
@@ -204,7 +205,7 @@ STT/TTS/ASR，级联选择永远不会误拾取）。实时会话仍是常驻全
 `QwenRealtimeModel`（都实现 ADK `Model.connect()`/`LiveConnection`），其余仍返回
 `CascadedVoiceModel`。原生路径的关键事实：
 
-- 厂商适配器在 `:data:agent`，与 `CascadedVoiceModel` 并列；传输内核 `VoiceWsKernel`
+- 厂商适配器在 `:data:modelaccess`，与 `CascadedVoiceModel` 并列；传输内核 `VoiceWsKernel`
   与 `@SpeechWebSocketClient` 限定符已晋升 `:core:network`（跨两模块的两个真实消费方）。
   握手失败的业务分类在构造时注入（domain:voice 的 `voiceHandshakeFailure`）——内核只知道
   HTTP 状态码，不知道领域语义。

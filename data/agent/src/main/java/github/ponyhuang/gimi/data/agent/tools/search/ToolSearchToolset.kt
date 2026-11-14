@@ -18,8 +18,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.security.MessageDigest
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.ToolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.toolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.DEFERRED_CATALOG
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
 
-internal const val TOOL_SEARCH_NAME: String = "tool_search"
 
 /**
  * 单次模型请求可动态暴露的工具声明预算。

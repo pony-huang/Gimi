@@ -16,12 +16,12 @@ fun SettingsRoute(
     appVersionName: String,
     onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
-    onNavigateToSpeechModels: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToRemoteAgents: () -> Unit,
     onNavigateToAppFunctions: () -> Unit,
     onNavigateToSandbox: () -> Unit,
+    onNavigateToMobileUse: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkspace: () -> Unit,
@@ -38,13 +38,13 @@ fun SettingsRoute(
     // 收集器随 ViewModel 保持稳定，但每次导航都使用最新的路由回调。
     val handleEffect by rememberUpdatedState<(SettingsEffect) -> Unit> { effect ->
         when (effect) {
-            SettingsEffect.NavigateToSpeechModels -> onNavigateToSpeechModels()
             SettingsEffect.NavigateToModelService -> onNavigateToModelService()
             SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
             SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
             SettingsEffect.NavigateToRemoteAgents -> onNavigateToRemoteAgents()
             SettingsEffect.NavigateToAppFunctions -> onNavigateToAppFunctions()
             SettingsEffect.NavigateToSandbox -> onNavigateToSandbox()
+            SettingsEffect.NavigateToMobileUse -> onNavigateToMobileUse()
             SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
             SettingsEffect.NavigateToWorkspace -> onNavigateToWorkspace()

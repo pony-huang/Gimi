@@ -82,7 +82,8 @@ import github.ponyhuang.gimi.ui.components.GimiSheetTitleRow
 import github.ponyhuang.gimi.ui.components.LocalGimiSheetController
 import github.ponyhuang.gimi.ui.components.SheetHeight
 import github.ponyhuang.gimi.ui.components.GimiSheetOptionRow
-import github.ponyhuang.gimi.ui.components.GimiSheetSwitchRow
+import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -657,9 +658,9 @@ private fun OfficialToolFunctionRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    GimiSheetSwitchRow(
+    PreferenceSwitchRow(
         leadingIcon = { FunctionIcon(it) },
-        label = officialFunctionLabel(toolId, function.id),
+        title = officialFunctionLabel(toolId, function.id),
         description = officialFunctionDescription(toolId, function.id, function.description),
         checked = enabled,
         enabled = mutationEnabled,
@@ -740,9 +741,9 @@ private fun McpServerRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    GimiSheetSwitchRow(
+    PreferenceSwitchRow(
         icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
-        label = server.name.ifBlank { server.id },
+        title = server.name.ifBlank { server.id },
         description = when (server.transport) {
             McpTransport.STREAMABLE_HTTP ->
                 stringResource(R.string.chat_mcp_transport_streamable_http)

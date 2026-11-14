@@ -7,8 +7,8 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.agent.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton

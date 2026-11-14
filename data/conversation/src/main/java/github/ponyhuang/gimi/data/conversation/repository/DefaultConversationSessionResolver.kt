@@ -6,8 +6,8 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionR
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -114,41 +114,42 @@ class DefaultConversationSessionResolver @Inject constructor(
         )
 
     private fun defaultSelection(): ModelSelection? {
-        val services = modelCatalog.currentServices()
+        val instances = modelCatalog.currentInstances()
         return modelCatalog.currentAssistantSelection()
-            ?.takeIf { services.isUsable(it) }
-            ?: services.asSequence()
-                .filter { it.isEnabled && it.apiKey.isNotBlank() }
-                .flatMap { service ->
-                    service.groups.asSequence().flatMap { group ->
-                        group.models.asSequence()
-                            .filter { ModelCapability.LLM in it.capabilities }
-                            .map { ModelSelection(service.id, group.id, it.id) }
+            ?.takeIf { instances.isUsable(it) }
+            ?: instances.asSequence()
+                .filter { it.isEnabled }
+                .mapNotNull { instance ->
+                    instance.conversationConnection?.let { connection ->
+                        connection.models.firstOrNull { ModelCapability.LLM in it.capabilities }
+                            ?.let { ModelSelection(instance.id, connection.id, it.id) }
                     }
                 }
                 .firstOrNull()
     }
 
-    /** 当前聊天模型与所有已开启工具服务共同可用的官方工具 ID。 */
+    /** 当前聊天模型与所有已开启工具实例共同可用的官方工具 ID。 */
     private fun supportedOfficialToolIds(selection: ModelSelection): Set<String> =
-        modelCatalog.currentServices()
-            .firstOrNull { it.id == selection.serviceId }
-            ?.let { service ->
+        modelCatalog.currentInstances()
+            .firstOrNull { it.id == selection.instanceId }
+            ?.let { instance ->
                 officialTools.availableTools(
-                    activeService = service,
+                    activeInstance = instance,
                     activeModelId = selection.modelId,
                 ).mapTo(linkedSetOf()) { it.toolId }
             }
             .orEmpty()
 
     private fun isUsable(selection: ModelSelection): Boolean =
-        modelCatalog.currentServices().isUsable(selection)
+        modelCatalog.currentInstances().isUsable(selection)
 }
 
-private fun List<LLMModelSetting>.isUsable(selection: ModelSelection): Boolean {
-    val service = firstOrNull { it.id == selection.serviceId } ?: return false
-    if (!service.isEnabled || service.apiKey.isBlank()) return false
-    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
-    val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
+/** 会话可用的选择要求：实例启用、对话凭据可解析、连接与模型存在且可对话。 */
+private fun List<ModelServiceInstance>.isUsable(selection: ModelSelection): Boolean {
+    val instance = firstOrNull { it.id == selection.instanceId } ?: return false
+    if (!instance.isEnabled) return false
+    val connection = instance.connection(selection.connectionId) ?: return false
+    if (instance.effectiveApiKey(connection).isBlank()) return false
+    val model = instance.findModel(selection) ?: return false
     return ModelCapability.LLM in model.capabilities
 }

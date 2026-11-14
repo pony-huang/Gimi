@@ -1,14 +1,14 @@
 <resources>
-    <string name="settings_sandbox_title">Sandbox</string>
-    <string name="settings_sandbox_subtitle">E2B isolated runtime</string>
+    <string name="settings_sandbox_title">Environments</string>
+    <string name="settings_sandbox_subtitle">Local environment and E2B sandbox</string>
     <string name="settings_title">Settings</string>
 
     <string name="settings_group_model">Models</string>
     <string name="settings_memory_title">Memory</string>
     <string name="settings_memory_subtitle">Local and cloud memory</string>
 
-    <string name="settings_model_service_title">LLM models</string>
-    <string name="settings_model_service_subtitle">Providers, keys and models</string>
+    <string name="settings_model_service_title">Model services</string>
+    <string name="settings_model_service_subtitle">Chat and speech services, keys and models</string>
 
     <string name="settings_default_model_title">Default models</string>
     <string name="settings_default_model_subtitle">Default model for each feature</string>
@@ -35,7 +35,7 @@
 
     <string name="about_app_name">Gimi</string>
     <string name="about_project_title">Project page</string>
-    <string name="about_project_subtitle">Enjoying Gimi? Give it a star—your support keeps me creating.</string>
+    <string name="about_project_subtitle">Give Gimi a star</string>
     <string name="about_privacy_title">Privacy policy</string>
     <string name="about_privacy_subtitle">View our privacy policy</string>
     <string name="privacy_policy_title">Privacy Policy</string>
@@ -82,6 +82,8 @@
     <string name="logs_export_success">Logs exported</string>
     <string name="logs_export_failed">Could not export logs. Please retry.</string>
     <string name="settings_group_extensions">Extensions</string>
+    <string name="settings_mobile_use_title">Shizuku</string>
+    <string name="settings_mobile_use_subtitle">Let the Agent use other apps in the background</string>
     <string name="settings_group_files">Files and workspace</string>
     <string name="settings_group_assistant">Assistant preferences</string>
     <string name="settings_group_permissions">System</string>

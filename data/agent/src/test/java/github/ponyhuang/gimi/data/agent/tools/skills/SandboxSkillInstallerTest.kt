@@ -134,5 +134,6 @@ class SandboxSkillInstallerTest {
         }
         override suspend fun discardImport(preparedId: String) { discards++ }
         override suspend fun remove(name: String) = Unit
+        override suspend fun setEnabled(name: String, enabled: Boolean) = Unit
     }
 }

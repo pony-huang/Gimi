@@ -9,7 +9,7 @@
     <!-- ApiBaseUrlSection -->
     <string name="modelsettings_api_url_label">API 地址</string>
     <string name="modelsettings_api_protocol_label">接口标准</string>
-    <string name="modelsettings_api_protocol_standard">OpenAI Chat Completions</string>
+    <string name="modelsettings_api_protocol_standard">Completions</string>
     <string name="modelsettings_api_protocol_anthropic">Anthropic API</string>
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
@@ -30,7 +30,6 @@
     <!-- LLMModelServiceDetailScreen / Route -->
     <string name="modelsettings_section_connection">连接配置</string>
     <string name="modelsettings_section_official_tools">官方工具</string>
-    <string name="modelsettings_official_tools_enabled">在聊天中显示厂商工具</string>
     <string name="modelsettings_official_tools_enabled_summary">开启后，可在聊天的工具面板中选择 %1$s 支持的工具；不会自动调用。</string>
     <string name="modelsettings_official_tools_deepseek_summary">开启后，可使用网页搜索查找实时信息，或通过网页抓取读取指定页面正文，也可供其他模型调用。</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
@@ -81,7 +80,7 @@
     <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
-    <string name="modelsettings_list_title">LLM 模型</string>
+    <string name="modelsettings_list_title">模型服务</string>
     <string name="modelsettings_defaults_screen_title">默认模型</string>
     <string name="modelsettings_detail_title">服务详情</string>
 
@@ -96,18 +95,17 @@
     <string name="modelsettings_add_service">添加服务</string>
     <string name="modelsettings_provider_added">已添加 · 点击编辑</string>
     <string name="modelsettings_service_paused_count">已暂停 · %1$d 个模型</string>
-    <string name="modelsettings_empty_title">接入你的第一个服务</string>
-    <string name="modelsettings_empty_summary">点击右上角 + 添加服务</string>
     <string name="modelsettings_search_provider">搜索服务商</string>
     <string name="modelsettings_choose_provider">选择服务商</string>
+    <string name="modelsettings_empty_title">添加第一个模型服务</string>
+    <string name="modelsettings_empty_summary">接入对话与语音模型，或配置自定义 LLM。</string>
     <string name="modelsettings_no_matches">暂无匹配项</string>
     <string name="modelsettings_list_hint">点击服务编辑连接、模型和扩展能力。</string>
     <string name="modelsettings_select_models">选择模型</string>
     <string name="modelsettings_extensions">扩展能力</string>
     <string name="modelsettings_extensions_summary">配置厂商工具在聊天中的使用入口</string>
-    <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
+    <string name="modelsettings_api_protocol_anthropic_label">Messages</string>
     <string name="modelsettings_saving">正在保存…</string>
-    <string name="modelsettings_confirm_models">应用选择（%1$d）</string>
     <string name="modelsettings_save_changes">保存修改</string>
     <string name="modelsettings_new_service_hint">配置将在添加服务后生效</string>
     <string name="modelsettings_paused_hint">已暂停 · 连接、模型和工具偏好已保留</string>
@@ -183,4 +181,134 @@
 
     <!-- 音色选择器文案已迁至 :core:designsystem（voice_picker_* / voice_gender_* / voice_group_*），供语音页与设置页共用。 -->
 
+    <!-- 统一模型服务：列表、添加目录与默认模型入口 -->
+    <string name="modelsettings_search_service">搜索服务名称或厂商</string>
+    <string name="modelsettings_list_section_preferences">使用偏好</string>
+    <string name="modelsettings_defaults_entry_title">默认模型</string>
+    <string name="modelsettings_defaults_entry_subtitle">选择对话、语音输入与朗读使用的模型</string>
+    <string name="modelsettings_capability_count_chat">对话 %1$d</string>
+    <string name="modelsettings_capability_count_recognition">识别 %1$d</string>
+    <string name="modelsettings_capability_count_synthesis">合成 %1$d</string>
+    <string name="modelsettings_capability_count_realtime">实时语音 %1$d</string>
+    <string name="modelsettings_summary_unconfigured">未选择模型</string>
+    <string name="modelsettings_summary_paused_prefix">已停用 · %1$s</string>
+    <string name="modelsettings_source_custom_openai">自定义 · Completions</string>
+    <string name="modelsettings_source_custom_anthropic">自定义 · Messages</string>
+    <!-- 添加服务目录 -->
+    <string name="modelsettings_section_compatible">兼容接口</string>
+    <string name="modelsettings_section_built_in">内置服务商</string>
+    <string name="modelsettings_custom_llm_title">自定义 LLM 服务</string>
+    <string name="modelsettings_custom_llm_subtitle">Completions / Messages</string>
+    <string name="modelsettings_add_service_note">同一服务商可以添加多套独立配置。</string>
+    <!-- 服务详情 -->
+    <string name="modelsettings_section_service_setup">服务配置</string>
+    <string name="modelsettings_field_service_name">服务名称</string>
+    <string name="modelsettings_field_shared_api_key">共享 API 密钥</string>
+    <string name="modelsettings_shared_credential_hint">对话与语音使用此密钥</string>
+    <string name="modelsettings_toggle_key_visibility">显示或隐藏密钥</string>
+    <string name="modelsettings_get_api_key">获取密钥</string>
+    <string name="modelsettings_section_available_models">可用模型</string>
+    <string name="modelsettings_no_capabilities">尚未选择模型</string>
+    <string name="modelsettings_selected_count">已选 %1$d 个</string>
+    <string name="modelsettings_section_access">接入设置</string>
+    <string name="modelsettings_connection_settings">接口设置</string>
+    <string name="modelsettings_connection_settings_subtitle">连接地址、密钥来源与连接测试</string>
+    <string name="modelsettings_official_tools">厂商工具</string>
+    <string name="modelsettings_official_tools_subtitle">联网搜索、图像生成等厂商能力</string>
+    <string name="modelsettings_enable_service">启用服务</string>
+    <string name="modelsettings_enabled_label">已启用</string>
+    <string name="modelsettings_disabled_label">已停用 · 默认选择已保留</string>
+    <string name="modelsettings_save_notice_paused">保存后保持停用状态</string>
+    <string name="modelsettings_save_new_service">保存服务</string>
+    <string name="modelsettings_save_with_defaults">保存服务与默认选择</string>
+    <string name="modelsettings_confirm_models">确认选择（%1$d）</string>
+    <string name="modelsettings_models_confirm_hint">确认后返回服务详情，保存服务后生效。</string>
+    <string name="modelsettings_delete_service">删除服务</string>
+    <string name="modelsettings_delete_dialog_title">删除“%1$s”？</string>
+    <string name="modelsettings_delete_dialog_body">将删除这套服务的连接配置、密钥和模型选择。</string>
+    <string name="modelsettings_delete_dialog_roles">以下默认用途需要重新选择模型</string>
+    <string name="modelsettings_delete_voice_binding">朗读音色将回到应用默认值</string>
+    <string name="modelsettings_delete_realtime_voice_binding">通话音色将回到所选模型的缺省音色</string>
+    <string name="modelsettings_delete_confirm">删除服务</string>
+    <string name="modelsettings_cancel">取消</string>
+    <string name="modelsettings_discard_title">放弃未保存的修改？</string>
+    <string name="modelsettings_discard_body">关闭前可以保存修改，或放弃本次编辑。</string>
+    <string name="modelsettings_discard_confirm">放弃修改</string>
+    <string name="modelsettings_discard_continue">继续编辑</string>
+    <string name="modelsettings_add_model_title">手动添加模型</string>
+    <string name="modelsettings_add_model_manually">手动添加模型</string>
+    <string name="modelsettings_add_model_id_label">模型 ID</string>
+    <string name="modelsettings_add_model_kind_label">模型类别</string>
+    <string name="modelsettings_add_model_kind_hint">类别决定该模型承担的用途（对话、识别、合成或实时语音）。</string>
+    <string name="modelsettings_add">添加</string>
+    <string name="modelsettings_models_empty_hint">没有可选择的模型；可以从对话连接获取候选或手动添加。</string>
+    <string name="modelsettings_search_models">搜索模型名称或 ID</string>
+    <string name="modelsettings_category_all">全部</string>
+    <!-- 接口设置 -->
+    <string name="modelsettings_field_protocol">接口协议</string>
+    <string name="modelsettings_field_endpoint">接口地址</string>
+    <string name="modelsettings_field_credential_source">密钥来源</string>
+    <string name="modelsettings_credential_shared">使用共享密钥</string>
+    <string name="modelsettings_credential_independent">使用独立密钥</string>
+    <string name="modelsettings_field_independent_key">独立 API 密钥</string>
+    <string name="modelsettings_field_workspace">业务空间 ID（可选）</string>
+    <string name="modelsettings_vendor_managed_endpoint">官方端点由服务提供，无需填写地址。</string>
+    <string name="modelsettings_connections_save_hint">返回服务详情后，保存修改使配置生效。</string>
+    <string name="modelsettings_test_run">测试连接</string>
+    <string name="modelsettings_test_retry">重新测试</string>
+    <string name="modelsettings_testing">测试中</string>
+    <string name="modelsettings_test_untested">未测试</string>
+    <string name="modelsettings_test_succeeded">连接测试成功</string>
+    <string name="modelsettings_test_auth_failed">密钥无效或无权限</string>
+    <string name="modelsettings_test_network_failed">连接失败，请检查地址或网络</string>
+    <string name="modelsettings_test_unsupported">该连接不支持连接测试</string>
+    <string name="modelsettings_show">显示</string>
+    <string name="modelsettings_hide">隐藏</string>
+    <!-- 厂商工具 -->
+    <string name="modelsettings_provide_official_tools">提供厂商工具</string>
+    <string name="modelsettings_official_tools_disabled">已关闭 · 工具偏好将在保存后生效</string>
+    <!-- 厂商工具文案：无厂商前缀的短名称与具体作用 -->
+    <string name="modelsettings_tool_name_web_search">联网搜索</string>
+    <string name="modelsettings_tool_name_web_fetch">网页读取</string>
+    <string name="modelsettings_tool_name_image_generation">图像生成</string>
+    <string name="modelsettings_tool_name_google_search">Google 搜索</string>
+    <string name="modelsettings_tool_name_url_context">网址上下文</string>
+    <string name="modelsettings_tool_name_google_maps">Google 地图</string>
+    <string name="modelsettings_tool_name_glm_web">联网搜索与网页读取</string>
+    <string name="modelsettings_tool_name_kimi_web">联网搜索与网页读取</string>
+    <string name="modelsettings_tool_desc_independent_cross_model">独立调用，全模型可用</string>
+    <string name="modelsettings_tool_desc_deepseek_fetch">抓取网页内容供对话引用</string>
+    <string name="modelsettings_tool_desc_native_web_search">当前协议内原生执行</string>
+    <string name="modelsettings_tool_desc_image_generation">文生图与图生图</string>
+    <string name="modelsettings_tool_desc_gemini_native">由 Gemini 原生执行</string>
+    <string name="modelsettings_tool_desc_glm_web">网页搜索与读取，仅限 GLM 模型</string>
+    <string name="modelsettings_tool_capabilities">工具能力</string>
+    <string name="modelsettings_tool_protocol_limited">当前协议不可用</string>
+    <string name="modelsettings_tool_local_functions">独立调用，全模型可用</string>
+    <string name="modelsettings_tool_vendor_side">当前协议内原生执行</string>
+    <string name="modelsettings_official_tools_enabled">在聊天工具面板中选择使用</string>
+    <string name="modelsettings_official_tools_cost_note">独立调用可能产生厂商费用。</string>
+    <!-- 默认建议与角色 -->
+    <string name="modelsettings_suggestions_title">默认模型建议</string>
+    <string name="modelsettings_suggestions_note">以下用途尚未设置默认模型，可确认建议或继续保持未设置。</string>
+    <string name="modelsettings_suggestions_existing_title">已有默认选择</string>
+    <string name="modelsettings_suggestions_existing_note">保存本次服务配置后，已有默认选择继续保留。</string>
+    <string name="modelsettings_role_assistant">默认对话模型</string>
+    <string name="modelsettings_role_fast">快速模型</string>
+    <string name="modelsettings_role_recognition">语音识别</string>
+    <string name="modelsettings_role_synthesis">语音合成</string>
+    <string name="modelsettings_role_realtime">实时语音模型</string>
+    <string name="modelsettings_dialog_add_service">添加服务…</string>
+    <!-- 反馈文案 -->
+    <string name="modelsettings_notice_models_synced">已获取 %1$d 个模型</string>
+    <string name="modelsettings_notice_instance_missing">未找到该模型服务</string>
+    <string name="modelsettings_notice_saved">服务已保存</string>
+    <string name="modelsettings_notice_deleted">服务已删除</string>
+    <string name="modelsettings_capability_chat">对话</string>
+    <string name="modelsettings_capability_recognition">语音识别</string>
+    <string name="modelsettings_capability_synthesis">语音合成</string>
+    <string name="modelsettings_capability_realtime">实时语音</string>
+    <string name="modelsettings_protocol_openai">Completions</string>
+    <string name="modelsettings_protocol_anthropic">Messages</string>
+    <string name="modelsettings_protocol_gemini">Gemini</string>
 </resources>

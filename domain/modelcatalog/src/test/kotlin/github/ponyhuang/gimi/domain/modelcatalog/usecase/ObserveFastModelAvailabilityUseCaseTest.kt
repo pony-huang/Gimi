@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.domain.modelcatalog.usecase
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
@@ -84,6 +84,6 @@ class ObserveFastModelAvailabilityUseCaseTest {
         override fun resolveChatModel(selection: ModelSelection?): ResolvedAgentModel? =
             resolver(selection)
 
-        override fun currentServices(): List<LLMModelSetting> = emptyList()
+        override fun currentInstances(): List<ModelServiceInstance> = emptyList()
     }
 }

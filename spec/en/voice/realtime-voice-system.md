@@ -67,8 +67,9 @@ capture/AEC/playback shell but bypasses the cascade pipeline entirely — see
 |---|---|---|
 | `domain:voice` | Session contract, state snapshot, failure taxonomy, capability-resolution interfaces, session-based synthesis interface | Any Android / ADK / Compose type |
 | `core:audio` | Recording, Silero VAD, software AEC (speexdsp JNI), playback reference buffer, audio format contract | Business semantics |
-| `data:voice` | Session assembly, AEC/VAD orchestration, PCM playback, device routing, per-vendor protocols, foreground service, process-level controller | Model selection, agent execution |
-| `data:agent`/`voice` | Assembling ASR + text model + TTS into the official ADK `Model`/`LiveConnection`; wiring Chat mode to the full agent | Devices, AEC, playback |
+| `data:voice` | Session assembly, AEC/VAD orchestration, PCM playback, device routing, capability registry, foreground service, process-level controller | Model selection, agent execution, vendor adapters |
+| `:data:modelaccess` | Vendor model/speech adapters: realtime (`OpenAiRealtimeModel`/`QwenRealtimeModel`), cascade (`CascadedVoiceModel`), ASR/TTS protocols + probes, `VoiceLiveModelFactory` assembly | Devices, AEC, playback, session ownership |
+| `data:agent`/`voice` | Voice session runtime: `AdkVoiceAudioBackend`, duplex session facade (`NativeRealtimeDuplexSession`), realtime tool bridge; wiring Chat mode to the full agent | Vendor model adapters (moved to `:data:modelaccess`) |
 | `feature:chat`/`realtime` | UI state mapping and forwarding user intent | Session ownership, lifecycle teardown |
 | `:app` | Manifest declarations, permissions, notification-permission guidance, navigation return | — |
 
@@ -87,7 +88,7 @@ Two wiring details are worth knowing:
 1. At compile time `data:voice` depends only on the `VoiceAudioBackend`
    interface; the implementation is supplied by `VoiceAudioModule` in
    `data:agent` (`AdkVoiceAudioBackend`). So "no model inference inside
-   `data:voice`" is not an accident — it is enforced by the layering.
+   `data:voice`" is not an accident — it is enforced by the layering. (Since the adapter extraction, `data:voice` additionally depends on `:data:modelaccess` for the vendor-owned endpoint helper.)
 2. `RealtimeVoiceRepository` is **not** a singleton (each injection yields a new
    instance). The singleton is `RealtimeVoiceCallController`, which holds the
    session on an application-level `CoroutineScope`. That, not the page, is why
@@ -197,7 +198,7 @@ The call-side mode menu shows the configured Realtime model name but offers
 
 Adapter facts live behind `domain:voice`'s `RealtimeVoiceSupport` contract
 (service id, uplink contract, default voice, built-in voices, custom-voice
-policy), contributed by each native adapter in `data:agent` and aggregated by
+policy), contributed by each native adapter in `:data:modelaccess` and aggregated by
 `VoiceCapabilityRegistry`. `VoiceLiveModelFactory` therefore reads the uplink
 sampling rate and the default voice from the adapter instead of branching on
 the service id.
@@ -254,7 +255,7 @@ speech services route `openai-speech` → `OpenAiRealtimeModel`, `qwen-audio` �
 `QwenRealtimeModel` (both ADK `Model`s implementing `connect()`/`LiveConnection`),
 and `CascadedVoiceModel` otherwise. Key facts about the native path:
 
-- The vendor adapter lives in `:data:agent` next to `CascadedVoiceModel`; the
+- The vendor adapters live in `:data:modelaccess` next to `CascadedVoiceModel`; the
   transport kernel `VoiceWsKernel` and the `@SpeechWebSocketClient` qualifier
   were promoted to `:core:network` (two real consumers across two modules). The
   handshake-failure classification is injected at construction

@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.feature.modelsettings.defaults
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +13,8 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -23,12 +27,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.voice.model.TtsVoiceCatalog
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.components.SearchablePickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.components.VoicePickerDialog
@@ -47,6 +48,8 @@ fun DefaultModelSettingsScreen(
     modifier: Modifier = Modifier,
     /** 打开外部链接；音色选择器用它跳转官方音色列表。 */
     onOpenUrl: (String) -> Unit = {},
+    /** 从选择器空态进入添加服务；保存后宿主回到本页并再次打开该用途选择器。 */
+    onAddService: (DefaultModelDialog) -> Unit = {},
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
@@ -179,6 +182,7 @@ fun DefaultModelSettingsScreen(
             title = stringResource(R.string.modelsettings_dialog_pick_assistant),
             target = DefaultModelDialog.Assistant,
             onAction = onAction,
+            onAddService = onAddService,
         )
 
         DefaultModelDialog.Fast -> ModelChoiceDialog(
@@ -187,6 +191,7 @@ fun DefaultModelSettingsScreen(
             title = stringResource(R.string.modelsettings_dialog_pick_quick),
             target = DefaultModelDialog.Fast,
             onAction = onAction,
+            onAddService = onAddService,
         )
 
         DefaultModelDialog.Speech -> ModelChoiceDialog(
@@ -195,6 +200,7 @@ fun DefaultModelSettingsScreen(
             title = stringResource(R.string.modelsettings_dialog_pick_stt),
             target = DefaultModelDialog.Speech,
             onAction = onAction,
+            onAddService = onAddService,
         )
 
         DefaultModelDialog.Tts -> ModelChoiceDialog(
@@ -203,6 +209,7 @@ fun DefaultModelSettingsScreen(
             title = stringResource(R.string.modelsettings_dialog_pick_tts),
             target = DefaultModelDialog.Tts,
             onAction = onAction,
+            onAddService = onAddService,
         )
 
         DefaultModelDialog.TtsVoice -> {
@@ -217,16 +224,8 @@ fun DefaultModelSettingsScreen(
                 onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it)) },
                 onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
                 // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
-                namingTemplate = if (state.ttsVoiceCustomInputAllowed) {
-                    TtsVoiceCatalog.QWEN_BASE_VOICE_TEMPLATE
-                } else {
-                    null
-                },
-                docsUrl = if (state.ttsVoiceCustomInputAllowed) {
-                    TtsVoiceCatalog.QWEN_VOICE_LIST_URL
-                } else {
-                    null
-                },
+                namingTemplate = state.ttsVoiceIdTemplate,
+                docsUrl = state.ttsVoiceDocsUrl,
                 onOpenUrl = onOpenUrl,
             )
         }
@@ -235,6 +234,7 @@ fun DefaultModelSettingsScreen(
             rows = state.realtimeModels,
             currentSelection = state.realtimeSelection,
             onAction = onAction,
+            onAddService = onAddService,
         )
 
         DefaultModelDialog.RealtimeVoice -> VoicePickerDialog(
@@ -272,6 +272,7 @@ private fun RealtimeModelChoiceDialog(
     rows: List<SelectableModelRow>,
     currentSelection: ModelSelection?,
     onAction: (DefaultModelSettingsAction) -> Unit,
+    onAddService: (DefaultModelDialog) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val disabledTitle = stringResource(R.string.modelsettings_defaults_realtime_model_none)
@@ -285,7 +286,7 @@ private fun RealtimeModelChoiceDialog(
         searchText = { option ->
             when (option) {
                 is RealtimeModelOption.Model ->
-                    "${option.row.model.name} ${option.row.model.id} ${option.row.service.name}"
+                    "${option.row.model.name} ${option.row.model.id} ${option.row.instance.name}"
                 RealtimeModelOption.Disabled -> "$disabledTitle realtime"
             }
         },
@@ -299,7 +300,7 @@ private fun RealtimeModelChoiceDialog(
         },
         key = {
             when (it) {
-                is RealtimeModelOption.Model -> "model/${it.row.service.id}/${it.row.group.id}/${it.row.model.id}"
+                is RealtimeModelOption.Model -> "model/${it.row.instance.id}/${it.row.connection.id}/${it.row.model.id}"
                 RealtimeModelOption.Disabled -> "disabled"
             }
         },
@@ -312,7 +313,7 @@ private fun RealtimeModelChoiceDialog(
         },
         optionSubtitle = { option ->
             when (option) {
-                is RealtimeModelOption.Model -> "${option.row.service.name} · ${option.row.group.name}"
+                is RealtimeModelOption.Model -> option.row.instance.name
                 RealtimeModelOption.Disabled -> ""
             }
         },
@@ -324,6 +325,9 @@ private fun RealtimeModelChoiceDialog(
             }
         },
         onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
+        emptyContent = {
+            EmptyCatalogWithAddService { onAddService(DefaultModelDialog.RealtimeModel) }
+        },
     )
 }
 
@@ -341,7 +345,7 @@ private fun DefaultModelOption(
     PreferenceListItem(
         icon = icon,
         title = title,
-        subtitle = selected?.let { "${it.model.name} · ${it.service.name}" } ?: subtitle,
+        subtitle = selected?.let { "${it.model.name} · ${it.instance.name}" } ?: subtitle,
         onClick = onClick,
         showDivider = showDivider,
     )
@@ -354,6 +358,7 @@ private fun ModelChoiceDialog(
     title: String,
     target: DefaultModelDialog,
     onAction: (DefaultModelSettingsAction) -> Unit,
+    onAddService: (DefaultModelDialog) -> Unit,
 ) {
     var query by rememberSaveable(target) { mutableStateOf("") }
     // 能力名与"未接入"说明在组合函数里取好：optionSubtitle 不是 @Composable lambda，
@@ -377,28 +382,18 @@ private fun ModelChoiceDialog(
     SearchablePickerSingleChoiceDialog(
         query = query,
         onQueryChange = { query = it },
-        searchText = { "${it.model.name} ${it.model.id} ${it.service.name} ${it.group.name}" },
+        searchText = { "${it.model.name} ${it.model.id} ${it.instance.name}" },
         searchPlaceholder = stringResource(R.string.modelsettings_search_model_or_service),
         options = groupedRows,
         selected = { it.selection() == currentSelection },
-        key = { "${it.service.id}/${it.group.id}/${it.model.id}" },
+        key = { "${it.instance.id}/${it.connection.id}/${it.model.id}" },
         title = title,
         optionTitle = { it.model.name },
         // 与聊天页模型弹窗同一规则：服务内只有一个候选组时，组名对每行都相同，只显示服务名。
         optionSubtitle = { row ->
-            val groupCount = groupedRows.asSequence()
-                .filter { it.service.id == row.service.id }
-                .map { it.group.id }
-                .distinct()
-                .count()
-            val servicePart = if (groupCount > 1) {
-                "${row.service.name} · ${row.group.name}"
-            } else {
-                row.service.name
-            }
             buildList {
                 row.capability?.let { capabilityLabels[it] }?.let { label -> add(label) }
-                add(servicePart)
+                add(row.instance.name)
                 // 未接入的能力仍然显示，但禁用并说明原因，避免用户误以为配置失败。
                 if (!row.isSupported) {
                     row.capability?.let { unsupportedMessages[it] }?.let { note -> add(note) }
@@ -412,57 +407,79 @@ private fun ModelChoiceDialog(
             onAction(DefaultModelSettingsAction.SelectModel(target, it.selection()))
         },
         onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
+        // 目录为空时提供补配服务的行动出口；保存后回到本页再次确认一次用途。
+        emptyContent = {
+            EmptyCatalogWithAddService { onAddService(target) }
+        },
     )
 }
 
+@Composable
+private fun EmptyCatalogWithAddService(onAddService: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.modelsettings_dialog_no_models), style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onAddService) {
+            Text(stringResource(R.string.modelsettings_dialog_add_service))
+        }
+    }
+}
+
 private fun defaultModelSettingsPreviewState(isMutationBlocked: Boolean): DefaultModelSettingsUiState {
-    val service = LLMModelSetting(
-        id = "openai",
-        name = "OpenAI",
-        isEnabled = true,
-        apiKey = "sk-test",
-        apiBaseUrl = "https://api.openai.com/v1",
-        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "https://api.anthropic.com",
-        groups = listOf(
-            ModelGroup(
-                id = "gpt",
-                name = "GPT",
-                models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
-            ),
-        ),
-    )
-    val row = SelectableModelRow(
-        service = service,
-        group = service.groups.first(),
-        model = service.groups.first().models.first(),
-    )
-    val realtimeService = LLMModelSetting(
-        id = "qwen-audio",
-        name = "Qwen",
-        isEnabled = true,
-        apiKey = "sk-test",
-        apiBaseUrl = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
-        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "qwen-audio-realtime",
-                name = "实时语音对话",
-                models = listOf(
-                    Model(
-                        id = "qwen-audio-3.1-realtime-plus",
-                        name = "qwen-audio-3.1-realtime-plus",
-                        capabilities = setOf(ModelCapability.Realtime),
-                    ),
+    fun previewInstance(
+        id: String,
+        name: String,
+        templateId: String,
+        capability: github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability,
+        vararg modelIds: String,
+    ): github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance {
+        val models = modelIds.map { modelId ->
+            Model(
+                id = modelId,
+                name = modelId,
+                capabilities = when (capability) {
+                    github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability.Realtime ->
+                        setOf(ModelCapability.Realtime)
+                    else -> setOf(ModelCapability.LLM)
+                },
+            )
+        }
+        return github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance(
+            id = id,
+            name = name,
+            templateId = templateId,
+            isEnabled = true,
+            isOfficialToolsEnabled = true,
+            sharedApiKey = "sk-test",
+            connections = listOf(
+                github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection(
+                    id = "$id-connection",
+                    capability = capability,
+                    protocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
+                    endpoint = "https://api.openai.com/v1",
+                    models = models,
                 ),
             ),
-        ),
+        )
+    }
+    val instance = previewInstance(
+        "instance-openai", "OpenAI", "openai",
+        github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability.Conversation,
+        "gpt-4o",
+    )
+    val row = SelectableModelRow(
+        instance = instance,
+        connection = instance.connections.first(),
+        model = instance.connections.first().models.first(),
+    )
+    val realtimeInstance = previewInstance(
+        "instance-qwen", "Qwen", "qwen",
+        github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability.Realtime,
+        "qwen-audio-3.1-realtime-plus",
     )
     val realtimeRow = SelectableModelRow(
-        service = realtimeService,
-        group = realtimeService.groups.first(),
-        model = realtimeService.groups.first().models.first(),
+        instance = realtimeInstance,
+        connection = realtimeInstance.connections.first(),
+        model = realtimeInstance.connections.first().models.first(),
         capability = ModelCapability.Realtime,
     )
     return DefaultModelSettingsUiState(

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
@@ -115,7 +116,7 @@ private val DrawerGearButtonSize = 48.dp
  * 历史对话抽屉 —— 预测性返回进度抽屉（[PredictiveBackDrawer]）的内容编排。
  *
  * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片。
- * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 语音通话 / 个性化）→ 最近会话 + 管理（多选期间换成
+ * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 语音通话 / 个性化 / 运行环境）→ 最近会话 + 管理（多选期间换成
  * 取消 / 已选数 / 全选 / 删除）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
  * 夜间模式等外观配置已移至设置的"个性化"分组，抽屉不再直接切换。
  *
@@ -134,6 +135,7 @@ private val DrawerGearButtonSize = 48.dp
  * @param onNewConversationClick 点击"新对话"入口时回调（实现方负责新建会话并关闭抽屉）
  * @param onVoiceCallClick     点击"语音通话"入口时回调（实现方负责打开语音页并关闭抽屉）
  * @param onPersonalizeClick   点击"个性化"入口时回调（实现方负责跳转设置并关闭抽屉）
+ * @param onRuntimeEnvironmentClick 点击"运行环境"入口时回调（实现方负责跳转运行环境页并关闭抽屉）
  * @param onSettingsClick      点击右下角齿轮时回调（实现方负责关闭抽屉并跳转）
  * @param showUpdateBadge      是否在齿轮上点亮更新提醒点
  * @param onOpenChange         抽屉目标开关状态变化上报（手势提交、遮罩点击、拖拽收尾）
@@ -154,6 +156,7 @@ fun ChatDrawer(
     onNewConversationClick: () -> Unit = {},
     onVoiceCallClick: () -> Unit = {},
     onPersonalizeClick: () -> Unit = {},
+    onRuntimeEnvironmentClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     showUpdateBadge: Boolean = false,
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
@@ -194,6 +197,7 @@ fun ChatDrawer(
                         onNewConversationClick = onNewConversationClick,
                         onVoiceCallClick = onVoiceCallClick,
                         onPersonalizeClick = onPersonalizeClick,
+                        onRuntimeEnvironmentClick = onRuntimeEnvironmentClick,
                         onSettingsClick = onSettingsClick,
                         showUpdateBadge = showUpdateBadge,
                         listState = historyListState,
@@ -227,6 +231,7 @@ private fun HistoryDrawerContent(
     onNewConversationClick: () -> Unit,
     onVoiceCallClick: () -> Unit,
     onPersonalizeClick: () -> Unit,
+    onRuntimeEnvironmentClick: () -> Unit,
     onSettingsClick: () -> Unit,
     showUpdateBadge: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
@@ -298,8 +303,16 @@ private fun HistoryDrawerContent(
                     icon = Icons.Default.Palette,
                     label = stringResource(R.string.chat_drawer_personalize),
                     isFirst = false,
-                    isLast = true,
+                    isLast = false,
                     onClick = onPersonalizeClick,
+                )
+                // 运行环境入口：图标与设置一级页"运行环境"行一致，便于跨页面识别同一目的地。
+                DrawerFunctionEntry(
+                    icon = Icons.Default.Code,
+                    label = stringResource(R.string.chat_drawer_runtime),
+                    isFirst = false,
+                    isLast = true,
+                    onClick = onRuntimeEnvironmentClick,
                 )
                 Spacer(Modifier.height(12.dp))
             }
@@ -918,6 +931,7 @@ private fun RecentContentPreview(
                     onNewConversationClick = {},
                     onVoiceCallClick = {},
                     onPersonalizeClick = {},
+                    onRuntimeEnvironmentClick = {},
                     onSettingsClick = {},
                     showUpdateBadge = true,
                 )

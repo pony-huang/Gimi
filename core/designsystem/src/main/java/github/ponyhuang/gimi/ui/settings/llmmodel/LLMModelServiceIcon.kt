@@ -69,20 +69,20 @@ fun LLMModelServiceIcon(
 }
 
 /**
- * serviceId → 图标资源映射；core 模块不能反向依赖 data 模块，故以字面量维护。
- * 新增语音/模型服务时，须同步此处与 `data/modelcatalog` 的 SpeechModelProvider 目录，
+ * 服务模板标识 → 图标资源映射；core 模块不能反向依赖 data 模块，故以字面量维护。
+ * 新增厂商模板时，须同步此处与 `data/modelcatalog` 的 ModelServiceTemplates 清单，
  * 否则将静默回退到 SmartToy 占位图标。
  */
 private fun modelServiceIconFor(serviceId: String): Int? = when (serviceId) {
     "deepseek" -> R.drawable.ic_model_provider_deepseek
-    "minimax", "minimax-speech" -> R.drawable.ic_model_provider_minimax
-    "mimo", "mimo-speech" -> R.drawable.ic_model_provider_xiaomimimo
-    "openai", "openai-speech" -> R.drawable.ic_model_provider_openai
+    "minimax" -> R.drawable.ic_model_provider_minimax
+    "mimo" -> R.drawable.ic_model_provider_xiaomimimo
+    "openai" -> R.drawable.ic_model_provider_openai
     "anthropic" -> R.drawable.ic_model_provider_anthropic
     "gemini" -> R.drawable.ic_model_provider_gemini
     "kimi" -> R.drawable.ic_model_provider_kimi
     "glm" -> R.drawable.ic_model_provider_chatglm
-    "qwen-audio" -> R.drawable.ic_model_provider_qwen
+    "qwen" -> R.drawable.ic_model_provider_qwen
     else -> null
 }
 
@@ -107,6 +107,6 @@ private fun LLMModelServiceIconFallbackPreview() {
 @Composable
 private fun LLMModelServiceIconQwenPreview() {
     GimiTheme {
-        LLMModelServiceIcon(serviceId = "qwen-audio", modifier = Modifier.size(48.dp))
+        LLMModelServiceIcon(serviceId = "qwen", modifier = Modifier.size(48.dp))
     }
 }

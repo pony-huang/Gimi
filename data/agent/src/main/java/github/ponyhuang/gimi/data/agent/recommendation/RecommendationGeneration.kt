@@ -11,12 +11,12 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
 import com.google.adk.kt.types.ToolConfig
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
-import github.ponyhuang.gimi.data.agent.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
 import github.ponyhuang.gimi.data.agent.recommendation.AgentRecommendationGenerator.Companion.READ_ONLY_STATUS_TOOLS
-import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput

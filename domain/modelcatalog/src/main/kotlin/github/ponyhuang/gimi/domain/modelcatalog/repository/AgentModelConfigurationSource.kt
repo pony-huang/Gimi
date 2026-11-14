@@ -1,6 +1,6 @@
 package github.ponyhuang.gimi.domain.modelcatalog.repository
 
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +17,8 @@ interface AgentModelConfigurationSource {
     /** 默认助手模型，缺失/失效时回退到第一个可用模型。 */
     fun defaultSelection(): ModelSelection?
 
-    /** 解析普通聊天模型；服务被禁用/key 为空/模型不存在时返回 null。 */
+    /** 解析普通聊天模型；服务被禁用/凭据为空/模型不存在时返回 null。 */
     fun resolveChatModel(selection: ModelSelection?): ResolvedAgentModel?
 
-    fun currentServices(): List<LLMModelSetting>
+    fun currentInstances(): List<ModelServiceInstance>
 }

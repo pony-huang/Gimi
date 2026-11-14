@@ -10,8 +10,11 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.serialization.adkJson
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.ToolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.toolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.DEFERRED_CATALOG
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
 
-internal const val INLINE_DEFINITIONS = "gimi.inline_tool_definitions"
 internal fun inlinePendingKey(agentName: String): String = "gimi.inline_tools.pending:$agentName"
 
 /** 工具结果提交后再记录 system 事件；待提交快照随结果落库，取消后仍可恢复。 */

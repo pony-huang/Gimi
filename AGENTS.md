@@ -16,7 +16,7 @@
 
 ### Capabilities
 
-Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `voice`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, and `appearance`. Provider/runtime-only data capabilities also include `agent`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant`, `plugin`, `recommendation`, `memory`, and `workspace`.
+Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `voice`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, `appearance`, and `environment`. Provider/runtime-only data capabilities also include `agent` and `modelaccess` (vendor access layer: adapters grouped by `<vendor>/<capability>` — anthropic/qwen/openai/minimax/mimo, an `openaicompatible` protocol family serving deepseek/kimi/glm/openai, and cross-vendor `shared` (vendor voice catalogs behind `VoiceCatalogResolver`);and cross-vendor `shared`; composition inside it must go through `:domain:voice` interfaces, never sibling implementation classes). Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant`, `plugin`, `recommendation`, `memory`, `workspace`, and `environment`. The top-level `:environment-runtime` application module builds the companion runtime APK (independent UID); it is packaged into the main app's assets, never depended on by other modules.
 
 ### Ownership and placement
 
@@ -228,6 +228,7 @@ Load specs on demand:
 
 | Document (English) | Read before… |
 |---|---|
+| [Model services](spec/en/modelcatalog/model-services.md) | discussing model configuration terminology, changing model service configuration, adding a vendor template/provider tool/speech adapter, or touching the instance storage format |
 | [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) | changing UI or motion, deciding whether a design draft is required, or preparing design approval and image delivery |
 | [Gimi brand styling](spec/en/ui/brand-styling.md) | designing UI or creating Gimi-branded visual artifacts; choosing colors, typography, shapes, or brand assets |
 | [Predictive back support](spec/en/ui/predictive-back.md) | changing back navigation, system animations, drawer/bottom-sheet back handling, or verifying predictive back on a device |

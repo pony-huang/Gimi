@@ -11,10 +11,11 @@ import org.junit.Test
 class SkillToolContributionTest {
     @Test
     fun exposesSkillDiscoveryAndReadingWithoutEnvironmentToolsInBothAccessModes() = runTest {
-        val contribution = SkillToolContribution(mockk<SkillSource>())
+        val contribution = SkillToolContribution(mockk<SkillSource>(), github.ponyhuang.gimi.data.agent.tools.skills.InstallSkillTool(mockk()))
         val expected = setOf("list_skills", "load_skill", "load_skill_resource")
         for (mode in ToolAccessMode.entries) {
             val spec = AgentBuildSpec(toolAccessMode = mode, pluginRuntime = mockk())
+            assertEquals(listOf("install_skill"), contribution.tools(spec).map { it.name })
             val names = contribution.toolsets(spec).single().getTools(null).map { it.name }.toSet()
             assertEquals(expected, names)
         }

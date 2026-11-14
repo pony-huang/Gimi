@@ -27,14 +27,15 @@ Flow<ADK Event>
    +- 持久化：  ADK SessionService（Room）是唯一存储；标题/记忆走 ADK 插件
 ```
 
-**没有 `:domain:agent` 模块**——agent 业务契约（运行事件、仓库接口、运行时门）在 `:domain:conversation`；ADK 运行时只在 `:data:agent`。
+**没有 `:domain:agent` 模块**——agent 业务契约（运行事件、仓库接口、运行时门）在 `:domain:conversation`；ADK 运行时只在 `:data:agent`，厂商模型/语音适配器在 `:data:modelaccess`。
 
 ## 模块所有权
 
 | 模块 | 拥有 | 不得拥有 |
 |---|---|---|
 | `:domain:conversation` | 与 SDK 无关的运行模型（`ChatRunEvent`、`Message`、`ChatTurn`）、`ChatAgentRepository`/`ConversationRepository` 接口、`PrepareChatSendUseCase`、`ChatRunEventMapper`、`AgentRuntimeGate`/`AgentSessionIdentity` | 任何 Android、Compose、Hilt、Room、OkHttp、ADK 类型 |
-| `:data:agent` | agent 装配（`AgentFactory`、`AgentChatRunner`）、全部 `AgentContribution` 实现、模型适配器、A2A + A2UI 运行时、聊天模式语音执行 | 持久化契约、UI 状态 |
+| `:data:agent` | agent 装配（`AgentFactory`、`AgentChatRunner`）、全部 `AgentContribution` 实现、语音会话运行时（`AdkVoiceAudioBackend`、双工门面、实时工具桥）、A2A + A2UI 运行时、聊天模式语音执行 | 持久化契约、UI 状态、厂商模型适配器 |
+| `:data:modelaccess` | 厂商接入，按 `<厂商>/<能力>` 分组：`anthropic/llm`（Claude）、`qwen|openai/realtime`、厂商语音适配器（ASR/TTS）、`<vendor>/tool` 官方工具；装配（`AgentLLMModelFactory`、`VoiceLiveModelFactory`、`CascadedVoiceModel`）在模块根包；`openaicompatible` 协议家族服务 deepseek/kimi/glm/openai | Agent 运行时、会话持久化、设备/AEC/播放 |
 | `:data:conversation` | `AdkConversationRepository`（Room 读侧）、`EventMapper`（历史重放）、附件归档、工具批准存储 | ADK agent 装配 |
 | `:feature:chat` | `ChatViewModel` + 各协调器（运行生命周期、事件归并、恢复/工具配置/会话导航） | 仓库实现、ADK 类型 |
 | `:domain:assistant` | 系统助手入口（蓝牙/分离式语音）——同一运行时的第二执行源 | 自己的 agent 运行时 |
@@ -47,7 +48,7 @@ Flow<ADK Event>
 
 1. **`AgentBuildSpec`** —— 不可变构建输入：模型 `selection`、`toolAccessMode`（`ALWAYS_AVAILABLE`/`ON_DEMAND`）、`reasoningEffort`、`thinkingEnabled`、`pluginRuntime` 快照、`instructionSuffix`、`a2uiSupported`。
 2. **`AgentContribution` SPI** —— contribution 是自声明的 capability 拥有者：`id`、`revision()`（缓存键输入；无外部可变配置时返回 null）、`toolsets(spec)`（挂在 `LlmAgent.toolsets` 上的命名工具集——`ALWAYS_AVAILABLE` 下常驻，`ON_DEMAND` 下大多转为检索候选）、`tools(spec)`（直接附加的工具）、`candidateSources(spec)`（`ON_DEMAND` 下进 `ToolSearchToolset` 的检索候选源）、`subAgents(spec)`（模型经 `transfer_to_agent` 委派的非 LLM 子能力）、`toolCatalog(context)`（给推荐/能力目录等旁路消费的扁平枚举——与 agent 构建解耦）。`AgentContributionRegistry` 聚合 `Set<AgentContribution>`（Hilt `@IntoSet`），按 `id` 排序保证确定性，重复 id 直接失败。现有 contribution 类型（注册 id）：app function（`appfunctions`）、a2ui、sandbox（E2B）、local、mcp、official、skill、plugin、base（记忆/用户输入）、model catalog（仅 revision）、remote agent（仅 sub-agent）、delegate tasks（子任务）、direct phone（`direct_phone`，仅 sub-agent，后端报告可用时才挂载）。各自加载什么属于实现细节，需要时读对应类。
-3. **`AgentFactory` + `AgentChatRunner`** —— 工厂解析模型（`AgentLLMModelFactory`，回退链：显式选择 → 聊天页选择 → 第一个启用服务；全无则报错并指向设置页），用 `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`、思考配置、聚合的工具/工具集/子代理以及全局 `RemoteAgentFailureRecovery` 回调构建 ADK `LlmAgent`。`ON_DEMAND` 模式下追加 `ToolSearchToolset`（ObjectBox + 向量检索，视为可重建缓存、永不迁移；实现原理见[工具搜索](tool-search.md)）。Runner 以 LRU 缓存至多 10 个 `SharedRuntime`，键为 `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)`——其中 `revision` 是单一合并值：`AgentBuildConfigurationSnapshot` 在查缓存时捕获全部 contribution 的 `revision()` 输出，其 `pluginRuntime` 快照就是实际参与装配的内容——返回每回合的 `AgentChatExecution`。
+3. **`AgentFactory` + `AgentChatRunner`** —— 工厂解析模型（`:data:modelaccess` 的 `AgentLLMModelFactory`，回退链：显式选择 → 聊天页选择 → 第一个启用服务；全无则报错并指向设置页），用 `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`、思考配置、聚合的工具/工具集/子代理以及全局 `RemoteAgentFailureRecovery` 回调构建 ADK `LlmAgent`。`ON_DEMAND` 模式下追加 `ToolSearchToolset`（ObjectBox + 向量检索，视为可重建缓存、永不迁移；实现原理见[工具搜索](tool-search.md)）。Runner 以 LRU 缓存至多 10 个 `SharedRuntime`，键为 `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)`——其中 `revision` 是单一合并值：`AgentBuildConfigurationSnapshot` 在查缓存时捕获全部 contribution 的 `revision()` 输出，其 `pluginRuntime` 快照就是实际参与装配的内容——返回每回合的 `AgentChatExecution`。
 
 **注册**：每个 contribution 在 `di/AgentContributionModule.kt` 一行 `@Binds @IntoSet`（subtasks 在自己模块绑定）。新增工具/配置源 = 实现 `AgentContribution` + 一行绑定，不改编排代码。这个抽象模块多绑定是既定可用的模式——下文「坑」里 `@Binds` 不聚合的问题指 data 模块里其他普通单例绑定。加完绑定后要验证 contribution 真的进了集合（如注册表重复 id 报错或工具目录输出）。
 
@@ -66,7 +67,7 @@ Flow<ADK Event>
 
 ## 不变量
 
-1. **领域纯净**：`:domain:conversation`（及所有领域模块）只依赖 Kotlin/coroutines；`ChatRunEvent`/`ChatAgentRepository` 是与 SDK 无关的接缝。ADK 类型止步于 `:data:agent`/`:data:conversation`。
+1. **领域纯净**：`:domain:conversation`（及所有领域模块）只依赖 Kotlin/coroutines；`ChatRunEvent`/`ChatAgentRepository` 是与 SDK 无关的接缝。ADK 类型止步于 `:data:agent`/`:data:conversation`/`:data:modelaccess`。
 2. **缓存键纪律**：构建级旋钮进 `AgentKey`；会话级旋钮（工具勾选、确认开关）经 `RunConfig.customMetadata` 进 `ToolRunMetadata`——绝不进缓存键。contribution 消费的任何配置必须反映到其 `revision()`，否则陈旧缓存 agent 会继续服务。
 3. **事件映射一致性**：流式（`ChatRunEventMapper`）与历史重放（`EventMapper`）必须共用 id 规则：`Message.id = Event.id`，part id 按消息内 part 序号派生（thought 与 text 共用索引 0）。DAO 读出后绝不按时间戳重排（DAO 顺序 = 追加顺序 = 发出顺序）。只做逐 part 降级——一个坏事件绝不能清空整个会话。
 4. **凭据绝不进 `ModelRuntimeMetadata`**（ADK 会把 custom metadata 合并进持久化事件）；凭据在每次工具执行时重新解析。

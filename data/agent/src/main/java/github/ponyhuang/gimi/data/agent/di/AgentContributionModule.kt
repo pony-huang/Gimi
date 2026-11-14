@@ -29,6 +29,9 @@ import github.ponyhuang.gimi.data.agent.phone.DirectPhoneContribution
 abstract class AgentContributionModule {
     @Binds
     @IntoSet
+    abstract fun bindEnvironmentContribution(implementation: github.ponyhuang.gimi.data.agent.contribution.EnvironmentToolContribution): AgentContribution
+    @Binds
+    @IntoSet
     abstract fun bindAppFunctionContribution(implementation: github.ponyhuang.gimi.data.agent.contribution.AppFunctionToolContribution): AgentContribution
 
     @Binds

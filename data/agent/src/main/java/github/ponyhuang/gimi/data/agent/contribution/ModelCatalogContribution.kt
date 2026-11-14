@@ -5,6 +5,7 @@ import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 
 /**
  * 模型目录贡献方：不贡献工具，只把模型服务配置的 revision 纳入 Agent 缓存键，

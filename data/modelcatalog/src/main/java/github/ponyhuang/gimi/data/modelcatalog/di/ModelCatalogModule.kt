@@ -9,8 +9,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.core.common.coroutine.IoDispatcher
-import github.ponyhuang.gimi.data.modelcatalog.LLMModelRoomDatabase
-import github.ponyhuang.gimi.data.modelcatalog.ModelServiceRepository
+import github.ponyhuang.gimi.data.modelcatalog.ModelServiceConfigurationStore
+import github.ponyhuang.gimi.data.modelcatalog.ModelTemplateDatabase
 import github.ponyhuang.gimi.data.modelcatalog.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiCompatibleModelServiceGateway
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -32,13 +32,13 @@ abstract class ModelCatalogBindingsModule {
     @Binds
     @Singleton
     abstract fun bindModelCatalogRepository(
-        implementation: ModelServiceRepository,
+        implementation: ModelServiceConfigurationStore,
     ): ModelCatalogRepository
 
     @Binds
     @Singleton
     abstract fun bindAgentModelConfigurationSource(
-        implementation: ModelServiceRepository,
+        implementation: ModelServiceConfigurationStore,
     ): AgentModelConfigurationSource
 
     @Binds
@@ -53,12 +53,12 @@ abstract class ModelCatalogBindingsModule {
 object ModelCatalogInfrastructureModule {
     @Provides
     @Singleton
-    fun provideModelServiceDatabase(
+    fun provideModelTemplateDatabase(
         @ApplicationContext context: Context,
-    ): LLMModelRoomDatabase = Room.databaseBuilder(
+    ): ModelTemplateDatabase = Room.databaseBuilder(
         context,
-        LLMModelRoomDatabase::class.java,
-        LLMModelRoomDatabase.DATABASE_NAME,
+        ModelTemplateDatabase::class.java,
+        ModelTemplateDatabase.DATABASE_NAME,
     ).fallbackToDestructiveMigration(dropAllTables = true).build()
 
     @Provides

@@ -15,4 +15,7 @@ interface SkillRepository {
     suspend fun discardImport(preparedId: String)
 
     suspend fun remove(name: String)
+
+    /** 持久化技能的启用状态；禁用的技能不会暴露给助手运行时。 */
+    suspend fun setEnabled(name: String, enabled: Boolean)
 }

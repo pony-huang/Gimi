@@ -1,7 +1,10 @@
 package github.ponyhuang.gimi.data.modelcatalog.official
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
@@ -35,7 +38,7 @@ class OfficialToolCatalogTest {
     @Test
     fun openAiCompatibleOnlyServicesDeclareNoProviderNativeTools() {
         // OpenAI 兼容通道只能下发 function 工具，OpenAI/MiMo 的原生联网搜索因此不做声明。
-        assertTrue(registry.all.none { it.serviceId == "openai" || it.serviceId == "mimo" })
+        assertTrue(registry.all.none { it.templateId == "openai" || it.templateId == "mimo" })
         assertTrue(registry.supportedToolIds("openai", ApiProtocol.OpenaiChatcompletions).isEmpty())
         assertTrue(registry.supportedToolIds("mimo", ApiProtocol.OpenaiChatcompletions).isEmpty())
     }
@@ -88,7 +91,7 @@ class OfficialToolCatalogTest {
         // 同一服务换协议不再提供任何声明。
         assertTrue(registry.supportedToolIds("anthropic", ApiProtocol.OpenaiChatcompletions).isEmpty())
         assertTrue(registry.supportedToolIds("openai", ApiProtocol.Gemini).isEmpty())
-        assertTrue(registry.supportedToolIds("unknown-service", ApiProtocol.OpenaiChatcompletions).isEmpty())
+        assertTrue(registry.supportedToolIds("unknown-template", ApiProtocol.OpenaiChatcompletions).isEmpty())
     }
 
     @Test
@@ -132,16 +135,32 @@ class OfficialToolCatalogTest {
         assertFalse(support.specsFor("kimi", ApiProtocol.Gemini, "kimi-k2.5").any { it.toolId == "kimi_web_tools" })
     }
 
-    private fun catalogFor(serviceId: String? = null): DefaultOfficialToolFunctionCatalog {
-        val services = if (serviceId == null) emptyList() else listOf(
-            LLMModelSetting(
-                id = serviceId, name = serviceId, isEnabled = true, apiKey = "key",
-                apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions,
-                anthropicBaseUrl = "https://example.com", groups = emptyList(),
-            ),
-        )
+    private fun catalogFor(templateId: String? = null): DefaultOfficialToolFunctionCatalog {
+        val instances = if (templateId == null) {
+            emptyList()
+        } else {
+            listOf(
+                ModelServiceInstance(
+                    id = "instance-$templateId",
+                    name = templateId,
+                    templateId = templateId,
+                    isEnabled = true,
+                    isOfficialToolsEnabled = true,
+                    sharedApiKey = "key",
+                    connections = listOf(
+                        ServiceConnection(
+                            id = "conn-conversation-1",
+                            capability = ServiceCapability.Conversation,
+                            protocol = ApiProtocol.OpenaiChatcompletions,
+                            endpoint = "https://example.com",
+                            credential = CredentialSource.Shared,
+                        ),
+                    ),
+                ),
+            )
+        }
         val source = mockk<AgentModelConfigurationSource> {
-            every { currentServices() } returns services
+            every { currentInstances() } returns instances
         }
         return DefaultOfficialToolFunctionCatalog(support, source)
     }

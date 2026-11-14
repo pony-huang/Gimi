@@ -174,6 +174,38 @@ class SkillArchiveStoreTest {
         assertEquals(SkillImportFailure.Reason.InvalidSkillName, failure.reason)
     }
 
+    @Test
+    fun installsSelectedSkillFromRepositoryArchive() = runTest {
+        val prepared = store.prepare(archive(
+            "repo-main/README.md" to "Repository",
+            "repo-main/skills/demo/SKILL.md" to skillMd("demo", "Demo"),
+            "repo-main/skills/demo/scripts/main.py" to "print('ok')",
+            "repo-main/skills/other/SKILL.md" to skillMd("other", "Other"),
+        ), directory = "repo-main/skills/demo")
+        store.commit(prepared.id, allowReplace = false)
+        assertEquals(listOf("demo"), store.listInstalled().map { it.name })
+        assertTrue(File(skillsRoot, "demo/scripts/main.py").isFile)
+        assertFalse(File(skillsRoot, "README.md").exists())
+    }
+
+    @Test
+    fun selectedDirectoryCannotEscapeArchiveOrSelectMissingSkill() = runTest {
+        for (directory in listOf("../outside", "/demo", "missing")) {
+            val failure = runCatching { store.prepare(validArchive("demo", "Demo"), directory) }.exceptionOrNull()
+            assertTrue(failure is SkillImportFailure)
+            assertTrue(stagingRoot.listFiles().orEmpty().isEmpty())
+        }
+    }
+
+    @Test
+    fun selectedSkillWithMissingDescriptionReturnsManifestError() = runTest {
+        val failure = runCatching {
+            store.prepare(archive("repo-main/demo/SKILL.md" to "---\nname: demo\n---\nInstructions"), "repo-main/demo")
+        }.exceptionOrNull() as SkillImportFailure
+        assertEquals(SkillImportFailure.Reason.InvalidManifest, failure.reason)
+        assertTrue(stagingRoot.listFiles().orEmpty().isEmpty())
+    }
+
     private fun validArchive(name: String, description: String) =
         archive(
             "$name/SKILL.md" to skillMd(name, description),

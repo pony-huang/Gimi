@@ -2,8 +2,10 @@ package github.ponyhuang.gimi.data.agent.tools.official
 
 import github.ponyhuang.gimi.data.modelcatalog.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -20,22 +22,43 @@ fun testHttpClient(): OkHttpClient = OkHttpClient()
 
 /** 无任何已启用服务的配置源;官方工具因此拿不到凭据。 */
 fun emptyServices(): AgentModelConfigurationSource = mockk {
-    every { currentServices() } returns emptyList()
+    every { currentInstances() } returns emptyList()
 }
+
+/**
+ * 构造一个厂商服务实例:实例 ID 与模板 ID 同为 [templateId],仅含一条
+ * OpenAI 兼容对话连接,凭据走实例共享密钥 —— 与旧 LLMModelSetting 夹具语义等价。
+ */
+fun officialToolsInstance(
+    templateId: String,
+    apiKey: String,
+    isOfficialToolsEnabled: Boolean = true,
+    protocol: ApiProtocol = ApiProtocol.OpenaiChatcompletions,
+    endpoint: String = "https://example.com",
+): ModelServiceInstance = ModelServiceInstance(
+    id = templateId,
+    name = templateId,
+    templateId = templateId,
+    isEnabled = true,
+    isOfficialToolsEnabled = isOfficialToolsEnabled,
+    sharedApiKey = apiKey,
+    connections = listOf(
+        ServiceConnection(
+            id = "conversation",
+            capability = ServiceCapability.Conversation,
+            protocol = protocol,
+            endpoint = endpoint,
+        ),
+    ),
+)
 
 fun servicesWith(
     serviceId: String,
     apiKey: String = "key",
 ): AgentModelConfigurationSource {
-    val service = mockk<LLMModelSetting> {
-        every { id } returns serviceId
-        every { isEnabled } returns true
-        every { isOfficialToolsEnabled } returns true
-        every { this@mockk.apiKey } returns apiKey
-        every { apiProtocol } returns ApiProtocol.OpenaiChatcompletions
-    }
+    val instance = officialToolsInstance(serviceId, apiKey)
     return mockk {
-        every { currentServices() } returns listOf(service)
+        every { currentInstances() } returns listOf(instance)
     }
 }
 

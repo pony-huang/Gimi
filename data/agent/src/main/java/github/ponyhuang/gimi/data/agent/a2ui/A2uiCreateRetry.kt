@@ -6,7 +6,7 @@ import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.domain.a2ui.*
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection

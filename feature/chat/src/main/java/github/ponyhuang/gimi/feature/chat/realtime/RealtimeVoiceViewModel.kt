@@ -12,12 +12,13 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
-import github.ponyhuang.gimi.domain.voice.model.TtsVoiceCatalog
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
@@ -87,6 +88,10 @@ data class VoiceSettingsUiState(
     val isTtsVoiceLoading: Boolean = false,
     /** TTS 服务是否允许填写内置音色表之外的音色 ID（声音复刻、基础音色）。 */
     val ttsVoiceCustomInputAllowed: Boolean = false,
+/** 开放自由填写厂商（千问）的音色 ID 命名模板；null 表示不展示。 */
+    val ttsVoiceIdTemplate: String? = null,
+    /** 开放自由填写厂商的官方音色列表页；null 表示不展示。 */
+    val ttsVoiceDocsUrl: String? = null,
     val realtimeRows: List<VoiceModelRow> = emptyList(),
     /** Realtime 默认模型；null 表示未配置，Realtime 模式因此不可进入。 */
     val realtimeSelection: ModelSelection? = null,
@@ -153,6 +158,7 @@ class RealtimeVoiceViewModel @Inject constructor(
     private val promptPresets: SimpleChatPromptRepository,
     private val modeRepository: RealtimeVoiceModeRepository,
     private val voiceCapabilities: VoiceCapabilityResolver,
+    private val voiceCatalog: VoiceCatalogResolver,
     observeSettings: ObserveDefaultModelSettingsUseCase,
 ) : ViewModel() {
     private val devicePickerOpen = MutableStateFlow(false)
@@ -367,16 +373,15 @@ class RealtimeVoiceViewModel @Inject constructor(
      */
     private fun realtimeAvailability(settings: DefaultModelSettings): RealtimeAvailability {
         val selection = settings.realtimeSelection ?: return RealtimeAvailability(false, "")
-        val service = settings.services.firstOrNull { it.id == selection.serviceId }
-            ?.takeIf { it.isAdded && it.isEnabled && it.apiKey.isNotBlank() }
+        val resolved = (settings.instances.resolveConnection(selection))
+            ?.takeIf { ModelCapability.Realtime in it.model.capabilities }
             ?: return RealtimeAvailability(false, "")
-        if (!voiceCapabilities.isSupported(service.id, ModelCapability.Realtime)) {
+        // 未接入原生 Realtime 适配器的模板没有全双工契约，不可进入 Realtime 模式。
+        val templateId = resolved.templateId ?: return RealtimeAvailability(false, "")
+        if (!voiceCapabilities.isSupported(templateId, ModelCapability.Realtime)) {
             return RealtimeAvailability(false, "")
         }
-        val model = service.groups.firstOrNull { it.id == selection.groupId }?.models
-            ?.firstOrNull { it.id == selection.modelId && ModelCapability.Realtime in it.capabilities }
-            ?: return RealtimeAvailability(false, "")
-        return RealtimeAvailability(true, model.name.ifBlank { model.id })
+        return RealtimeAvailability(true, resolved.model.name.ifBlank { resolved.model.id })
     }
 
     /**
@@ -406,33 +411,40 @@ class RealtimeVoiceViewModel @Inject constructor(
         isTtsVoiceLoading: Boolean,
         promptPresets: PromptPresetsSnapshot,
     ): VoiceSettingsUiState {
-        val configuredServices = settings.services.filter { it.isEnabled && it.apiKey.isNotBlank() }
-        // Realtime 候选只列已接入原生全双工适配器的服务：带 Realtime 标记但没有适配器的模型
+        val configuredInstances = settings.instances.filter { it.isEnabled }
+        // Realtime 候选只列已接入原生全双工适配器的模板：带 Realtime 标记但没有适配器的模型
         // 会静默回落到级联链路（而级联要求 STT/TTS 能力），选它只会得到起不来的会话。
-        val realtimeRows = configuredServices
-            .filter { voiceCapabilities.isSupported(it.id, ModelCapability.Realtime) }
-            .flatMap { service ->
-                service.groups.flatMap { group ->
-                    group.models.filter { ModelCapability.Realtime in it.capabilities }.map { model ->
+        val realtimeRows = configuredInstances
+            .filter { instance ->
+                val templateId = instance.templateId
+                templateId != null && voiceCapabilities.isSupported(templateId, ModelCapability.Realtime)
+            }
+            .flatMap { instance ->
+                instance.connections.flatMap { connection ->
+                    connection.models.filter { ModelCapability.Realtime in it.capabilities }.map { model ->
                         VoiceModelRow(
-                            service = service,
-                            group = group,
+                            instance = instance,
+                            connection = connection,
                             model = model,
                             capability = ModelCapability.Realtime,
                         )
                     }
                 }
             }
-        val realtimeSupport = settings.realtimeSelection?.let { voiceCapabilities.realtimeSupport(it.serviceId) }
+        val realtimeSupport = settings.realtimeSelection
+            ?.let { selection -> settings.instances.resolveConnection(selection)?.templateId }
+            ?.let { voiceCapabilities.realtimeSupport(it) }
         val applicableVoice = settings.realtimeVoice?.takeIf { it.selection == settings.realtimeSelection }
+        val ttsTemplateId = settings.ttsSelection
+            ?.let { selection -> settings.instances.resolveConnection(selection)?.templateId }
         return VoiceSettingsUiState(
-            speechRows = configuredServices.voiceModelRows(
+            speechRows = configuredInstances.voiceModelRows(
                 voiceCapabilities,
                 predicate = { it.capabilities.any { capability -> capability.isRecognition } },
                 requiredCapability = { it.recognitionCapability },
             ),
             speechSelection = settings.speechSelection,
-            ttsRows = configuredServices.voiceModelRows(
+            ttsRows = configuredInstances.voiceModelRows(
                 voiceCapabilities,
                 predicate = { ModelCapability.TTS in it.capabilities },
                 requiredCapability = { ModelCapability.TTS },
@@ -440,10 +452,12 @@ class RealtimeVoiceViewModel @Inject constructor(
             ttsSelection = settings.ttsSelection,
             ttsVoiceId = settings.ttsVoiceId,
             ttsVoiceOptions = ttsVoiceOptions.ifEmpty {
-                TtsVoiceCatalog.forService(settings.ttsSelection?.serviceId)
+                voiceCatalog.builtInVoices(ttsTemplateId)
             },
             isTtsVoiceLoading = isTtsVoiceLoading,
-            ttsVoiceCustomInputAllowed = TtsVoiceCatalog.allowsCustomVoice(settings.ttsSelection?.serviceId),
+            ttsVoiceCustomInputAllowed = voiceCatalog.allowsCustomVoice(ttsTemplateId),
+            ttsVoiceIdTemplate = voiceCatalog.customVoiceIdTemplate(ttsTemplateId),
+            ttsVoiceDocsUrl = voiceCatalog.customVoiceListUrl(ttsTemplateId),
             realtimeRows = realtimeRows,
             realtimeSelection = settings.realtimeSelection,
             realtimeVoiceOptions = settings.realtimeSelection

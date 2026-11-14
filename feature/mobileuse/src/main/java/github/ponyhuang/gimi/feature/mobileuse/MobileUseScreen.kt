@@ -33,7 +33,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 无状态 Shizuku 设置页；开关、授权状态与展开态都来自 UiState，本层不读取服务或发起副屏操作。 */
@@ -55,12 +55,12 @@ fun MobileUseScreen(
             item { PreferenceSectionTitle(stringResource(R.string.mobile_use_switch_section)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceSwitchItem(
+                    PreferenceSwitchRow(
                         icon = Icons.Default.Phonelink,
                         title = stringResource(R.string.mobile_use_switch_title),
-                        subtitle = stringResource(R.string.mobile_use_intro),
+                        description = stringResource(R.string.mobile_use_intro),
                         checked = state.enabled,
-                        switchEnabled = !state.updating,
+                        enabled = !state.updating,
                         onCheckedChange = onEnabledChange,
                     )
                 }

@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.adk.kt.types.FunctionCall
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
 
 /**
  * 一轮 Realtime 工具调用的执行器：串行执行模型发起的全部 function_call，

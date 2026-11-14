@@ -4,12 +4,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -57,11 +66,41 @@ fun SkillsSettingsRoute(
         viewModel.onAction(SkillsSettingsAction.ConsumeNotice)
     }
 
+    // 对齐 MCP 列表页：标题栏"+"号收安装入口；两种来源用弹出菜单承载，不新增选择页。
+    var installMenuExpanded by remember { mutableStateOf(false) }
     PreferenceScaffold(
-
         style = PreferenceStyle.Compact,
         title = stringResource(R.string.skills_screen_title),
         onBack = onBack,
+        actions = {
+            Box {
+                IconButton(onClick = { installMenuExpanded = true }) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.skills_add),
+                    )
+                }
+                DropdownMenu(
+                    expanded = installMenuExpanded,
+                    onDismissRequest = { installMenuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.skills_import_url)) },
+                        onClick = {
+                            installMenuExpanded = false
+                            viewModel.onAction(SkillsSettingsAction.OpenUrlDialog)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.skills_import_local)) },
+                        onClick = {
+                            installMenuExpanded = false
+                            viewModel.onAction(SkillsSettingsAction.RequestLocalArchive)
+                        },
+                    )
+                }
+            }
+        },
     ) { scaffoldModifier ->
         Box(modifier = scaffoldModifier.fillMaxSize()) {
             SkillsSettingsScreen(

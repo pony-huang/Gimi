@@ -1,0 +1,6 @@
+<resources>
+    <string name="runtime_documents_title">Gimi local environment</string>
+    <string name="runtime_active">Local runtime component is running</string>
+    <string name="runtime_stop">Stop and disable</string>
+    <string name="runtime_name">Gimi Runtime</string>
+</resources>

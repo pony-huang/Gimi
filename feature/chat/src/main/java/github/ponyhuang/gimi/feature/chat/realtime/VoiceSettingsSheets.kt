@@ -26,11 +26,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.ui.components.GimiPickerItemRow
@@ -54,13 +54,13 @@ enum class VoiceSettingsKind { Speech, Tts, Realtime }
  * @property isSupported 该模型所属服务是否已接入目标能力；未接入时仍显示但不可选。
  */
 data class VoiceModelRow(
-    val service: LLMModelSetting,
-    val group: ModelGroup,
+    val instance: ModelServiceInstance,
+    val connection: github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection,
     val model: Model,
     val capability: ModelCapability? = null,
     val isSupported: Boolean = true,
 ) {
-    fun selection() = ModelSelection(service.id, group.id, model.id)
+    fun selection() = ModelSelection(instance.id, connection.id, model.id)
 }
 
 /**
@@ -70,21 +70,26 @@ data class VoiceModelRow(
  * 而不是整批按同一个能力判定——专用转写（STT）与音频理解（ASR）是两套协议，
  * 同一个服务可能只接入其中一套。
  */
-internal fun List<LLMModelSetting>.voiceModelRows(
+internal fun List<ModelServiceInstance>.voiceModelRows(
     voiceCapabilities: VoiceCapabilityResolver,
     predicate: (Model) -> Boolean,
     requiredCapability: (Model) -> ModelCapability? = { null },
-): List<VoiceModelRow> = flatMap { service ->
-    service.groups.flatMap { group ->
-        group.models.filter(predicate).map { model ->
+): List<VoiceModelRow> = flatMap { instance ->
+    instance.connections.flatMap { connection ->
+        // 连接凭据不可用的实例行不可用，避免展示后运行时解析失败。
+        if (instance.effectiveApiKey(connection).isBlank()) {
+            return@flatMap emptyList()
+        }
+        val templateId = instance.templateId
+        connection.models.filter(predicate).map { model ->
             val capability = requiredCapability(model)
             VoiceModelRow(
-                service = service,
-                group = group,
+                instance = instance,
+                connection = connection,
                 model = model,
                 capability = capability,
                 isSupported = capability == null ||
-                    voiceCapabilities.isSupported(service.id, capability),
+                    (templateId != null && voiceCapabilities.isSupported(templateId, capability)),
             )
         }
     }
@@ -165,15 +170,7 @@ internal fun VoiceModelPickerPage(
             normalizedQuery.isEmpty() || option.searchText(noneTitle)
                 .contains(normalizedQuery, ignoreCase = true)
         }
-        val groupCount: (String) -> Int = { serviceId ->
-            options.asSequence()
-                .map { it.row }
-                .filterIsInstance<VoiceModelRow>()
-                .filter { it.service.id == serviceId }
-                .map { it.group.id }
-                .distinct()
-                .count()
-        }
+        // 每个实例的语音连接单层展示，副标题不再按连接细分。
         when {
             rows.isEmpty() -> Box(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = listMaxHeight),
@@ -202,7 +199,7 @@ internal fun VoiceModelPickerPage(
                 contentPadding = PaddingValues(bottom = 8.dp),
             ) {
                 items(visible, key = { option ->
-                    option.row?.let { "${it.service.id}/${it.group.id}/${it.model.id}" } ?: "none"
+                    option.row?.let { "${it.instance.id}/${it.connection.id}/${it.model.id}" } ?: "none"
                 }) { option ->
                     GimiPickerItemRow(
                         title = option.row?.model?.name ?: noneTitle,
@@ -210,7 +207,6 @@ internal fun VoiceModelPickerPage(
                             row = option.row,
                             capabilityLabels = capabilityLabels,
                             unsupportedNotes = unsupportedNotes,
-                            groupCount = groupCount,
                         ),
                         selected = when (val row = option.row) {
                             null -> currentSelection == null
@@ -229,7 +225,7 @@ internal fun VoiceModelPickerPage(
 /** 候选行的搜索文本：「不使用」项也带上 realtime 关键词。 */
 private fun VoiceModelOption.searchText(noneTitle: String): String = when (val row = row) {
     null -> "$noneTitle realtime"
-    else -> "${row.model.name} ${row.model.id} ${row.service.name} ${row.group.name}"
+    else -> "${row.model.name} ${row.model.id} ${row.instance.name}"
 }
 
 /**
@@ -240,18 +236,11 @@ private fun voiceModelSubtitle(
     row: VoiceModelRow?,
     capabilityLabels: Map<ModelCapability, String>,
     unsupportedNotes: Map<ModelCapability, String>,
-    groupCount: (String) -> Int,
 ): String {
     if (row == null) return ""
     return buildList {
         row.capability?.let { capabilityLabels[it] }?.let(::add)
-        // 服务内只有一个候选组时组名对每行都相同，只显示服务名（与设置页弹窗同规则）。
-        val servicePart = if (groupCount(row.service.id) > 1) {
-            "${row.service.name} · ${row.group.name}"
-        } else {
-            row.service.name
-        }
-        add(servicePart)
+        add(row.instance.name)
         if (!row.isSupported) row.capability?.let { unsupportedNotes[it] }?.let(::add)
     }.joinToString(" · ")
 }
@@ -259,35 +248,44 @@ private fun voiceModelSubtitle(
 // ── 预览 ────────────────────────────────────────────────────
 
 private fun previewModelRow(
-    serviceId: String,
-    serviceName: String,
+    instanceId: String,
+    instanceName: String,
     modelId: String,
     modelName: String,
     capability: ModelCapability,
     isSupported: Boolean = true,
-): VoiceModelRow = VoiceModelRow(
-    service = LLMModelSetting(
-        id = serviceId,
-        name = serviceName,
+): VoiceModelRow {
+    val instance = ModelServiceInstance(
+        id = instanceId,
+        name = instanceName,
+        templateId = instanceId,
         isEnabled = true,
-        apiKey = "preview-key",
-        apiBaseUrl = "https://preview.example.com",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = emptyList(),
-    ),
-    group = ModelGroup(id = "audio", name = "Audio", models = emptyList()),
-    model = Model(id = modelId, name = modelName),
-    capability = capability,
-    isSupported = isSupported,
-)
+        isOfficialToolsEnabled = true,
+        sharedApiKey = "preview-key",
+        connections = listOf(
+            github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection(
+                id = "$instanceId-connection",
+                capability = github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability.Recognition,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://preview.example.com",
+            ),
+        ),
+    )
+    return VoiceModelRow(
+        instance = instance,
+        connection = instance.connections.first(),
+        model = Model(id = modelId, name = modelName),
+        capability = capability,
+        isSupported = isSupported,
+    )
+}
 
 @Composable
 private fun VoiceModelPickerPagePreviewHost(allowNone: Boolean) {
     val rows = listOf(
-        previewModelRow("minimax", "MiniMax", "speech-02", "Speech-02", ModelCapability.STT),
-        previewModelRow("qwen", "千问", "qwen3-asr-flash", "Qwen3 ASR Flash", ModelCapability.ASR),
-        previewModelRow("mimo", "MiMo", "mimo-tts", "MiMo TTS", ModelCapability.TTS, isSupported = false),
+        previewModelRow("instance-minimax", "MiniMax", "speech-02", "Speech-02", ModelCapability.STT),
+        previewModelRow("instance-qwen", "千问", "qwen3-asr-flash", "Qwen3 ASR Flash", ModelCapability.ASR),
+        previewModelRow("instance-mimo", "MiMo", "mimo-tts", "MiMo TTS", ModelCapability.TTS, isSupported = false),
     )
     GimiTheme {
         Surface(color = preferenceCanvasColor()) {
@@ -295,7 +293,7 @@ private fun VoiceModelPickerPagePreviewHost(allowNone: Boolean) {
                 VoiceModelPickerPage(
                     title = "选择识别模型",
                     rows = rows,
-                    currentSelection = ModelSelection("minimax", "audio", "speech-02"),
+                    currentSelection = ModelSelection("instance-minimax", "instance-minimax-connection", "speech-02"),
                     onPick = {},
                     onBack = {},
                     allowNone = allowNone,

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
@@ -52,6 +53,7 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
  * 分组顺序为「模型 → 助手偏好 → 能力扩展 → 文件与工作区 → 系统 → 关于」：
  * 模型是应用可用性的前提，助手偏好里的开关每轮对话都会生效，
  * 能力扩展与文件工作区属于按需配置的进阶入口，权限与关于最少被访问，因此后置。
+ * 设备控制（Shizuku）归入能力扩展组首行：迁移自"个性化选项"页，连接状态需要经常复查。
  */
 @Composable
 fun SettingsScreen(
@@ -76,12 +78,6 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_model_service_title),
                                 subtitle = stringResource(R.string.settings_model_service_subtitle),
                                 action = SettingsAction.OpenModelService,
-                            ),
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Mic,
-                                title = stringResource(R.string.settings_speech_models_title),
-                                subtitle = stringResource(R.string.settings_speech_models_subtitle),
-                                action = SettingsAction.OpenSpeechModels,
                             ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Tune,
@@ -118,13 +114,21 @@ fun SettingsScreen(
                     )
                 }
             }
-            // 能力扩展按接入面排序：MCP 与 Skills 是日常对话最常触发的外部能力，
-            // 沙盒与插件面向进阶用法，AppFunction 与 A2A 依赖特定外部环境，启用面最窄。
+            // 能力扩展组首行是设备控制（Shizuku）：迁移自"个性化选项"页，服务未运行/未授权
+            // 会直接打断后台操作，需要频繁回来复查，因此放在组内最前；其余按接入面排序：
+            // MCP 与 Skills 是日常对话最常触发的外部能力，运行环境与插件面向进阶用法，
+            // AppFunction 与 A2A 依赖特定外部环境，启用面最窄。
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_extensions)) }
             item {
                 PreferenceGroupCard {
                     SettingsNavigationItems(
                         items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Phonelink,
+                                title = stringResource(R.string.settings_mobile_use_title),
+                                subtitle = stringResource(R.string.settings_mobile_use_subtitle),
+                                action = SettingsAction.OpenMobileUse,
+                            ),
                             SettingsNavigationItem(
                                 icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                                 title = stringResource(R.string.settings_mcp_title),

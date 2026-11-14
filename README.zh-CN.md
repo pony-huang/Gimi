@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="doc/icon.webp" width="192" alt="Gimi" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="doc/icon-dark.png" />
+  <img src="doc/icon-light.png" width="192" alt="Gimi" />
+</picture>
 
 # Gimi
 

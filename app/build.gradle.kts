@@ -4,6 +4,23 @@ plugins {
     id("gimi.android.hilt")
 }
 
+// 配套 APK 随主 App 交付，按构建类型独立生成，安装后使用独立 UID 执行代码。
+listOf("debug", "release").forEach { buildType ->
+    val capitalized = buildType.replaceFirstChar { it.uppercase() }
+    val packageRuntime = tasks.register<Copy>("package${capitalized}EnvironmentRuntime") {
+        dependsOn(":environment-runtime:assemble$capitalized")
+        from(project(":environment-runtime").layout.buildDirectory.dir("outputs/apk/$buildType")) {
+            include("environment-runtime-$buildType.apk")
+            rename { "environment-runtime.apk" }
+        }
+        into(layout.buildDirectory.dir("generated/environmentAssets/$buildType"))
+    }
+    android.sourceSets.getByName(buildType).assets.srcDir(
+        layout.buildDirectory.dir("generated/environmentAssets/$buildType").get().asFile,
+    )
+    tasks.matching { it.name == "merge${capitalized}Assets" }.configureEach { dependsOn(packageRuntime) }
+}
+
 android {
     namespace = "github.ponyhuang.gimi"
     defaultConfig {
@@ -95,6 +112,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":feature:environment"))
+    implementation(project(":data:environment"))
     implementation(project(":data:a2ui"))
     implementation(project(":feature:sandbox"))
     implementation(project(":data:sandbox"))
@@ -149,6 +168,7 @@ dependencies {
     implementation(project(":feature:workspace"))
     implementation(project(":feature:mobileuse"))
     testImplementation(project(":core:testing"))
+    testImplementation(project(":data:modelaccess"))
     // Drop kxml2 from the release runtime configurations only. Android's
     // framework already provides android.content.res.XmlResourceParser which
     // implements the same org.xmlpull.v1.XmlPullParser interface, so keeping

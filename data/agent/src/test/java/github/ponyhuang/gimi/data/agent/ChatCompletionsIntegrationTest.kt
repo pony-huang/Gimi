@@ -46,6 +46,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 
 /** 验证应用工厂到官方后端的 HTTP 边界及主动接受的能力限制，不调用真实模型。 */
 class ChatCompletionsIntegrationTest {
@@ -81,7 +83,8 @@ class ChatCompletionsIntegrationTest {
                 .put("message", JSONObject().put("role", "assistant").put("content", payload))
                 .put("finish_reason", "stop"))).toString(),
         ))
-        val config = ModelConfig("compatible", ApiProtocol.OpenaiChatcompletions,
+        // OpenAI 兼容协议属于自定义服务，无厂商模板身份。
+        val config = ModelConfig("compatible", null, ApiProtocol.OpenaiChatcompletions,
             "test-model", "test-key", server.url("/custom/v1/").toString())
         val recommendationFactory = mockk<AgentLLMModelFactory>()
         every { recommendationFactory.selectFastModelConfig() } returns config
@@ -310,6 +313,7 @@ class ChatCompletionsIntegrationTest {
 
     private fun model(serviceId: String = "compatible"): Model = factory.createModel(ModelConfig(
         serviceId = serviceId,
+        templateId = null,
         baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = "test-model",
         apiKey = "test-key",

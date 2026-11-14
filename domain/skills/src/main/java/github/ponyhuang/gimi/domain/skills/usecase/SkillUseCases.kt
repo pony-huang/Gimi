@@ -34,3 +34,10 @@ class RemoveSkillUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(name: String) = repository.remove(name)
 }
+
+class SetSkillEnabledUseCase @Inject constructor(
+    private val repository: SkillRepository,
+) {
+    suspend operator fun invoke(name: String, enabled: Boolean) =
+        repository.setEnabled(name, enabled)
+}

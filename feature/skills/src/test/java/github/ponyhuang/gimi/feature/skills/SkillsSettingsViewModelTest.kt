@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.skills.usecase.DiscardSkillImportUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.ObserveInstalledSkillsUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.PrepareSkillImportUseCase
 import github.ponyhuang.gimi.domain.skills.usecase.RemoveSkillUseCase
+import github.ponyhuang.gimi.domain.skills.usecase.SetSkillEnabledUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,12 +107,32 @@ class SkillsSettingsViewModelTest {
         }
     }
 
+    @Test
+    fun toggleDelegatesToRepositoryAndStateFollowsFlow() = runTest {
+        val repository = FakeSkillRepository(
+            installed = listOf(InstalledSkill("demo", "Demo")),
+        )
+        val viewModel = viewModel(repository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.skills.isEmpty()) state = awaitItem()
+            viewModel.onAction(SkillsSettingsAction.ToggleSkill(state.skills.single(), enabled = false))
+            advanceUntilIdle()
+            assertEquals("demo", repository.lastToggledName)
+            assertFalse(repository.lastToggledEnabled)
+            assertFalse(awaitItem().skills.single().enabled)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private fun viewModel(repository: SkillRepository) = SkillsSettingsViewModel(
         observeInstalled = ObserveInstalledSkillsUseCase(repository),
         prepareImport = PrepareSkillImportUseCase(repository),
         commitImport = CommitSkillImportUseCase(repository),
         discardImport = DiscardSkillImportUseCase(repository),
         removeSkill = RemoveSkillUseCase(repository),
+        setSkillEnabled = SetSkillEnabledUseCase(repository),
     )
 
     private class FakeSkillRepository(
@@ -124,6 +145,8 @@ class SkillsSettingsViewModelTest {
         var lastAllowReplace: Boolean = false
         var lastDiscardedId: String? = null
         var lastRemovedName: String? = null
+        var lastToggledName: String? = null
+        var lastToggledEnabled: Boolean = true
 
         override fun observeInstalled(): Flow<List<InstalledSkill>> = skills
 
@@ -150,6 +173,14 @@ class SkillsSettingsViewModelTest {
         override suspend fun remove(name: String) {
             lastRemovedName = name
             skills.value = skills.value.filterNot { it.name == name }
+        }
+
+        override suspend fun setEnabled(name: String, enabled: Boolean) {
+            lastToggledName = name
+            lastToggledEnabled = enabled
+            skills.value = skills.value.map {
+                if (it.name == name) it.copy(enabled = enabled) else it
+            }
         }
     }
 }

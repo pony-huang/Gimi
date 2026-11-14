@@ -23,7 +23,7 @@ class OfficialToolSupportTest {
     @Test
     fun crossModelAvailabilityIncludesOnlyIndependentApiTools() {
         val specs = available(
-            listOf(service("anthropic"), service("openai"), service("minimax"), service("kimi")),
+            listOf(instance("anthropic"), instance("openai"), instance("minimax"), instance("kimi")),
         )
         assertEquals(
             listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION, OfficialToolIds.KIMI_WEB_TOOLS),
@@ -35,9 +35,9 @@ class OfficialToolSupportTest {
     @Test
     fun disabledOrUncredentialedSourcesCannotContributeTools() {
         for (source in listOf(
-            service("minimax").copy(isEnabled = false),
-            service("minimax").copy(isOfficialToolsEnabled = false),
-            service("minimax").copy(apiKey = " "),
+            instance("minimax").copy(isEnabled = false),
+            instance("minimax").copy(isOfficialToolsEnabled = false),
+            instance("minimax").copy(sharedApiKey = " "),
         )) {
             assertTrue(available(listOf(source)).isEmpty())
         }
@@ -45,37 +45,99 @@ class OfficialToolSupportTest {
 
     @Test
     fun crossModelToolsRequireSupportedSourceProtocol() {
-        assertTrue(available(listOf(service("minimax").copy(apiProtocol = ApiProtocol.Gemini))).isEmpty())
+        // MiniMax 实例的对话连接换成不支持声明工具的协议后，图像生成不能再跨模型提供。
+        assertTrue(available(listOf(minimaxInstance(protocol = ApiProtocol.Gemini))).isEmpty())
     }
 
     @Test
     fun kimiIndependentToolsRequireEnabledCredentialedSource() {
-        assertEquals(listOf(OfficialToolIds.KIMI_WEB_TOOLS), available(listOf(service("kimi"))).map { it.toolId })
+        assertEquals(listOf(OfficialToolIds.KIMI_WEB_TOOLS), available(listOf(instance("kimi"))).map { it.toolId })
         for (source in listOf(
-            service("kimi").copy(isEnabled = false),
-            service("kimi").copy(isOfficialToolsEnabled = false),
-            service("kimi").copy(apiKey = " "),
-            service("kimi").copy(apiProtocol = ApiProtocol.Gemini),
+            instance("kimi").copy(isEnabled = false),
+            instance("kimi").copy(isOfficialToolsEnabled = false),
+            instance("kimi").copy(sharedApiKey = " "),
         )) {
             assertTrue(available(listOf(source)).isEmpty())
         }
-    }
-
-    @Test
-    fun absentActiveServiceCanStillReceiveIndependentApiTools() {
-        assertEquals(
-            listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION),
-            available(listOf(service("minimax"))).map { it.toolId },
+        // 对话连接使用独立凭据时，工具凭据跟随连接覆盖值。
+        assertTrue(
+            available(
+                listOf(
+                    instance("kimi", sharedApiKey = " ").copy(
+                        connections = listOf(
+                            ServiceConnection(
+                                id = "conn-conversation-1",
+                                capability = ServiceCapability.Conversation,
+                                protocol = ApiProtocol.Anthropic,
+                                endpoint = "https://api.kimi.example/v1",
+                                credential = CredentialSource.Independent("independent-key"),
+                            ),
+                        ),
+                    ),
+                ),
+            ).isNotEmpty(),
         )
     }
 
-    private fun available(services: List<LLMModelSetting>) = support.availableSpecsFor(
-        "anthropic", ApiProtocol.Anthropic, "claude-sonnet-4-6", services,
+    @Test
+    fun sameTemplateInstancesKeepCredentialOwnershipSeparate() {
+        // 两个同模板实例：启用 + 有凭据的实例提供工具，凭据为空的实例不提供。
+        val specs = available(
+            listOf(
+                instance("minimax", sharedApiKey = "mm-key", uniqueId = "instance-a"),
+                instance("minimax", sharedApiKey = " ", uniqueId = "instance-b"),
+            ),
+        )
+        assertEquals(listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION), specs.map { it.toolId })
+    }
+
+    @Test
+    fun absentActiveInstanceCanStillReceiveIndependentApiTools() {
+        assertEquals(
+            listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION),
+            available(listOf(instance("minimax"))).map { it.toolId },
+        )
+    }
+
+    private fun available(instances: List<ModelServiceInstance>) = support.availableSpecsFor(
+        "anthropic", ApiProtocol.Anthropic, "claude-sonnet-4-6", instances,
     )
 
-    private fun service(id: String) = LLMModelSetting(
-        id = id, name = id, isEnabled = true, apiKey = "key",
-        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "https://example.com", groups = emptyList(),
-    )
+    private fun minimaxInstance(protocol: ApiProtocol) = instance("minimax").let { base ->
+        base.copy(connections = base.connections.map { connection ->
+            if (connection.capability == ServiceCapability.Conversation) {
+                connection.copy(protocol = protocol)
+            } else {
+                connection
+            }
+        })
+    }
+
+    private fun instance(
+        templateId: String,
+        sharedApiKey: String = "key",
+        uniqueId: String = "instance-$templateId",
+    ): ModelServiceInstance {
+        val protocol = when (templateId) {
+            "anthropic" -> ApiProtocol.Anthropic
+            else -> ApiProtocol.OpenaiChatcompletions
+        }
+        return ModelServiceInstance(
+            id = uniqueId,
+            name = templateId,
+            templateId = templateId,
+            isEnabled = true,
+            isOfficialToolsEnabled = true,
+            sharedApiKey = sharedApiKey,
+            connections = listOf(
+                ServiceConnection(
+                    id = "conn-conversation-1",
+                    capability = ServiceCapability.Conversation,
+                    protocol = protocol,
+                    endpoint = "https://example.com",
+                    credential = CredentialSource.Shared,
+                ),
+            ),
+        )
+    }
 }

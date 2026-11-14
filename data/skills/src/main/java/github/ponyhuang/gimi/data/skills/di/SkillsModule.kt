@@ -9,9 +9,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.data.skills.EnabledSkillSource
 import github.ponyhuang.gimi.data.skills.FileSkillRepository
 import github.ponyhuang.gimi.data.skills.SkillArchiveReader
 import github.ponyhuang.gimi.data.skills.SkillArchiveStore
+import github.ponyhuang.gimi.data.skills.SkillEnabledStore
+import github.ponyhuang.gimi.data.skills.SharedPreferencesSkillEnabledStore
 import github.ponyhuang.gimi.data.skills.SkillsStorage
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
 import github.ponyhuang.gimi.core.storage.StorageRegistry
@@ -28,6 +31,16 @@ import androidx.core.net.toUri
 @Module
 @InstallIn(SingletonComponent::class)
 object SkillsModule {
+    @Provides
+    internal fun provideSnapshotRepository(
+        implementation: github.ponyhuang.gimi.data.skills.FileSkillSnapshotRepository,
+    ): github.ponyhuang.gimi.domain.skills.repository.SkillSnapshotRepository = implementation
+
+    @Provides
+    @Singleton
+    internal fun provideArchiveStore(paths: SkillStoragePaths): SkillArchiveStore =
+        SkillArchiveStore(paths.skillsRoot, paths.stagingRoot)
+
     @Provides
     @Singleton
     internal fun providePaths(
@@ -52,6 +65,8 @@ object SkillsModule {
         @ApplicationContext context: Context,
         okHttpClient: OkHttpClient,
         paths: SkillStoragePaths,
+        enabledStore: SkillEnabledStore,
+        store: SkillArchiveStore,
     ): SkillRepository {
         val reader = SkillArchiveReader(
             okHttpClient = okHttpClient,
@@ -60,17 +75,31 @@ object SkillsModule {
             },
         )
         return FileSkillRepository(
-            store = SkillArchiveStore(paths.skillsRoot, paths.stagingRoot),
+            store = store,
             archiveReader = reader,
+            enabledStore = enabledStore,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         )
     }
 
     @Provides
     @Singleton
-    internal fun provideSkillSource(paths: SkillStoragePaths): SkillSource {
+    internal fun provideSkillEnabledStore(
+        store: SharedPreferencesSkillEnabledStore,
+    ): SkillEnabledStore = store
+
+    @Provides
+    @Singleton
+    internal fun provideSkillSource(
+        paths: SkillStoragePaths,
+        enabledStore: SkillEnabledStore,
+    ): SkillSource {
         paths.skillsRoot.mkdirs()
-        return NewFileSystemSource(paths.skillsRoot.absolutePath)
+        // 运行时技能源包一层启用过滤：禁用的技能不进入 Agent 工具集，也不可按名加载。
+        return EnabledSkillSource(
+            delegate = NewFileSystemSource(paths.skillsRoot.absolutePath),
+            disabledNames = enabledStore::disabledNames,
+        )
     }
 }
 

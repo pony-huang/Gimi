@@ -1,14 +1,14 @@
 <resources>
     <string name="skills_screen_title">Skills</string>
-    <string name="skills_import_section">Install a skill</string>
+    <string name="skills_add">Add a skill</string>
     <string name="skills_import_url">Install from URL</string>
-    <string name="skills_import_url_subtitle">Download a public HTTPS ZIP archive</string>
     <string name="skills_import_local">Choose local ZIP</string>
-    <string name="skills_import_local_subtitle">Select a skill archive from this device</string>
     <string name="skills_importing">Validating and installing…</string>
     <string name="skills_installed_section">Installed</string>
     <string name="skills_empty">No skills installed</string>
     <string name="skills_remove">Delete %1$s</string>
+    <string name="skills_row_more">More actions</string>
+    <string name="skills_enable">Enable %1$s</string>
 
     <string name="skills_url_dialog_title">Install from URL</string>
     <string name="skills_url_label">HTTPS ZIP URL</string>

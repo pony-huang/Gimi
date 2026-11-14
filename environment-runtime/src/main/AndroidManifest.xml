@@ -1,0 +1,35 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <permission android:name="github.ponyhuang.gimi.environment.ACCESS_RUNTIME" android:protectionLevel="signature" />
+    <queries>
+        <package android:name="github.ponyhuang.gimi" />
+        <package android:name="github.ponyhuang.gimi.debug" />
+    </queries>
+    <application android:icon="@mipmap/ic_runtime" android:roundIcon="@mipmap/ic_runtime" android:label="@string/runtime_name" android:allowBackup="false" android:extractNativeLibs="true">
+        <meta-data android:name="github.ponyhuang.gimi.environment.API_VERSION" android:value="4" />
+        <provider
+            android:name=".RuntimeDocumentsProvider"
+            android:authorities="github.ponyhuang.gimi.environment.runtime.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <provider android:name=".RuntimeProvider" android:authorities="github.ponyhuang.gimi.environment.runtime" android:exported="true" android:permission="github.ponyhuang.gimi.environment.ACCESS_RUNTIME" />
+        <service android:name=".RuntimeService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started local code execution environment" />
+        </service>
+        <activity android:name=".RuntimeActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

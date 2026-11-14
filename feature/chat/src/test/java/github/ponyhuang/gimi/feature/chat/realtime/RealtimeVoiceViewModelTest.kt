@@ -11,10 +11,11 @@ import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUse
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
@@ -41,6 +42,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 
 /**
  * 模式抽屉与会话的回归线：
@@ -311,25 +313,27 @@ class RealtimeVoiceViewModelTest {
             promptPresets = promptPresets,
             modeRepository = modeRepository,
             voiceCapabilities = voiceCapabilities,
+            voiceCatalog = mockk(relaxed = true),
             observeSettings = observeSettings,
         )
     }
 
     /** 已配置 Realtime 默认模型的典型配置；其余默认模型留空以避开音色列表加载。 */
     private fun configuredRealtimeSettings(): DefaultModelSettings = DefaultModelSettings(
-        services = listOf(
-            LLMModelSetting(
-                id = "qwen",
+        instances = listOf(
+            ModelServiceInstance(
+                id = "instance-qwen",
                 name = "Qwen",
+                templateId = "qwen",
                 isEnabled = true,
-                apiKey = "key",
-                apiBaseUrl = "wss://example.com",
-                apiProtocol = ApiProtocol.OpenaiChatcompletions,
-                anthropicBaseUrl = "",
-                groups = listOf(
-                    ModelGroup(
-                        id = "realtime",
-                        name = "Realtime",
+                isOfficialToolsEnabled = false,
+                sharedApiKey = "key",
+                connections = listOf(
+                    ServiceConnection(
+                        id = "instance-qwen-realtime",
+                        capability = ServiceCapability.Realtime,
+                        protocol = ApiProtocol.OpenaiChatcompletions,
+                        endpoint = "wss://example.com",
                         models = listOf(
                             Model(
                                 id = "qwen-realtime",
@@ -338,7 +342,13 @@ class RealtimeVoiceViewModelTest {
                             ),
                         ),
                     ),
-                    ModelGroup(id = "chat", name = "Chat", models = listOf(Model("chat-model", "Chat"))),
+                    ServiceConnection(
+                        id = "instance-qwen-conversation",
+                        capability = ServiceCapability.Conversation,
+                        protocol = ApiProtocol.OpenaiChatcompletions,
+                        endpoint = "https://example.com",
+                        models = listOf(Model("chat-model", "Chat")),
+                    ),
                 ),
             ),
         ),
@@ -347,7 +357,7 @@ class RealtimeVoiceViewModelTest {
         speechSelection = null,
         ttsSelection = null,
         ttsVoiceId = "",
-        realtimeSelection = ModelSelection("qwen", "realtime", "qwen-realtime"),
+        realtimeSelection = ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-realtime"),
     )
 }
 

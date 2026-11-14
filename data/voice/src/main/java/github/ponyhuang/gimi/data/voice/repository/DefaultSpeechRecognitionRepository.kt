@@ -1,12 +1,10 @@
 package github.ponyhuang.gimi.data.voice.repository
 
 import github.ponyhuang.gimi.data.voice.remote.VoiceCapabilityRegistry
-import github.ponyhuang.gimi.data.voice.remote.speechRequestBaseUrl
+import github.ponyhuang.gimi.data.modelaccess.shared.speechRequestBaseUrl
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
+import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.voice.model.SpeechContextMessage
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
@@ -25,10 +23,10 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     private val registry: VoiceCapabilityRegistry,
 ) : SpeechRecognitionRepository {
     override val availability: Flow<Boolean> = combine(
-        modelCatalog.observeServices(),
+        modelCatalog.observeInstances(),
         modelCatalog.observeSpeechSelection(),
-    ) { services, selection ->
-        resolveConfig(services, selection) != null
+    ) { _, _ ->
+        currentConfig() != null
     }.distinctUntilChanged()
 
     override suspend fun transcribe(
@@ -37,13 +35,14 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     ): String {
         require(pcm16.isNotEmpty()) { "没有录制到语音，请重试" }
         val config = currentConfig() ?: error("请先在设置中选择可用的语音识别模型")
-        val recognizer = registry.recognizer(config.serviceId, config.capability)
+        // 适配器按模板标识分派；模型声明的识别能力（专用转写或音频理解）决定走哪套协议。
+        val recognizer = registry.recognizer(checkNotNull(config.templateId), checkNotNull(config.recognitionCapability))
         return recognizer.recognize(
             RecognitionRequest(
                 pcm16 = pcm16,
                 modelId = config.modelId,
                 apiKey = config.apiKey,
-                baseUrl = speechRequestBaseUrl(config.serviceId, config.baseUrl, config.workspaceId),
+                baseUrl = speechRequestBaseUrl(config.templateId, config.endpoint, config.workspaceId),
                 context = context,
                 workspaceId = config.workspaceId,
             ),
@@ -67,67 +66,24 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
             pcm16 = pcm16,
             modelId = config.modelId,
             apiKey = config.apiKey,
-            baseUrl = speechRequestBaseUrl(config.serviceId, config.baseUrl, config.workspaceId),
+            baseUrl = speechRequestBaseUrl(config.templateId, config.endpoint, config.workspaceId),
             context = context,
             workspaceId = config.workspaceId,
         )
-        val streaming = registry.streamingRecognizerOrNull(config.serviceId, config.capability)
+        val capability = checkNotNull(config.recognitionCapability)
+        val templateId = checkNotNull(config.templateId)
+        val streaming = registry.streamingRecognizerOrNull(templateId, capability)
         if (streaming != null) {
             streaming.recognize(request).collect { emit(it) }
         } else {
-            val text = registry.recognizer(config.serviceId, config.capability).recognize(request)
+            val text = registry.recognizer(templateId, capability).recognize(request)
             emit(RecognitionEvent.Final(text))
         }
     }
 
-    /** 当前选中的识别模型及其服务连接信息。 */
-    private data class ServiceRecognitionConfig(
-        val serviceId: String,
-        val modelId: String,
-        val apiKey: String,
-        val baseUrl: String,
-        /** 业务空间 ID（百炼）；厂商自有端点据此构造专属域名。 */
-        val workspaceId: String?,
-        /** 模型声明的识别能力：专用转写服务或音频理解模型，决定走哪一套协议。 */
-        val capability: ModelCapability,
-    )
-
-    private fun currentConfig(): ServiceRecognitionConfig? = resolveConfig(
-        modelCatalog.currentServices(),
-        modelCatalog.currentSpeechSelection(),
-    )
-
-    private fun resolveConfig(
-        services: List<LLMModelSetting>,
-        selection: ModelSelection?,
-    ): ServiceRecognitionConfig? {
-        val resolved = services.resolve(selection, isSpeech = true) ?: return null
-        val model = resolved.second
-        // 模型可同时具备两种识别语义时，优先走专用转写服务。
-        val capability = model.recognitionCapability ?: return null
-        return ServiceRecognitionConfig(
-            serviceId = resolved.first.id,
-            modelId = model.id,
-            // 配置可能存逗号分隔的多个 key，统一取第一个，与合成路径一致
-            apiKey = resolved.first.apiKey.substringBefore(',').trim(),
-            baseUrl = resolved.first.configuredBaseUrl,
-            workspaceId = resolved.first.workspaceId,
-            capability = capability,
-        )
-    }
-}
-
-internal fun List<LLMModelSetting>.resolve(
-    selection: ModelSelection?,
-    isSpeech: Boolean,
-): Pair<LLMModelSetting, github.ponyhuang.gimi.domain.modelcatalog.model.Model>? {
-    if (selection == null) return null
-    val service = firstOrNull { it.id == selection.serviceId } ?: return null
-    if (!service.isEnabled || service.apiKey.isBlank()) return null
-    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return null
-    val model = group.models.firstOrNull { it.id == selection.modelId } ?: return null
-    if (if (isSpeech) !model.capabilities.any { it.isRecognition } else !model.capabilities.contains(ModelCapability.TTS)) {
-        return null
-    }
-    return service to model
+    /** 当前选中的识别连接；能力校验在连接视图解析后进行。 */
+    private fun currentConfig(): ResolvedServiceConnection? =
+        modelCatalog.resolveVoiceConnection(modelCatalog.currentSpeechSelection()) { model ->
+            model.recognitionCapability != null
+        }
 }

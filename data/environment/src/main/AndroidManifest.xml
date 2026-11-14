@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="github.ponyhuang.gimi.environment.ACCESS_RUNTIME" />
+    <queries><package android:name="github.ponyhuang.gimi.environment.runtime" /></queries>
+</manifest>

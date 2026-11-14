@@ -2,10 +2,10 @@ package github.ponyhuang.gimi.data.agent.recommendation
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogEntry
-import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCapability
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -159,6 +160,10 @@ fun PreferenceGroupCard(
  * @property titleColor 标题文字色，默认继承行内内容色；禁用态可只降级文字而不用整行透明度。
  * @property subtitleColor 说明文字颜色，默认次要文字色。
  * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
+ * @property checked 与 [onCheckedChange] 同时提供时整行改为 toggleable（Role.Switch），
+ * 涟漪覆盖整行；开关行请直接使用 [PreferenceSwitchRow]。
+ * 此时行内尾部的开关组件应传空回调仅作展示，避免重复语义与局部涟漪。
+ * @property rowEnabled 行级交互（点击或整行开关）的可用性；只影响交互，不改文字与图标外观。
  * @param leadingIcon 自定义图标槽位；提供时以透明背景替换默认图标，沿用列表的对齐尺寸。
  */
 @Composable
@@ -169,6 +174,9 @@ fun PreferenceListItem(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    checked: Boolean? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    rowEnabled: Boolean = true,
     iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
     iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
     iconSize: Dp = GimiListDefaults.IconSize,
@@ -188,10 +196,21 @@ fun PreferenceListItem(
                 .heightIn(min = GimiListDefaults.MinHeight)
                 .then(
                     when {
+                        checked != null && onCheckedChange != null -> Modifier.toggleable(
+                            value = checked,
+                            enabled = rowEnabled,
+                            role = Role.Switch,
+                            onValueChange = onCheckedChange,
+                        )
                         onClick == null -> Modifier
-                        onLongClick == null -> Modifier.clickable(role = Role.Button, onClick = onClick)
+                        onLongClick == null -> Modifier.clickable(
+                            role = Role.Button,
+                            enabled = rowEnabled,
+                            onClick = onClick,
+                        )
                         else -> Modifier.combinedClickable(
                             role = Role.Button,
+                            enabled = rowEnabled,
                             onClick = onClick,
                             onLongClick = onLongClick,
                         )
@@ -220,13 +239,16 @@ fun PreferenceListItem(
                     .weight(1f)
                     .padding(start = GimiListDefaults.ContentSpacing, end = if (trailingContent == null) 0.dp else 8.dp),
             ) {
-                Text(
-                    text = title,
-                    style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
-                    color = titleColor,
-                    maxLines = if (compact) 2 else 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // 空标题不渲染，供只有图标与尾部内容的紧凑行（如 icon + switch）复用同一骨架。
+                if (title.isNotBlank()) {
+                    Text(
+                        text = title,
+                        style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                        color = titleColor,
+                        maxLines = if (compact) 2 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
@@ -254,39 +276,54 @@ fun PreferenceListItem(
 }
 
 /**
- * 带开关的设置行。开关值由调用方持有，整行点击可独立配置，避免与导航型行混淆。
- * [switchEnabled] 只控制开关；行点击的可用性由 [onClick] 决定。
+ * 统一的开关行：整行承担开关交互（Role.Switch，涟漪覆盖整行），尾部开关只作状态展示。
+ * 对齐聊天抽屉与设置页的开关行交互，覆盖 UI 设计的三种布局：
+ * 1. icon + menu + switch：传 [icon]（或 [leadingIcon]）与 [title]/[description]；
+ * 2. icon + switch：只传 [icon]（或 [leadingIcon]），不传标题与说明；
+ * 3. menu + switch：只传 [title]/[description]，不传图标（也可只传开关，左侧留空）。
+ *
+ * @property icon 标准图标槽：Compact 样式为透明底 24dp 图标，常规样式为主题蓝圆形底。
+ * @property leadingIcon 自定义图标槽（品牌图标、函数图标等）；提供时替代 [icon]。
+ * @property title 主标题；空时不渲染。
+ * @property description 说明文字；空时不渲染。
+ * @property enabled 整行交互与开关视觉的可用性；禁用时文字与图标同步降为 38% 透明度。
+ * @property showDivider 行底内缩分隔线，对齐文字左缘。
  */
 @Composable
-fun PreferenceSwitchItem(
-    icon: ImageVector,
-    title: String,
+fun PreferenceSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    subtitle: String? = null,
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    switchEnabled: Boolean = true,
-    iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
-    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
-    iconSize: Dp = GimiListDefaults.IconSize,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+    leadingIcon: (@Composable (Modifier) -> Unit)? = null,
+    title: String? = null,
+    description: String? = null,
     showDivider: Boolean = false,
 ) {
+    val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     PreferenceListItem(
         icon = icon,
-        title = title,
-        subtitle = subtitle,
+        title = title.orEmpty(),
+        subtitle = description,
         modifier = modifier,
-        onClick = onClick,
-        iconContainer = iconContainer,
-        iconTint = iconTint,
-        iconSize = iconSize,
+        iconTint = when {
+            compact && !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+            compact -> MaterialTheme.colorScheme.onSurfaceVariant
+            else -> MaterialTheme.colorScheme.onPrimary
+        },
         showDivider = showDivider,
+        leadingIcon = leadingIcon,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        rowEnabled = enabled,
+        titleColor = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        subtitleColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
         trailingContent = {
             GimiSwitch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = switchEnabled,
+                onCheckedChange = null,
+                enabled = enabled,
             )
         },
     )
@@ -430,21 +467,44 @@ private fun PreferenceListItemWithTrailingPreview() {
 @Preview(showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreferenceSwitchItemPreview() {
+private fun PreferenceSwitchRowPreview() {
     GimiTheme {
         PreferenceGroupCard {
-            PreferenceSwitchItem(
+            PreferenceSwitchRow(
                 icon = Icons.Default.Info,
-                title = "开关设置项",
+                title = "图标 + 标题/说明 + 开关",
+                description = "说明文字最多两行展示",
                 checked = true,
                 onCheckedChange = {},
                 showDivider = true,
             )
-            PreferenceSwitchItem(
+            PreferenceSwitchRow(
                 icon = Icons.Default.Info,
-                title = "禁用的开关设置项",
+                title = "关闭的开关行",
+                description = "说明文字",
                 checked = false,
-                switchEnabled = false,
+                onCheckedChange = {},
+                showDivider = true,
+            )
+            PreferenceSwitchRow(
+                icon = Icons.Default.Info,
+                title = "禁用的开关行",
+                description = "整行交互与视觉均不可用",
+                checked = false,
+                enabled = false,
+                onCheckedChange = {},
+                showDivider = true,
+            )
+            PreferenceSwitchRow(
+                icon = Icons.Default.Info,
+                title = "图标 + 开关",
+                checked = true,
+                onCheckedChange = {},
+                showDivider = true,
+            )
+            PreferenceSwitchRow(
+                title = "标题 + 开关",
+                checked = false,
                 onCheckedChange = {},
             )
         }

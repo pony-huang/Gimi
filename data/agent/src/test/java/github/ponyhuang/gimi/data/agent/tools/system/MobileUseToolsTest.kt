@@ -8,7 +8,7 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
@@ -164,7 +164,7 @@ class MobileUseToolsTest {
         val readonly = mockk<ReadonlyContext>()
         every { readonly.runConfig } returns RunConfig(
             customMetadata = ToolRunMetadata.of(
-                ModelRuntimeMetadata("service", ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
+                ModelRuntimeMetadata("service", null, ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
                 null, true, owner,
             ),
         )

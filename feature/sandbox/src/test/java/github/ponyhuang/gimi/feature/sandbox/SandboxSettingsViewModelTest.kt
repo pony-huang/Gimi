@@ -44,7 +44,6 @@ class SandboxSettingsViewModelTest {
     @Test fun queriesDraftCredentialsOnceAndSelectionWaitsForSave() = runTest {
         val settings = Settings(); val templates = Templates()
         val viewModel = SandboxSettingsViewModel(settings, templates)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiUrl(" http://localhost:3000/Control "))
         viewModel.onAction(SandboxSettingsAction.SetApiKey(" draft-key "))
         viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
@@ -111,7 +110,6 @@ class SandboxSettingsViewModelTest {
         lateinit var pending: Continuation<List<SandboxTemplate>>
         val templates = Templates { _, _ -> suspendCoroutine { pending = it } }
         val settings = Settings(); val viewModel = SandboxSettingsViewModel(settings, templates)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetTemplate("manual:v1"))
@@ -125,7 +123,6 @@ class SandboxSettingsViewModelTest {
     @Test fun savesAndRestoresHttpEndpointsWithoutChangingPathCase() = runTest {
         val settings = Settings(); val templates = Templates()
         val viewModel = SandboxSettingsViewModel(settings, templates)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiUrl(" http://localhost:3000/Control "))
         viewModel.onAction(SandboxSettingsAction.SetSandboxUrl(" http://localhost:3002/Proxy "))
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
@@ -141,7 +138,6 @@ class SandboxSettingsViewModelTest {
     @Test fun invalidProxyBlocksSaveButDoesNotBlockTemplateQuery() = runTest {
         val settings = Settings(); val templates = Templates()
         val viewModel = SandboxSettingsViewModel(settings, templates)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         viewModel.onAction(SandboxSettingsAction.SetSandboxUrl("localhost:3002"))
         viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
@@ -154,11 +150,8 @@ class SandboxSettingsViewModelTest {
         viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
         assertEquals(1, settings.saves)
     }
-    @Test fun toggleIsImmediateAndConnectionEditsWaitForSave() = runTest {
+    @Test fun connectionEditsWaitForSave() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
-        assertTrue(viewModel.uiState.value.enabled)
-        assertFalse(viewModel.uiState.value.configured)
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key")); runCurrent()
         assertEquals("", repository.configuration.value.connection.apiKey)
         assertEquals("key", viewModel.uiState.value.apiKey)
@@ -166,19 +159,19 @@ class SandboxSettingsViewModelTest {
         assertTrue(viewModel.uiState.value.configured)
         assertEquals("key", repository.configuration.value.connection.apiKey)
     }
-    @Test fun disablingPreservesUnsavedDraftAndSavedCredentials() = runTest {
+    @Test fun externalDisablePreservesUnsavedDraftAndSavedCredentials() = runTest {
         val repository = Settings()
         repository.configuration.value = SandboxConfiguration(true, SandboxConnection(apiKey = "saved"))
         val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("draft"))
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(false)); runCurrent()
+        // 开关在上一级运行环境页持有；这里模拟外部开关变更不会覆盖未保存的草稿。
+        repository.configuration.value = repository.configuration.value.copy(enabled = false); runCurrent()
         assertEquals("draft", viewModel.uiState.value.apiKey)
         assertEquals("saved", repository.configuration.value.connection.apiKey)
         assertFalse(viewModel.uiState.value.enabled)
     }
     @Test fun invalidDomainKeyAndTimeoutAreNotSaved() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiUrl("e2b.app"))
         viewModel.onAction(SandboxSettingsAction.SetIdleTimeout("0"))
         viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
@@ -187,7 +180,6 @@ class SandboxSettingsViewModelTest {
     }
     @Test fun rejectsDuplicateAndBlankEnvironmentNamesBeforeMapping() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         repeat(2) { viewModel.onAction(SandboxSettingsAction.AddEnvironment) }
         val rows = viewModel.uiState.value.environment
@@ -202,7 +194,6 @@ class SandboxSettingsViewModelTest {
     }
     @Test fun emptyEnvironmentValueIsSavedAndRowCanBeRemoved() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         viewModel.onAction(SandboxSettingsAction.AddEnvironment)
         val id = viewModel.uiState.value.environment.single().id
@@ -215,7 +206,6 @@ class SandboxSettingsViewModelTest {
     }
     @Test fun failedSaveKeepsDraftAndActualConfiguration() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("draft"))
         repository.fail = true
         viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
@@ -227,7 +217,6 @@ class SandboxSettingsViewModelTest {
     @Test fun invalidCollapsedVariableExpandsWhenSaving() = runTest {
         val repository = Settings()
         val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         viewModel.onAction(SandboxSettingsAction.AddEnvironment)
         val id = viewModel.uiState.value.environment.single().id
@@ -242,7 +231,6 @@ class SandboxSettingsViewModelTest {
     @Test fun savingPreservesVariableIdentityAndExpansion() = runTest {
         val repository = Settings()
         val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
         viewModel.onAction(SandboxSettingsAction.AddEnvironment)
         val id = viewModel.uiState.value.environment.single().id

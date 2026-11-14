@@ -26,7 +26,6 @@ import github.ponyhuang.gimi.data.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpManualConfigurationTool
 import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolFactory
-import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorMatch
@@ -53,6 +52,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
 
 /**
  * 两种工具访问模式的 Agent 组装验证。
@@ -172,6 +174,7 @@ class AgentFactoryToolAccessTest {
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
+                "install_skill",
             ),
             agent.tools.map(BaseTool::name),
         )
@@ -194,6 +197,7 @@ class AgentFactoryToolAccessTest {
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
+                "install_skill",
             ),
             agent.tools.map(BaseTool::name),
         )
@@ -353,7 +357,7 @@ class AgentFactoryToolAccessTest {
                     mcpRepository = mcpRepository,
                 ),
                 OfficialToolContribution(officialToolset, officialCatalog),
-                SkillToolContribution(mockk<SkillSource>(relaxed = true)),
+                SkillToolContribution(mockk<SkillSource>(relaxed = true), github.ponyhuang.gimi.data.agent.tools.skills.InstallSkillTool(mockk())),
                 PluginToolContribution(pluginRuntimeProvider),
                 BaseToolContribution(),
                 ModelCatalogContribution(modelServices),
@@ -372,6 +376,7 @@ class AgentFactoryToolAccessTest {
 
     private fun modelConfig() = ModelConfig(
         serviceId = SERVICE_ID,
+        templateId = SERVICE_ID,
         baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = "model",
         apiKey = "key",
@@ -387,7 +392,7 @@ class AgentFactoryToolAccessTest {
         every { all } returns listOf(
             OfficialToolSpec(
                 toolId = "kimi_web_tools",
-                serviceId = "kimi",
+                templateId = "kimi",
                 protocols = setOf(ApiProtocol.OpenaiChatcompletions),
                 displayName = "Kimi web tools",
                 searchCandidate = true,

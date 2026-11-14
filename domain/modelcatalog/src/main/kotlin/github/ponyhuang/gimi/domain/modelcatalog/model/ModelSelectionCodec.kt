@@ -5,8 +5,8 @@ object ModelSelectionCodec {
     private const val SEPARATOR = '\u001f'
 
     fun encode(selection: ModelSelection): String = listOf(
-        selection.serviceId,
-        selection.groupId,
+        selection.instanceId,
+        selection.connectionId,
         selection.modelId,
     ).joinToString(SEPARATOR.toString())
 

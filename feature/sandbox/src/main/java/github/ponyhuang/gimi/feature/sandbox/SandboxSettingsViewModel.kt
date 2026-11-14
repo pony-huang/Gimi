@@ -53,7 +53,6 @@ class SandboxSettingsViewModel @Inject constructor(
     fun onAction(action: SandboxSettingsAction) {
         if (uiState.value.busy) return
         when (action) {
-            is SandboxSettingsAction.SetEnabled -> persist { repository.setEnabled(action.enabled) }
             is SandboxSettingsAction.SetApiUrl -> {
                 if (action.value != uiState.value.apiUrl) invalidateTemplates()
                 edit(SandboxSettingField.API_URL) { it.copy(apiUrl = action.value) }
@@ -80,7 +79,6 @@ class SandboxSettingsViewModel @Inject constructor(
             SandboxSettingsAction.AddEnvironment -> edit(SandboxSettingField.ENVIRONMENT) { state ->
                 state.copy(environment = state.environment + SandboxEnvironmentDraft(nextEnvironmentId++, expanded = true))
             }
-            SandboxSettingsAction.ToggleConfiguration -> mutableState.update { it.copy(configurationExpanded = !it.configurationExpanded) }
             SandboxSettingsAction.ToggleKeyVisibility -> mutableState.update { it.copy(keyVisible = !it.keyVisible) }
             SandboxSettingsAction.Save -> save()
         }
@@ -133,14 +131,13 @@ class SandboxSettingsViewModel @Inject constructor(
 
     private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
         fromConfiguration(configuration, state).copy(
-            configurationExpanded = state.configurationExpanded, keyVisible = state.keyVisible, busy = state.busy,
+            keyVisible = state.keyVisible, busy = state.busy,
             templates = if (sameCredentials(configuration.connection, state)) state.templates else emptyList(),
             templateLoadState = if (sameCredentials(configuration.connection, state)) state.templateLoadState else SandboxTemplateLoadState.IDLE,
         )
 
     private fun save() {
         val state = uiState.value
-        if (!state.enabled) return
         val duplicates = state.environment.groupingBy { it.name.trim() }.eachCount().filterValues { it > 1 }.keys
         val rows = state.environment.map { row ->
             val invalid = !isSandboxEnvironmentName(row.name.trim()) || row.name.trim() in duplicates

@@ -38,6 +38,7 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 
 /**
  * 远程 A2A agent 运行时缓存的装配/降级/缓存边界：经真实 [AndroidA2AHttpClient] 对
@@ -401,8 +402,8 @@ class RemoteAgentRuntimeCacheTest {
                         override val name = "fixture"
                         override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {}
                     }, subAgents = lastChildren),
-                    github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
-                        "fixture", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
+                    ModelRuntimeMetadata(
+                        "fixture", null, github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
                         "fixture", "https://example.com",
                     ),
                 )

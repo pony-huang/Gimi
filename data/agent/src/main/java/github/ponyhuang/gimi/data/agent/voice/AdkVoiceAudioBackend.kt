@@ -53,6 +53,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
+import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeConnectionProbe
+import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeConnectionProbe
+import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
+import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
 
 /**
  * 应用会话与语音后端的唯一转换层；设备、AEC 和播放仍由 data:speech 拥有。

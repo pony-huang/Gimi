@@ -37,14 +37,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentCardSnapshot
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentSkillSnapshot
-import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
@@ -75,33 +74,19 @@ fun RemoteAgentEditorScreen(
             if (state.isMutationBlocked && state.connectionError != "a2a.storage_error") {
                 PreferenceBanner(text = stringResource(R.string.a2a_agent_mutation_blocked))
             }
-            // 启用开关是状态控制而非表单字段，置顶作主开关；
-            // 样式与其它设置页条目的 PreferenceListItem + 尾部 Switch 保持一致。
+            // 启用开关是状态控制而非表单字段，置顶作主开关；整行承担开关交互。
             PreferenceGroupCard {
-                PreferenceListItem(
+                PreferenceSwitchRow(
                     icon = Icons.Default.Hub,
                     title = stringResource(R.string.a2a_field_enable_agent),
-                    subtitle = stringResource(R.string.a2a_field_enable_subtitle),
-                    onClick = {
-                        if (!state.isMutationBlocked) {
-                            onAction(
-                                A2aSettingsAction.EditorChanged(
-                                    draft.copy(isEnabled = !draft.isEnabled),
-                                ),
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        GimiSwitch(
-                            checked = draft.isEnabled,
-                            enabled = !state.isMutationBlocked,
-                            onCheckedChange = {
-                                onAction(
-                                    A2aSettingsAction.EditorChanged(
-                                        draft.copy(isEnabled = it),
-                                    ),
-                                )
-                            },
+                    description = stringResource(R.string.a2a_field_enable_subtitle),
+                    checked = draft.isEnabled,
+                    enabled = !state.isMutationBlocked,
+                    onCheckedChange = {
+                        onAction(
+                            A2aSettingsAction.EditorChanged(
+                                draft.copy(isEnabled = it),
+                            ),
                         )
                     },
                 )

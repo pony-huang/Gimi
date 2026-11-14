@@ -10,10 +10,16 @@ import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -35,29 +41,49 @@ import org.junit.Test
 class RealtimeAssistantToolsResolveTest {
 
     private val realtimeSelection = ModelSelection(
-        serviceId = "qwen-speech",
-        groupId = "qwen-audio-realtime",
+        instanceId = "qwen-speech",
+        connectionId = "qwen-audio-realtime",
         modelId = "qwen-audio-3.1-realtime-plus",
     )
 
-    /** 只含一个 Realtime 模型的语音服务目录；[services] 可模拟目录未就绪/服务被移除。 */
-    private fun configSource(services: List<LLMModelSetting> = listOf(speechService())): AgentModelConfigurationSource = mockk {
-        coEvery { awaitReady() } returns Unit
-        every { currentServices() } returns services
+    /** 只含一个 Realtime 模型的语音服务目录；[instances] 可模拟目录未就绪/服务被移除。 */
+    private fun configSource(
+        instances: List<ModelServiceInstance> = listOf(speechInstance()),
+    ): Pair<AgentModelConfigurationSource, ModelCatalogRepository> {
+        val source = mockk<AgentModelConfigurationSource> {
+            coEvery { awaitReady() } returns Unit
+            every { currentInstances() } returns instances
+        }
+        val catalog = mockk<ModelCatalogRepository> {
+            // 与运行时仓库一致:按选择在实例快照中解析连接视图。
+            every { resolveConnection(any()) } answers { instances.resolveConnection(firstArg()) }
+        }
+        return source to catalog
     }
 
-    private fun speechService(): LLMModelSetting = mockk {
-        every { id } returns "qwen-speech"
-        every { apiProtocol } returns ApiProtocol.OpenaiChatcompletions
-        every { apiBaseUrl } returns "wss://dashscope.example/realtime"
-        every { groups } returns listOf(mockk {
-            every { id } returns "qwen-audio-realtime"
-            every { models } returns listOf(mockk {
-                every { id } returns "qwen-audio-3.1-realtime-plus"
-                every { multimodal } returns MultimodalCapabilities()
-            })
-        })
-    }
+    /** 语音服务实例:模板身份为厂商(qwen),Realtime 连接携带唯一的实时模型。 */
+    private fun speechInstance(): ModelServiceInstance = ModelServiceInstance(
+        id = "qwen-speech",
+        name = "qwen-speech",
+        templateId = "qwen",
+        isEnabled = true,
+        isOfficialToolsEnabled = false,
+        sharedApiKey = "test-key",
+        connections = listOf(
+            ServiceConnection(
+                id = "qwen-audio-realtime",
+                capability = ServiceCapability.Realtime,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "wss://dashscope.example/realtime",
+                models = listOf(Model(
+                    id = "qwen-audio-3.1-realtime-plus",
+                    name = "qwen-audio-3.1-realtime-plus",
+                    capabilities = setOf(ModelCapability.Realtime),
+                    multimodal = MultimodalCapabilities(),
+                )),
+            ),
+        ),
+    )
 
     private fun emptyPluginRuntime() = object : PluginRuntimeProvider<AgentPlugin> {
         override val runtime = MutableStateFlow(PluginRuntimeSnapshot<AgentPlugin>(revision = 0, enabledPlugins = emptyList()))
@@ -65,10 +91,11 @@ class RealtimeAssistantToolsResolveTest {
 
     private fun tools(
         contributions: AgentContributionRegistry = AgentContributionRegistry(emptySet()),
-        modelServices: AgentModelConfigurationSource = configSource(),
+        config: Pair<AgentModelConfigurationSource, ModelCatalogRepository> = configSource(),
     ): RealtimeAssistantTools = RealtimeAssistantTools(
         contributions = contributions,
-        modelServices = modelServices,
+        modelServices = config.first,
+        modelCatalog = config.second,
         pluginRuntimeProvider = emptyPluginRuntime(),
     )
 
@@ -130,7 +157,7 @@ class RealtimeAssistantToolsResolveTest {
     @Test
     fun `missing model catalog entry still yields the tool declarations`() = runTest {
         val registry = AgentContributionRegistry(setOf(contribution("local", toolset(localTool("clock_now")))))
-        val bridge = tools(registry, configSource(services = emptyList())).resolve(realtimeSelection)
+        val bridge = tools(registry, configSource(instances = emptyList())).resolve(realtimeSelection)
         assertNotNull(bridge)
         assertEquals(listOf("clock_now"), bridge!!.declarations.map { it.name })
     }

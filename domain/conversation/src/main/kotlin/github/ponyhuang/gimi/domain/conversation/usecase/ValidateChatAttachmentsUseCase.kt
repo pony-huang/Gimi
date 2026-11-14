@@ -2,8 +2,8 @@ package github.ponyhuang.gimi.domain.conversation.usecase
 
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import javax.inject.Inject
 
 /** 附件不能进入当前发送请求的原因，不持有界面文案。 */
@@ -28,16 +28,15 @@ sealed interface ChatAttachmentValidationFailure {
 class ValidateChatAttachmentsUseCase @Inject constructor() {
     operator fun invoke(
         selection: ModelSelection,
-        services: List<LLMModelSetting>,
+        instances: List<ModelServiceInstance>,
         drafts: List<DraftAttachment>,
     ): ChatAttachmentValidationFailure? {
         if (drafts.isEmpty()) return null
         if (drafts.mapTo(hashSetOf()) { it.category }.size != 1) {
             return ChatAttachmentValidationFailure.MixedCategories
         }
-        val model = services.firstOrNull { it.id == selection.serviceId }
-            ?.groups?.firstOrNull { it.id == selection.groupId }
-            ?.models?.firstOrNull { it.id == selection.modelId }
+        val model = instances.firstOrNull { it.id == selection.instanceId }
+            ?.findModel(selection)
             ?: return ChatAttachmentValidationFailure.ModelUnavailable
         val (supportedMimeTypes, maxInlineBytes) = when (drafts.first().category) {
             AttachmentCategory.IMAGE -> model.multimodal.vision?.let {

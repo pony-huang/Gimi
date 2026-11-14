@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.agent.recommendation
 
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import io.mockk.every

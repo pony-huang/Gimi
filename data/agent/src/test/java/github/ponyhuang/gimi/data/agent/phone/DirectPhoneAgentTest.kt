@@ -9,7 +9,7 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.mobileuse.DirectPhoneController
 import github.ponyhuang.gimi.domain.mobileuse.DirectPhoneResult
@@ -62,7 +62,7 @@ class DirectPhoneAgentTest {
         coEvery { controller.execute(capture(owners), any(), any()) } returns
             DirectPhoneResult(DirectPhoneResult.STATUS_COMPLETED, "done")
         val metadata = ToolRunMetadata.of(
-            ModelRuntimeMetadata("service", ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
+            ModelRuntimeMetadata("service", null, ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
             null, true, mobileUseOwner = "turn",
         )
         val agent = DirectPhoneAgent(controller)

@@ -25,7 +25,7 @@
 ### 视觉参数
 
 - Gimi 自有图标采用昼夜反转的扁平单色方案：白天／浅色模式使用 `#050505` 底和 `#FFFFFF` 标志；夜间／深色模式使用 `#FFFFFF` 底和 `#3C3C43` 标志。保持现有图形、比例、透明度与净空，不添加渐变或阴影。
-- 静态文档与 README 图标默认使用白天版本；需要单一夜间素材时，按上述夜间配对生成或选用对应资源。
+- README 使用自适应透明底标志素材，通过 `prefers-color-scheme` 的 `<picture>` 元素选择：白天／浅色模式用 `doc/icon-light.png`（透明底上的 `#050505` 标志），夜间／深色模式用 `doc/icon-dark.png`（透明底上的 `#F5F5F5` 标志）。`doc/icon.webp` 保留为原始白天版本源图；需要单一夜间素材时，按上述夜间配对生成或选用对应资源。
 - 品牌标准蓝使用项目现有 `BrandBlue = #4D6BFE`，与单色图标色分开定义。
 - `#4D6BFE` 与白色的对比度为 `4.33:1`，与黑色为 `4.85:1`。因此它适合焦点环、图标和非文字强调，但不用于白色背景上的普通字号文字，也不以白字承载普通字号填充按钮。
 
@@ -150,7 +150,7 @@
 
 ## 标志与第三方品牌边界
 
-- 保留 Gimi 名称和现有标志图形。`doc/icon.webp` 是 README 的 Gimi 品牌图片，使用白天版本；应用启动图标使用 `app/src/main/res/drawable-nodpi/ic_launcher_foreground_art.png` 及各密度启动图标资产。
+- 保留 Gimi 名称和现有标志图形。README 的 Gimi 品牌图片使用自适应透明底标志素材 `doc/icon-light.png` / `doc/icon-dark.png`，`doc/icon.webp` 保留为原始白天版本源图；应用启动图标使用 `app/src/main/res/drawable-nodpi/ic_launcher_foreground_art.png` 及各密度启动图标资产。
 - 启动图标按系统昼夜配置切换：默认资源为白天黑底白标；`drawable-night`、`drawable-night-nodpi` 与 `mipmap-night-*` 提供夜间白底深灰标。自适应图标 XML 不变，通过资源限定符解析对应版本。
 - 系统单色图标继续使用透明 alpha 遮罩，由系统负责着色；昼夜切换后资源随配置更新，但启动器缓存可能导致显示延迟，验证时可重启应用或刷新启动器。
 - 保持原始图形、宽高比和透明度，不拉伸、重绘、描边、添加渐变或阴影。标志四周至少保留标志高度 50% 的净空；数字界面建议最小显示宽度 24 dp。

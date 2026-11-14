@@ -31,9 +31,6 @@
     <string name="recommendation_tool_loading_title">Tool loading</string>
     <string name="recommendation_tool_loading_always">Load all</string>
     <string name="recommendation_tool_loading_on_demand">On demand</string>
-    <string name="recommendation_device_section">Device control</string>
-    <string name="recommendation_mobile_use_title">Shizuku</string>
-    <string name="recommendation_mobile_use_subtitle">Let the Agent use other apps in the background</string>
     <string name="recommendation_theme_section">Theme</string>
     <string name="recommendation_theme_mode_title">Theme mode</string>
     <string name="recommendation_theme_system">Follow system</string>

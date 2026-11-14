@@ -23,9 +23,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
@@ -43,25 +43,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
-import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceFormContent
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
-/** 无状态沙盒表单；即时开关、配置草稿与各变量组展开态均由 ViewModel 驱动。 */
+/**
+ * 无状态沙盒表单；配置草稿与各变量组展开态均由 ViewModel 驱动。
+ * E2B 的启用开关由上一级运行环境页持有，本页只承担连接与运行配置。
+ */
 @Composable
 fun SandboxSettingsScreen(
     state: SandboxSettingsUiState,
@@ -69,15 +72,11 @@ fun SandboxSettingsScreen(
     onOpenDocumentation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val configurationRotation by animateFloatAsState(
-        if (state.configurationExpanded) 180f else 0f,
-        animationSpec = tween(300, easing = FastOutSlowInEasing),
-        label = "Configuration arrow",
-    )
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             item {
                 PreferenceSectionTitle(stringResource(R.string.sandbox_execution_section))
+                PreferenceSectionNote(stringResource(R.string.sandbox_capabilities_description))
                 TextButton(
                     onClick = onOpenDocumentation,
                     modifier = Modifier.padding(start = 24.dp),
@@ -87,115 +86,82 @@ fun SandboxSettingsScreen(
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null,
                         modifier = Modifier.padding(start = 4.dp).size(14.dp))
                 }
+            }
+            item {
+                PreferenceSectionTitle(stringResource(R.string.sandbox_connection_section))
                 PreferenceGroupCard {
-                    PreferenceListItem(
-                        icon = Icons.Default.Code,
-                        title = stringResource(R.string.sandbox_e2b),
-                        subtitle = stringResource(when {
-                            !state.enabled -> R.string.sandbox_disabled_description
-                            !state.configured -> R.string.sandbox_pending_description
-                            else -> R.string.sandbox_configured_description
-                        }),
-                        onClick = if (state.busy) null else { { onAction(SandboxSettingsAction.ToggleConfiguration) } },
-                        trailingContent = {
-                            GimiSwitch(
-                                checked = state.enabled,
-                                enabled = !state.busy,
-                                onCheckedChange = { onAction(SandboxSettingsAction.SetEnabled(it)) },
-                            )
-                            IconButton(
-                                onClick = { onAction(SandboxSettingsAction.ToggleConfiguration) },
-                                enabled = !state.busy,
-                            ) {
-                                Icon(
-                                    Icons.Default.ExpandMore,
-                                    contentDescription = stringResource(if (state.configurationExpanded) R.string.sandbox_collapse_configuration else R.string.sandbox_expand_configuration),
-                                    modifier = Modifier.rotate(configurationRotation),
-                                )
-                            }
-                        },
-                    )
+                    PreferenceFormContent {
+                        SandboxField(
+                            state.apiUrl, { onAction(SandboxSettingsAction.SetApiUrl(it)) },
+                            stringResource(R.string.sandbox_api_url),
+                            stringResource(if (SandboxSettingField.API_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_api_url_help),
+                            SandboxSettingField.API_URL in state.errors, !state.busy,
+                            KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        )
+                        SandboxField(
+                            state.sandboxUrl, { onAction(SandboxSettingsAction.SetSandboxUrl(it)) },
+                            stringResource(R.string.sandbox_proxy_url),
+                            stringResource(if (SandboxSettingField.SANDBOX_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_proxy_url_help),
+                            SandboxSettingField.SANDBOX_URL in state.errors, !state.busy,
+                            KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        )
+                        PreferenceTextField(
+                            value = state.apiKey,
+                            onValueChange = { onAction(SandboxSettingsAction.SetApiKey(it)) },
+                            label = { Text(stringResource(R.string.sandbox_api_key)) },
+                            supportingText = { Text(stringResource(if (SandboxSettingField.API_KEY in state.errors) R.string.sandbox_key_required else R.string.sandbox_key_help)) },
+                            visualTransformation = if (state.keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { onAction(SandboxSettingsAction.ToggleKeyVisibility) }, enabled = !state.busy) {
+                                    Icon(
+                                        if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key),
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            isError = SandboxSettingField.API_KEY in state.errors,
+                            enabled = !state.busy,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
             item {
-                Text(
-                    text = stringResource(R.string.sandbox_capabilities_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-                )
+                PreferenceSectionTitle(stringResource(R.string.sandbox_runtime_configuration))
+                PreferenceGroupCard {
+                    PreferenceFormContent {
+                        SandboxTemplatePicker(state, onAction)
+                        SandboxField(
+                            state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
+                            stringResource(R.string.sandbox_idle_timeout),
+                            stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
+                            SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy,
+                            KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                    }
+                }
             }
             item {
-                SandboxExpansion(state.configurationExpanded) {
-                    Column {
-                        PreferenceSectionTitle(stringResource(R.string.sandbox_connection_section))
-                        PreferenceGroupCard {
-                            PreferenceFormContent {
-                                SandboxField(
-                                    state.apiUrl, { onAction(SandboxSettingsAction.SetApiUrl(it)) },
-                                    stringResource(R.string.sandbox_api_url),
-                                    stringResource(if (SandboxSettingField.API_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_api_url_help),
-                                    SandboxSettingField.API_URL in state.errors, !state.busy,
-                                    KeyboardOptions(keyboardType = KeyboardType.Uri),
-                                )
-                                SandboxField(
-                                    state.sandboxUrl, { onAction(SandboxSettingsAction.SetSandboxUrl(it)) },
-                                    stringResource(R.string.sandbox_proxy_url),
-                                    stringResource(if (SandboxSettingField.SANDBOX_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_proxy_url_help),
-                                    SandboxSettingField.SANDBOX_URL in state.errors, !state.busy,
-                                    KeyboardOptions(keyboardType = KeyboardType.Uri),
-                                )
-                                PreferenceTextField(
-                                    value = state.apiKey,
-                                    onValueChange = { onAction(SandboxSettingsAction.SetApiKey(it)) },
-                                    label = { Text(stringResource(R.string.sandbox_api_key)) },
-                                    supportingText = { Text(stringResource(if (SandboxSettingField.API_KEY in state.errors) R.string.sandbox_key_required else R.string.sandbox_key_help)) },
-                                    visualTransformation = if (state.keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                    trailingIcon = {
-                                        IconButton(onClick = { onAction(SandboxSettingsAction.ToggleKeyVisibility) }, enabled = !state.busy) {
-                                            Icon(
-                                                if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                                contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key),
-                                            )
-                                        }
-                                    },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                    isError = SandboxSettingField.API_KEY in state.errors,
-                                    enabled = !state.busy,
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
+                PreferenceSectionTitle(stringResource(R.string.sandbox_environment))
+                PreferenceGroupCard {
+                    PreferenceFormContent {
+                        Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        state.environment.forEachIndexed { index, entry ->
+                            key(entry.id) {
+                                SandboxEnvironmentGroup(entry, !state.busy,
+                                    showDivider = index < state.environment.lastIndex, onAction)
                             }
                         }
-                        PreferenceSectionTitle(stringResource(R.string.sandbox_runtime_configuration))
-                        PreferenceGroupCard {
-                            PreferenceFormContent {
-                                SandboxTemplatePicker(state, onAction)
-                                SandboxField(
-                                    state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
-                                    stringResource(R.string.sandbox_idle_timeout),
-                                    stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
-                                    SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy,
-                                    KeyboardOptions(keyboardType = KeyboardType.Number),
-                                )
-                            }
-                        }
-                        PreferenceSectionTitle(stringResource(R.string.sandbox_environment))
-                        PreferenceGroupCard {
-                            PreferenceFormContent {
-                                Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                state.environment.forEach { entry ->
-                                    key(entry.id) { SandboxEnvironmentGroup(entry, !state.busy, onAction) }
-                                }
-                                TextButton(
-                                    onClick = { onAction(SandboxSettingsAction.AddEnvironment) },
-                                    enabled = !state.busy,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 8.dp))
-                                }
-                            }
+                        TextButton(
+                            onClick = { onAction(SandboxSettingsAction.AddEnvironment) },
+                            enabled = !state.busy,
+                            modifier = Modifier.align(Alignment.Start),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 6.dp))
                         }
                     }
                 }
@@ -205,13 +171,14 @@ fun SandboxSettingsScreen(
 }
 
 @Composable
-private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boolean, onAction: (SandboxSettingsAction) -> Unit) {
+private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boolean, showDivider: Boolean, onAction: (SandboxSettingsAction) -> Unit) {
     val rotation by animateFloatAsState(if (entry.expanded) 180f else 0f, tween(300, easing = FastOutSlowInEasing), label = "Environment arrow")
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(onClick = { onAction(SandboxSettingsAction.ToggleEnvironment(entry.id)) }, enabled = enabled, color = Color.Transparent) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 // 折叠摘要只展示名称；值可能是令牌，不应在浏览列表时直接暴露。
-                Text(entry.name.ifBlank { stringResource(R.string.sandbox_new_environment) }, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text(entry.name.ifBlank { stringResource(R.string.sandbox_new_environment) }, Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Monospace)
                 Icon(Icons.Default.ExpandMore, stringResource(if (entry.expanded) R.string.sandbox_collapse_environment else R.string.sandbox_expand_environment), Modifier.rotate(rotation))
             }
         }
@@ -235,12 +202,14 @@ private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boo
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                IconButton(onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) }, enabled = enabled, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                IconButton(onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) }, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
                     Icon(Icons.Default.DeleteOutline, stringResource(R.string.sandbox_remove_environment), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        if (showDivider) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        }
     }
 }
 
@@ -263,14 +232,12 @@ private fun SandboxField(value: String, onValueChange: (String) -> Unit, label: 
 /** 保存区属于页面壳，不随表单滚动；保持连接草稿必须显式保存的语义。 */
 @Composable
 internal fun SandboxSettingsSaveBar(state: SandboxSettingsUiState, onAction: (SandboxSettingsAction) -> Unit) {
-    if (state.enabled) {
-        PreferenceSaveBar(
-            label = stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save),
-            onSave = { onAction(SandboxSettingsAction.Save) },
-            enabled = state.canSave,
-            notice = if (state.dirty) stringResource(R.string.sandbox_unsaved_changes) else null,
-        )
-    }
+    PreferenceSaveBar(
+        label = stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save),
+        onSave = { onAction(SandboxSettingsAction.Save) },
+        enabled = state.canSave,
+        notice = if (state.dirty) stringResource(R.string.sandbox_unsaved_changes) else null,
+    )
 }
 
 @Preview(name = "Configured light", widthDp = 390, heightDp = 780)
@@ -282,30 +249,21 @@ private fun SandboxConfiguredPreview() = SandboxScreenPreview(SandboxSettingsUiS
 @Preview(name = "Runtime dark", widthDp = 390, heightDp = 1080, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Preview(name = "Runtime tablet", widthDp = 840, heightDp = 1080)
 @Composable
-private fun SandboxRuntimePreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configured = true, apiKey = "preview-key", configurationExpanded = true,
+private fun SandboxRuntimePreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configured = true, apiKey = "preview-key",
     environment = listOf(SandboxEnvironmentDraft(0, "LANG", "zh_CN.UTF-8"), SandboxEnvironmentDraft(1, expanded = true)), dirty = true))
 
-@Preview(name = "Disabled", widthDp = 390, heightDp = 780)
+@Preview(name = "Unconfigured", widthDp = 390, heightDp = 780)
 @Composable
-private fun SandboxDisabledPreview() = SandboxScreenPreview(SandboxSettingsUiState())
-
-@Preview(name = "Disabled expanded light", widthDp = 390, heightDp = 1080)
-@Preview(name = "Disabled expanded dark", widthDp = 390, heightDp = 1080, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun SandboxDisabledExpandedPreview() = SandboxScreenPreview(SandboxSettingsUiState(configurationExpanded = true))
-
-@Preview(name = "Pending", widthDp = 390, heightDp = 780)
-@Composable
-private fun SandboxPendingPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true))
+private fun SandboxUnconfiguredPreview() = SandboxScreenPreview(SandboxSettingsUiState())
 
 @Preview(name = "Invalid fields", widthDp = 320, heightDp = 780, fontScale = 1.3f)
 @Composable
-private fun SandboxInvalidPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configurationExpanded = true, apiUrl = "192.168.1.10:3000", errors = setOf(SandboxSettingField.API_URL, SandboxSettingField.API_KEY)))
+private fun SandboxInvalidPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, apiUrl = "192.168.1.10:3000", errors = setOf(SandboxSettingField.API_URL, SandboxSettingField.API_KEY)))
 
 @Preview(name = "Local HTTP light", widthDp = 390, heightDp = 1080)
 @Preview(name = "Local HTTP dark", widthDp = 390, heightDp = 1080, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun SandboxLocalHttpPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configurationExpanded = true,
+private fun SandboxLocalHttpPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true,
     apiUrl = "http://192.168.1.10:3000", sandboxUrl = "http://192.168.1.10:3002", apiKey = "preview-key", template = "base"))
 
 @Composable

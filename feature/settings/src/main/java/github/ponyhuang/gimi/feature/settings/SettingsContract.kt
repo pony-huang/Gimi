@@ -2,7 +2,6 @@ package github.ponyhuang.gimi.feature.settings
 
 sealed interface SettingsAction {
     /** 打开语音厂商配置列表。 */
-    data object OpenSpeechModels : SettingsAction
     data object OpenModelService : SettingsAction
     data object OpenDefaultModels : SettingsAction
     data object OpenMcpServers : SettingsAction
@@ -12,6 +11,8 @@ sealed interface SettingsAction {
     data object OpenAppFunctions : SettingsAction
     /** 打开沙盒连接与执行环境配置页。 */
     data object OpenSandbox : SettingsAction
+    /** 打开 Shizuku（设备控制）连接与授权状态页。 */
+    data object OpenMobileUse : SettingsAction
     data object OpenPlugins : SettingsAction
     data object OpenSkills : SettingsAction
     /** 打开附件工作区管理页。 */
@@ -25,7 +26,6 @@ sealed interface SettingsAction {
 
 sealed interface SettingsEffect {
     /** 进入语音厂商配置列表。 */
-    data object NavigateToSpeechModels : SettingsEffect
     data object NavigateToModelService : SettingsEffect
     data object NavigateToDefaultModels : SettingsEffect
     data object NavigateToMcpServers : SettingsEffect
@@ -35,6 +35,8 @@ sealed interface SettingsEffect {
     data object NavigateToAppFunctions : SettingsEffect
     /** 进入沙盒功能拥有的设置目的地。 */
     data object NavigateToSandbox : SettingsEffect
+    /** 进入设备控制（Shizuku）功能拥有的设置目的地。 */
+    data object NavigateToMobileUse : SettingsEffect
     data object NavigateToPlugins : SettingsEffect
     data object NavigateToSkills : SettingsEffect
     /** 跳转附件工作区管理页。 */

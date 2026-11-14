@@ -36,10 +36,11 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyExcepti
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
@@ -2024,12 +2025,12 @@ class ChatViewModelCharacterizationTest {
         sessionResolverOverride: ConversationSessionResolver? = null,
         recognitionOverride: SpeechRecognitionRepository? = null,
     ): Fixture {
-        val selection = ModelSelection("service", "chat", "model")
+        val selection = ModelSelection("instance", "connection", "model")
         val services = if (configured) listOf(service()) else emptyList()
         val catalog = mockk<ModelCatalogRepository>(relaxed = true) {
-            every { observeServices() } returns MutableStateFlow(services)
+            every { observeInstances() } returns MutableStateFlow(services)
             every { observeLoadState() } returns MutableStateFlow(CatalogLoadState.Ready)
-            every { currentServices() } returns services
+            every { currentInstances() } returns services
             every { currentAssistantSelection() } returns selection.takeIf { configured }
             coEvery { awaitReady() } returns Unit
         }
@@ -2265,18 +2266,19 @@ class ChatViewModelCharacterizationTest {
         ),
     )
 
-    private fun service() = LLMModelSetting(
-        id = "service",
+    private fun service() = ModelServiceInstance(
+        id = "instance",
         name = "Service",
+        templateId = "openai",
         isEnabled = true,
-        apiKey = "key",
-        apiBaseUrl = "https://example.test",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "chat",
-                name = "Chat",
+        isOfficialToolsEnabled = false,
+        sharedApiKey = "key",
+        connections = listOf(
+            ServiceConnection(
+                id = "connection",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://example.test",
                 models = listOf(Model(id = "model", name = "Model")),
             ),
         ),

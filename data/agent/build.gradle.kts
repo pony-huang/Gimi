@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:environment"))
     implementation(project(":domain:voice"))
     implementation(project(":domain:a2ui"))
     implementation(project(":domain:skills"))
@@ -68,6 +69,8 @@ dependencies {
     implementation(project(":domain:plugin"))
     implementation(project(":plugin-api"))
     implementation(project(":domain:workfiles"))
+    // 厂商模型接入层（Claude/实时/级联/语音适配与装配）拆分至独立模块。
+    implementation(project(":data:modelaccess"))
     // Realtime 语音模型与语音上传需要共享传输内核（VoiceWsKernel）与音频格式契约。
     implementation(project(":core:network"))
     implementation(project(":core:audio"))
@@ -89,7 +92,6 @@ dependencies {
     // 其 POM 把 protobuf-java-util 声明为 provided，由本模块显式补齐；版本与传递的
     // protobuf-java 4.35.0 对齐。
     implementation(libs.protobuf.java.util)
-    implementation(libs.google.adk.kotlin.integrations.openai)
     implementation(libs.okhttp)
     // OpenAI Realtime 协议沿用语音链路惯例：Gson JsonObject 手工构建/解析。
     implementation(libs.gson)

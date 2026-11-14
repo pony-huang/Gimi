@@ -96,11 +96,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
-import github.ponyhuang.gimi.domain.voice.model.TtsVoiceCatalog
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
@@ -531,16 +531,8 @@ fun RealtimeVoiceScreen(
                                         onPick = { voiceId -> onSelectSettingsVoice(VoiceSettingsKind.Tts, voiceId) },
                                         onBack = { sheetPage = page.parent },
                                         // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
-                                        namingTemplate = if (settings.ttsVoiceCustomInputAllowed) {
-                                            TtsVoiceCatalog.QWEN_BASE_VOICE_TEMPLATE
-                                        } else {
-                                            null
-                                        },
-                                        docsUrl = if (settings.ttsVoiceCustomInputAllowed) {
-                                            TtsVoiceCatalog.QWEN_VOICE_LIST_URL
-                                        } else {
-                                            null
-                                        },
+                                        namingTemplate = settings.ttsVoiceIdTemplate,
+                                        docsUrl = settings.ttsVoiceDocsUrl,
                                         onOpenUrl = onOpenUrl,
                                     )
                                 } else {
@@ -987,39 +979,47 @@ private fun VoiceControl(
 
 /** 抽屉页面预览共用的候选模型行假数据。 */
 private fun previewVoiceModelRow(
-    serviceId: String,
-    serviceName: String,
-    groupId: String,
-    groupName: String,
+    instanceId: String,
+    instanceName: String,
+    connectionId: String,
     modelId: String,
     modelName: String,
-): VoiceModelRow = VoiceModelRow(
-    service = LLMModelSetting(
-        id = serviceId,
-        name = serviceName,
+): VoiceModelRow {
+    val instance = ModelServiceInstance(
+        id = instanceId,
+        name = instanceName,
+        templateId = instanceId,
         isEnabled = true,
-        apiKey = "preview-key",
-        apiBaseUrl = "https://preview.example.com",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = emptyList(),
-    ),
-    group = ModelGroup(id = groupId, name = groupName, models = emptyList()),
-    model = Model(id = modelId, name = modelName),
-)
+        isOfficialToolsEnabled = true,
+        sharedApiKey = "preview-key",
+        connections = listOf(
+            ServiceConnection(
+                id = connectionId,
+                capability = ServiceCapability.Recognition,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://preview.example.com",
+            ),
+        ),
+    )
+    return VoiceModelRow(
+        instance = instance,
+        connection = instance.connections.first(),
+        model = Model(id = modelId, name = modelName),
+    )
+}
 
 /** 抽屉页面预览共用的一套已配置默认模型与音色。 */
 private fun previewVoiceSettings(): VoiceSettingsUiState = VoiceSettingsUiState(
-    speechRows = listOf(previewVoiceModelRow("minimax", "MiniMax", "audio", "Audio", "speech-02", "Speech-02")),
-    speechSelection = ModelSelection("minimax", "audio", "speech-02"),
-    ttsRows = listOf(previewVoiceModelRow("mimo", "MiMo", "audio", "Audio", "mimo-tts", "MiMo TTS")),
-    ttsSelection = ModelSelection("mimo", "audio", "mimo-tts"),
+    speechRows = listOf(previewVoiceModelRow("instance-minimax", "MiniMax", "conn-synthesis", "speech-02", "Speech-02")),
+    speechSelection = ModelSelection("instance-minimax", "conn-synthesis", "speech-02"),
+    ttsRows = listOf(previewVoiceModelRow("instance-mimo", "MiMo", "conn-synthesis", "mimo-tts", "MiMo TTS")),
+    ttsSelection = ModelSelection("instance-mimo", "conn-synthesis", "mimo-tts"),
     ttsVoiceId = "tongtong",
     ttsVoiceOptions = listOf(TtsVoice(id = "tongtong", name = "童童", language = "zh", gender = "Female")),
     realtimeRows = listOf(
-        previewVoiceModelRow("qwen", "千问", "realtime", "Realtime", "qwen3-omni-flash-realtime", "qwen3-omni-flash-realtime"),
+        previewVoiceModelRow("instance-qwen", "千问", "conn-realtime", "qwen3-omni-flash-realtime", "qwen3-omni-flash-realtime"),
     ),
-    realtimeSelection = ModelSelection("qwen", "realtime", "qwen3-omni-flash-realtime"),
+    realtimeSelection = ModelSelection("instance-qwen", "conn-realtime", "qwen3-omni-flash-realtime"),
     realtimeDefaultVoice = "Cherry",
     realtimeVoiceOptions = listOf(TtsVoice(id = "Cherry", name = "Cherry", language = "zh", gender = "Female")),
     writable = true,

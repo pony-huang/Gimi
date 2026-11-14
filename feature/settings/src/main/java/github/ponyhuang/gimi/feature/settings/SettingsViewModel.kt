@@ -16,13 +16,13 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
 
     fun onAction(action: SettingsAction) {
         when (action) {
-            SettingsAction.OpenSpeechModels -> emitEffect(SettingsEffect.NavigateToSpeechModels)
             SettingsAction.OpenModelService -> emitEffect(SettingsEffect.NavigateToModelService)
             SettingsAction.OpenDefaultModels -> emitEffect(SettingsEffect.NavigateToDefaultModels)
             SettingsAction.OpenMcpServers -> emitEffect(SettingsEffect.NavigateToMcpServers)
             SettingsAction.OpenRemoteAgents -> emitEffect(SettingsEffect.NavigateToRemoteAgents)
             SettingsAction.OpenAppFunctions -> emitEffect(SettingsEffect.NavigateToAppFunctions)
             SettingsAction.OpenSandbox -> emitEffect(SettingsEffect.NavigateToSandbox)
+            SettingsAction.OpenMobileUse -> emitEffect(SettingsEffect.NavigateToMobileUse)
             SettingsAction.OpenPlugins -> emitEffect(SettingsEffect.NavigateToPlugins)
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)
             SettingsAction.OpenWorkspace -> emitEffect(SettingsEffect.NavigateToWorkspace)

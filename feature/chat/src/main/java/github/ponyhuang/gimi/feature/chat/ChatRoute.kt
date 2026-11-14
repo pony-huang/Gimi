@@ -47,6 +47,7 @@ fun ChatRoute(
     onReturnToChat: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPersonalization: () -> Unit,
+    onOpenRuntimeEnvironment: () -> Unit,
     onConfigureModels: () -> Unit,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
@@ -210,6 +211,11 @@ fun ChatRoute(
         onPersonalizeClick = {
             onReturnToChat()
             onOpenPersonalization()
+            drawerOpen = false
+        },
+        onRuntimeEnvironmentClick = {
+            onReturnToChat()
+            onOpenRuntimeEnvironment()
             drawerOpen = false
         },
         onSettingsClick = {

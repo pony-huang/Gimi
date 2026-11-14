@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.voice.runtime
 
+import github.ponyhuang.gimi.data.voice.repository.resolveVoiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -59,7 +60,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
      */
     init {
         scope.launch {
-            combine(catalog.observeServices(), catalog.observeRealtimeSelection()) { _, selection -> selection }
+            combine(catalog.observeInstances(), catalog.observeRealtimeSelection()) { _, selection -> selection }
                 .collect {
                     val resolved = resolveRealtimeDefault()
                     mutableState.update { state ->
@@ -203,12 +204,11 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
      */
     private fun resolveRealtimeDefault(): Pair<ModelSelection, String?>? {
         val selection = catalog.currentRealtimeSelection() ?: return null
-        val service = catalog.currentService(selection.serviceId) ?: return null
-        if (!service.isEnabled || !service.isAdded || service.apiKey.isBlank()) return null
-        val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return null
-        val model = group.models.firstOrNull { it.id == selection.modelId } ?: return null
-        if (ModelCapability.Realtime !in model.capabilities) return null
-        if (!capabilities.isSupported(service.id, ModelCapability.Realtime)) return null
+        val resolved = (catalog.resolveVoiceConnection(selection) { ModelCapability.Realtime in it.capabilities })
+            ?: return null
+        // 未接入原生 Realtime 适配器的模板没有全双工契约，不可进入 Realtime 模式。
+        val templateId = resolved.templateId ?: return null
+        if (!capabilities.isSupported(templateId, ModelCapability.Realtime)) return null
         // 音色覆盖绑定在具体模型上：换模型后旧覆盖不再适用，回落到模型缺省音色。
         val voiceId = catalog.currentRealtimeVoice()?.takeIf { it.selection == selection }?.voiceId
         return selection to voiceId
@@ -275,8 +275,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
 
     private fun modelName(selection: ModelSelection?): String {
         selection ?: return ""
-        val service = catalog.currentService(selection.serviceId) ?: return ""
-        return service.groups.firstOrNull { it.id == selection.groupId }?.models
-            ?.firstOrNull { it.id == selection.modelId }?.let { it.name.ifBlank { it.id } }.orEmpty()
+        val model = catalog.resolveConnection(selection)?.model ?: return ""
+        return model.name.ifBlank { model.id }
     }
 }

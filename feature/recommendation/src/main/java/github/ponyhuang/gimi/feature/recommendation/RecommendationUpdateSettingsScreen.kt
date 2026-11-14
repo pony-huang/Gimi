@@ -42,7 +42,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -87,10 +87,10 @@ fun RecommendationUpdateSettingsScreen(
             }
             item {
                 PreferenceGroupCard {
-                    PreferenceSwitchItem(
+                    PreferenceSwitchRow(
                         icon = Icons.Default.AutoAwesome,
                         title = stringResource(R.string.recommendation_enabled_title),
-                        subtitle = stringResource(R.string.recommendation_enabled_subtitle),
+                        description = stringResource(R.string.recommendation_enabled_subtitle),
                         showDivider = state.enabled,
                         checked = state.enabled,
                         onCheckedChange = { checked ->

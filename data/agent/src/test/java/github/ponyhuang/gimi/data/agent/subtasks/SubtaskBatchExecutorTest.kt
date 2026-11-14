@@ -7,7 +7,7 @@ import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
-import github.ponyhuang.gimi.data.agent.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -27,7 +27,7 @@ import org.junit.Test
 /** 保留执行边界回归：真实 ADK 工作流、并发、恢复、隔离与取消，模型由 fake 替代。 */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SubtaskBatchExecutorTest {
-    private val config = ModelConfig("service", ApiProtocol.OpenaiChatcompletions, "fixture-model", "private-key", "https://fixture.invalid")
+    private val config = ModelConfig("service", null, ApiProtocol.OpenaiChatcompletions, "fixture-model", "private-key", "https://fixture.invalid")
     private val user = AgentSessionIdentity.DEFAULT_USER_ID
     private val tools = object : Toolset {
         override suspend fun getTools(readonlyContext: com.google.adk.kt.agents.ReadonlyContext?) = emptyList<com.google.adk.kt.tools.BaseTool>()

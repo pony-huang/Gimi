@@ -20,8 +20,11 @@ class NavigationContentKeyTest {
 
     @Test
     fun destinationParametersDistinguishKeysAndEquivalentDestinationsStayStable() {
-        val destination = ModelSettingsDestination.ServiceDetail("service-a")
+        val destination = ModelSettingsDestination.ServiceDetail(instanceId = "service-a")
         assertEquals(destination.navigationContentKey(), destination.copy().navigationContentKey())
-        assertNotEquals(destination.navigationContentKey(), destination.copy(serviceId = "service-b").navigationContentKey())
+        assertNotEquals(
+            destination.navigationContentKey(),
+            destination.copy(instanceId = "service-b").navigationContentKey(),
+        )
     }
 }

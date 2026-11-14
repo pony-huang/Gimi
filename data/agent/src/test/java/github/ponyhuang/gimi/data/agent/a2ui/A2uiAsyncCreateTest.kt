@@ -19,6 +19,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 
 /** 真实 Runner 的异步交付、取消与归档回归，避免主 Agent 等待及后台付费调用泄漏。 */
 class A2uiAsyncCreateTest {
@@ -128,7 +130,7 @@ class A2uiAsyncCreateTest {
                 emit(LlmResponse(content = Content(role = Role.MODEL, parts = parts)))
             }
         }
-        val config = ModelConfig("service", ApiProtocol.OpenaiChatcompletions, "fixture", "fixture-key", "https://fixture.invalid")
+        val config = ModelConfig("service", null, ApiProtocol.OpenaiChatcompletions, "fixture", "fixture-key", "https://fixture.invalid")
         val access = object : ToolAccessRepository {
             override val defaultToolAccessMode = MutableStateFlow(ToolAccessMode.ALWAYS_AVAILABLE)
             override fun setDefaultToolAccessMode(mode: ToolAccessMode) { defaultToolAccessMode.value = mode }

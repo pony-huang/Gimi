@@ -23,6 +23,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 
 /**
  * 共享 Agent/Runner 的构建与缓存入口，为每轮聊天创建独立的执行句柄。

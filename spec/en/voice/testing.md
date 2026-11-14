@@ -8,13 +8,17 @@
 > updated.
 
 
-`data:voice/src/test` holds 21 test classes (plus one fake-event helper,
-`DashScopeTestEvents`); the Realtime native path spans
+Vendor adapter tests moved to `:data:modelaccess` (with the adapters/models);
+`data:voice/src/test` keeps the business layer (repositories, preferences,
+routing, call controller, notification). The fake-event helper
+`DashScopeTestEvents` travels with them. The Realtime native path spans
 `OpenAiRealtimeProtocolTest` / `OpenAiRealtimeModelTest` and
 `QwenRealtimeProtocolTest` / `QwenRealtimeModelTest` (MockWebServer WS:
 config-first framing, buffered uplink flush, event mapping, barge-in semantics
 (truncate / silent window), handshake classification, and the duplex-applicable
-subset of the single-receiver/close-unblocks contract) in `data:agent`, the
+subset of the single-receiver/close-unblocks contract), the vendor speech
+adapter tests (DashScope / MiniMax / MiMo / OpenAI-compatible audio) in
+`:data:modelaccess`; the
 `Pcm16ResamplerTest` contract in `:core:audio`, and `SpeechModelProviderTest`
 in `data:modelcatalog` (covering both Realtime templates):
 
@@ -43,10 +47,10 @@ in `data:modelcatalog` (covering both Realtime templates):
 | `RealtimeVoiceCallNotificationContentTest` | Snapshot collapse priority, high-frequency voice updates do not change the snapshot, state reset drives service exit |
 
 Related tests outside `data:voice`: `core:audio`'s `VoiceActivitySegmenterTest` /
-`PcmPlaybackReferenceTest` / `PcmLevelTest`, and `data:agent`'s
-`CascadedVoiceModelTest` / `AdkVoiceAudioBackendTest` /
-`VoiceAgentConversationTest` / `LiveConnectionContractTest` /
-`VoiceSentenceBufferTest`.
+`PcmPlaybackReferenceTest` / `PcmLevelTest`; `:data:modelaccess`'s
+`CascadedVoiceModelTest` / `LiveConnectionContractTest` / `VoiceSentenceBufferTest` /
+`RealtimeToolRoundRunnerTest`; and `data:agent`
+`AdkVoiceAudioBackendTest` / `VoiceAgentConversationTest` / `RealtimeAssistantToolsResolveTest` / `RealtimeModelBaseUrlTest`.
 
 Prompt presets:
 
@@ -59,7 +63,7 @@ Tests for the default Realtime selection:
 
 | File | Contract verified |
 |---|---|
-| `data:agent`'s `VoiceLiveModelFactoryTest` | Realtime/cascade dispatch by capability marker, uplink contract from the adapter declaration, session voice defaults per model generation, custom voice overrides the default |
+| `:data:modelaccess`'s `VoiceLiveModelFactoryTest` | Realtime/cascade dispatch by capability marker, uplink contract from the adapter declaration, session voice defaults per model generation, custom voice overrides the default |
 | `data:modelcatalog`'s `ModelServiceConfigurationPersistenceTest` | Default Realtime model and voice override survive a restart and can be cleared; the service-level voice field is gone |
 | `feature:modelsettings`'s `DefaultModelSettingsRealtimeTest` | Candidates only cover services declaring a native adapter, voice options follow the selected model, a custom voice is bound to its model, clearing model and clearing voice are separate writes |
 | `feature:modelsettings`'s `DefaultModelSettingsViewModelCharacterizationTest` | The existing capability grouping and TTS voice fallback are unaffected by the Realtime defaults |

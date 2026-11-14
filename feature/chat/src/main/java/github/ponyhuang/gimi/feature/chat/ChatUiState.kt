@@ -9,7 +9,7 @@ import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
@@ -63,7 +63,7 @@ data class ChatUiState(
     val recentConversations: RecentConversationsState = RecentConversationsState(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
-    val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),
+    val availableLLMModelSettings: List<ModelServiceInstance> = emptyList(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
     val toolConfiguration: ConversationToolConfiguration? = null,

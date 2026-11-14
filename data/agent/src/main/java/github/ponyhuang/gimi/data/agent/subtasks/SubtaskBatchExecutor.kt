@@ -19,8 +19,8 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.workflow.DynamicNodeFailedException
 import com.google.adk.kt.workflow.Node
 import com.google.adk.kt.workflow.parallelNode
-import github.ponyhuang.gimi.data.agent.ModelConfig
-import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskRun

@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.skills
 
+import github.ponyhuang.gimi.domain.skills.repository.SkillSnapshotFailure
 import com.google.adk.kt.skills.NewFileSystemSource
 import github.ponyhuang.gimi.domain.skills.model.InstalledSkill
 import github.ponyhuang.gimi.domain.skills.model.PreparedSkillImport
@@ -30,12 +31,24 @@ internal class SkillArchiveStore(
         stagingRoot.mkdirs()
     }
 
-    suspend fun prepare(input: InputStream): PreparedSkillImport = mutex.withLock {
+    /** 更新、删除与导出共享锁，保证一次导出只包含同一版本的资源。 */
+    suspend fun <T> withInstalledSnapshot(name: String, block: (File) -> T): T = mutex.withLock {
+        require(name.matches(Regex("[a-zA-Z0-9_-]+")))
+        val root = File(skillsRoot, name).canonicalFile
+        require(root.parentFile == skillsRoot.canonicalFile)
+        if (!File(root, "SKILL.md").isFile) throw SkillSnapshotFailure(
+            SkillSnapshotFailure.Reason.NotInstalled,
+        )
+        block(root)
+    }
+
+    suspend fun prepare(input: InputStream, directory: String? = null): PreparedSkillImport = mutex.withLock {
         val id = UUID.randomUUID().toString()
         val pendingRoot = File(stagingRoot, id)
         pendingRoot.mkdirs()
         try {
             extract(input, pendingRoot)
+            if (directory != null) selectDirectory(pendingRoot, directory)
             val children = pendingRoot.listFiles().orEmpty().filter { it.isDirectory }
             if (children.size != 1 || pendingRoot.listFiles().orEmpty().size != 1) {
                 fail(
@@ -143,6 +156,26 @@ internal class SkillArchiveStore(
                 it,
             )
         }.map { InstalledSkill(it.name, it.description) }.sortedBy { it.name }
+    }
+
+    /** 先校验并限额解包全部条目，再选取目录，避免通过未选择的条目绕过归档限制。 */
+    private fun selectDirectory(pendingRoot: File, directory: String) {
+        if (directory.isBlank() || directory.startsWith('/') || '\\' in directory ||
+            directory.split('/').any { it.isBlank() || it == "." || it == ".." }
+        ) fail(SkillImportFailure.Reason.InvalidSource, "directory must be a relative ZIP directory path.")
+        val selected = File(pendingRoot, directory).canonicalFile
+        ensureDescendant(selected, pendingRoot.canonicalFile)
+        if (!File(selected, "SKILL.md").isFile) {
+            fail(SkillImportFailure.Reason.InvalidStructure, "Selected directory must contain SKILL.md.")
+        }
+        val staging = File(stagingRoot, "selection-${UUID.randomUUID()}")
+        try {
+            move(selected, staging)
+            if (!pendingRoot.deleteRecursively() || !pendingRoot.mkdirs()) {
+                fail(SkillImportFailure.Reason.StorageFailure, "Unable to prepare selected skill.")
+            }
+            move(staging, File(pendingRoot, selected.name))
+        } finally { staging.deleteRecursively() }
     }
 
     private fun extract(input: InputStream, pendingRoot: File) {

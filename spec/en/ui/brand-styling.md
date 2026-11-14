@@ -25,7 +25,7 @@ Design principles:
 ### Visual parameters
 
 - Gimi's own icon uses a day/night inverted flat monochrome treatment: day/light mode uses a `#050505` background with a `#FFFFFF` mark; night/dark mode uses a `#FFFFFF` background with a `#3C3C43` mark. Preserve the existing artwork, proportions, transparency, and clear space without adding gradients or shadows.
-- Static documents and the README use the day version by default. When a single night-mode asset is required, generate or select it using the night pairing above.
+- The README uses adaptive transparent-background mark assets selected with the `prefers-color-scheme` `<picture>` element: `doc/icon-light.png` (a `#050505` mark on transparency) for day/light mode and `doc/icon-dark.png` (a `#F5F5F5` mark on transparency) for night/dark mode. `doc/icon.webp` remains the original day-version source artwork; when a single static night-mode asset is required, generate or select it using the night pairing above.
 - The canonical brand blue uses the project's existing `BrandBlue = #4D6BFE`, defined separately from the monochrome icon colors.
 - `#4D6BFE` has a contrast ratio of `4.33:1` against white and `4.85:1` against black. It is therefore suitable for focus rings, icons, and non-text emphasis, but not for normal-size text on white or normal-size white text on a filled button.
 
@@ -150,7 +150,7 @@ These values verify the state rules; they do not require additional literals in 
 
 ## Marks and third-party brand boundaries
 
-- Preserve the Gimi name and existing logo artwork. `doc/icon.webp` is the README's Gimi brand image and uses the day version; launcher icons use `app/src/main/res/drawable-nodpi/ic_launcher_foreground_art.png` and the density-specific launcher assets.
+- Preserve the Gimi name and existing logo artwork. The README's Gimi brand image uses the adaptive transparent-background mark assets `doc/icon-light.png` / `doc/icon-dark.png`, with `doc/icon.webp` kept as the original day-version source artwork; launcher icons use `app/src/main/res/drawable-nodpi/ic_launcher_foreground_art.png` and the density-specific launcher assets.
 - Launcher icons switch with the system day/night configuration: default resources provide the day black-background/white-mark pairing; `drawable-night`, `drawable-night-nodpi`, and `mipmap-night-*` provide the night white-background/dark-gray-mark pairing. The adaptive-icon XML remains unchanged and resolves the matching version through resource qualifiers.
 - The system monochrome icon continues to use a transparent alpha mask for system tinting. Resources update with configuration changes, although launcher caching can delay the visible switch; restart the app or refresh the launcher when verifying.
 - Preserve the original artwork, aspect ratio, and transparency. Do not stretch, redraw, outline, or add gradients or shadows. Leave clear space around the mark equal to at least 50% of its height; a minimum digital display width of 24 dp is recommended.

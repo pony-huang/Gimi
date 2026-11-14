@@ -13,7 +13,7 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.ConversationTitle
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching

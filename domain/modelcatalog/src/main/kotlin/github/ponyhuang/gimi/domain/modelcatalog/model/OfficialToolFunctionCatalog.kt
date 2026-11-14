@@ -1,10 +1,10 @@
 package github.ponyhuang.gimi.domain.modelcatalog.model
 
 /**
- * 会话中可展示的官方工具及其来源服务。
+ * 会话中可展示的官方工具及其来源实例。
  *
  * @property toolId 厂商唯一的官方工具目录 ID。
- * @property serviceId 提供凭据和执行配置的模型服务 ID。
+ * @property serviceId 提供凭据的模型服务实例 ID；凭据在执行期按实例解析。
  */
 data class OfficialToolAvailability(
     val toolId: String,
@@ -17,9 +17,9 @@ interface OfficialToolFunctionCatalog {
     /** 全部纯目录声明，不包含凭据与运行时工具实例。 */
     val all: List<OfficialToolSpec>
 
-    /** 按当前请求模型与已启用的来源服务解析可用声明。 */
+    /** 按当前请求模型与已启用的来源实例解析可用声明。 */
     fun availableSpecsFor(
-        serviceId: String,
+        templateId: String,
         protocol: ApiProtocol,
         modelId: String,
     ): List<OfficialToolSpec>
@@ -28,20 +28,20 @@ interface OfficialToolFunctionCatalog {
     fun enabledSearchCandidateSpecs(): List<OfficialToolSpec>
 
     /**
-     * Returns the tool ids the given service supports under [protocol],
+     * Returns the tool ids the given template supports under [protocol],
      * regardless of the concrete model. Tool ids are vendor-unique; model
      * family narrowing (if any) is applied later by the agent runtime.
      *
      * 实现为静态目录查询,无网络 IO;UI 与会话配置初始化同步调用。
      */
-    fun supportedToolIds(serviceId: String, protocol: ApiProtocol): Set<String>
+    fun supportedToolIds(templateId: String, protocol: ApiProtocol): Set<String>
 
     /**
-     * 返回当前聊天模型可用的官方工具：当前服务保留原生工具，其他已开启服务只贡献
-     * 可独立调用的 API 工具。
+     * 返回当前聊天模型可用的官方工具：当前实例的模板保留原生工具，其他已开启实例只
+     * 贡献可独立调用的 API 工具。
      */
     fun availableTools(
-        activeService: LLMModelSetting,
+        activeInstance: ModelServiceInstance,
         activeModelId: String,
     ): List<OfficialToolAvailability>
 

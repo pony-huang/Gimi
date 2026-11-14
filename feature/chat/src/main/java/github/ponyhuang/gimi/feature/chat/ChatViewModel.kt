@@ -26,7 +26,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.a2a.model.SkippedRemoteAgent
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
@@ -280,7 +280,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            modelServices.observeServices().collect { services ->
+            modelServices.observeInstances().collect { services ->
                 _uiState.update { state ->
                     state.copy(
                         availableLLMModelSettings = services,
@@ -863,7 +863,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun isUsableChatSelection(selection: ModelSelection): Boolean =
-        modelServices.currentServices().isUsableChatSelection(selection)
+        modelServices.currentInstances().isUsableChatSelection(selection)
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -883,11 +883,13 @@ private fun ChatSessionRuntime.toChatListItems(): List<ChatListItem> =
         ),
     )
 
-private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelection): Boolean {
-    val service = firstOrNull { it.id == selection.serviceId } ?: return false
-    if (!service.isEnabled || service.apiKey.isBlank()) return false
-    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
-    val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
+/** 会话可用的选择要求：实例启用、对话凭据可解析、连接与模型存在且可对话。 */
+private fun List<ModelServiceInstance>.isUsableChatSelection(selection: ModelSelection): Boolean {
+    val instance = firstOrNull { it.id == selection.instanceId } ?: return false
+    if (!instance.isEnabled) return false
+    val connection = instance.connection(selection.connectionId) ?: return false
+    if (instance.effectiveApiKey(connection).isBlank()) return false
+    val model = instance.findModel(selection) ?: return false
     return ModelCapability.LLM in model.capabilities
 }
 

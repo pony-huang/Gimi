@@ -39,6 +39,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 
 class AgentChatRunnerCacheTest {
 
@@ -416,7 +417,8 @@ class AgentChatRunnerCacheTest {
             override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {}
         }),
         modelRuntime = ModelRuntimeMetadata(
-            serviceId = selection?.serviceId ?: "service",
+            serviceId = selection?.instanceId ?: "service",
+            templateId = null,
             baseType = ApiProtocol.OpenaiChatcompletions,
             modelId = selection?.modelId ?: "model",
             fullBaseUrl = "https://example.com",

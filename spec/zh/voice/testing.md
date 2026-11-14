@@ -7,11 +7,11 @@
 > 必须同步更新这些测试。
 
 
-`data:voice/src/test` 共 21 个测试类（另有 1 个假事件辅助 `DashScopeTestEvents`）；
-Realtime 原生路径：`data:agent` 的 `OpenAiRealtimeProtocolTest` /
+厂商适配器测试随适配器/模型一并迁入 `:data:modelaccess`；`data:voice/src/test` 保留业务层（仓库、偏好、路由、通话控制器、通知）。假事件辅助
+`DashScopeTestEvents` 一并随迁。Realtime 原生路径：`:data:modelaccess` 的 `OpenAiRealtimeProtocolTest` /
 `OpenAiRealtimeModelTest` 与 `QwenRealtimeProtocolTest` / `QwenRealtimeModelTest`
 （MockWebServer WS:配置先行帧、缓冲上行冲出、事件映射、打断语义（截断 / 静默窗口）、
-握手分类、单接收者与 close 解锁契约子集）、`:core:audio` 的 `Pcm16ResamplerTest` 契约、
+握手分类、单接收者与 close 解锁契约子集）、厂商语音适配器测试（DashScope / MiniMax / MiMo / OpenAI 兼容音频，下表）同在 `:data:modelaccess`；`:core:audio` 的 `Pcm16ResamplerTest` 契约、
 `data:modelcatalog` 的 `SpeechModelProviderTest`（覆盖两个 Realtime 模板）：
 
 | 文件 | 验证的契约 |
@@ -39,9 +39,9 @@ Realtime 原生路径：`data:agent` 的 `OpenAiRealtimeProtocolTest` /
 | `RealtimeVoiceCallNotificationContentTest` | 通知快照折叠优先级、高频语音更新不改快照、状态复位驱动服务退出 |
 
 相关但不在 `data:voice` 的：`core:audio` 的 `VoiceActivitySegmenterTest` /
-`PcmPlaybackReferenceTest` / `PcmLevelTest`，`data:agent` 的
-`CascadedVoiceModelTest` / `AdkVoiceAudioBackendTest` / `VoiceAgentConversationTest` /
-`LiveConnectionContractTest` / `VoiceSentenceBufferTest`。
+`PcmPlaybackReferenceTest` / `PcmLevelTest`；`:data:modelaccess` 的
+`CascadedVoiceModelTest` / `LiveConnectionContractTest` / `VoiceSentenceBufferTest` /
+`RealtimeToolRoundRunnerTest`；`data:agent` 的 `AdkVoiceAudioBackendTest` / `VoiceAgentConversationTest` / `RealtimeAssistantToolsResolveTest` / `RealtimeModelBaseUrlTest`。
 
 提示词预设这一层的测试：
 
@@ -54,7 +54,7 @@ Realtime 原生路径：`data:agent` 的 `OpenAiRealtimeProtocolTest` /
 
 | 文件 | 验证的契约 |
 |---|---|
-| `data:agent` 的 `VoiceLiveModelFactoryTest` | Realtime/级联按能力标记分派、上行契约随适配器声明、会话音色缺省按模型代际解析、自定义音色覆盖缺省 |
+| `:data:modelaccess` 的 `VoiceLiveModelFactoryTest` | Realtime/级联按能力标记分派、上行契约随适配器声明、会话音色缺省按模型代际解析、自定义音色覆盖缺省 |
 | `data:modelcatalog` 的 `ModelServiceConfigurationPersistenceTest` | 默认 Realtime 模型与音色覆盖跨重启存活、可清除；服务级音色字段已移除 |
 | `feature:modelsettings` 的 `DefaultModelSettingsRealtimeTest` | 候选只列声明了原生适配器的服务、音色候选跟随所选模型、自定义音色绑定到模型、清除模型与清除音色各自落库 |
 | `feature:modelsettings` 的 `DefaultModelSettingsViewModelCharacterizationTest` | 既有按能力分组与 TTS 音色回落行为不受 Realtime 默认值影响 |

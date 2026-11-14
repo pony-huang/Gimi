@@ -18,7 +18,6 @@ import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
-import github.ponyhuang.gimi.data.agent.tools.search.INLINE_DEFINITIONS
 import github.ponyhuang.gimi.data.agent.tools.search.InlineToolSearchEvents
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.inlinePendingKey
@@ -29,6 +28,8 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
 
 @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)
 class InlineToolSearchPersistenceTest {
@@ -74,7 +75,7 @@ class InlineToolSearchPersistenceTest {
             rootAgent = LlmAgent(name = "agent", model = model, tools = listOf(search, clock)),
         ), sessionService = sessions)
         val metadata = ToolRunMetadata.of(ModelRuntimeMetadata(
-            "deepseek", ApiProtocol.Anthropic, "deepseek-flash", "https://api.deepseek.com/anthropic",
+            "deepseek", "deepseek", ApiProtocol.Anthropic, "deepseek-flash", "https://api.deepseek.com/anthropic",
         ), null, true)
         val execution = AgentChatExecution("user", "session", runner, metadata)
         try {

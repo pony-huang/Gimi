@@ -38,7 +38,7 @@
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_reasoning_effort_off">Off</string>
     <string name="chat_reasoning_effort_title">Thinking effort</string>
-    <string name="chat_reasoning_effort_openai_notice">Reasoning effort settings are currently unsupported when using the OpenAI Chat Completions API.</string>
+    <string name="chat_reasoning_effort_openai_notice">Reasoning effort settings are currently unsupported when using the Completions API.</string>
     <string name="chat_reasoning_effort_minimal">Minimal</string>
     <string name="chat_reasoning_effort_low">Low</string>
     <string name="chat_reasoning_effort_medium">Medium</string>
@@ -138,6 +138,7 @@
     <string name="chat_drawer_new_conversation">New chat</string>
     <string name="chat_drawer_voice_call">Voice call</string>
     <string name="chat_drawer_personalize">Personalization options</string>
+    <string name="chat_drawer_runtime">Runtime environment</string>
     <string name="chat_drawer_empty_history">No recent conversations</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>

@@ -6,7 +6,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.*
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
-import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.domain.a2ui.*
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationRepository
 import java.util.UUID

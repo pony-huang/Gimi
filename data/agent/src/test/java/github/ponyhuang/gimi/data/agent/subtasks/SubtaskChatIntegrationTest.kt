@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 
 /** 真实主 Runner → 委派工具 → 子工作流 → 领域进度 → 主回答的最小跨层接线回归。 */
 class SubtaskChatIntegrationTest {
@@ -31,7 +33,7 @@ class SubtaskChatIntegrationTest {
     fun streamsTaskProgressAlongsideParentEventsWithoutLeakingParentInputToWorker() = runTest {
         val sessions = InMemorySessionService()
         val store = SubtaskSessionStore(sessions)
-        val config = ModelConfig("service", ApiProtocol.OpenaiChatcompletions, "fixture", "fixture-key", "https://fixture.invalid")
+        val config = ModelConfig("service", null, ApiProtocol.OpenaiChatcompletions, "fixture", "fixture-key", "https://fixture.invalid")
         val tools = object : Toolset {
             override suspend fun getTools(readonlyContext: com.google.adk.kt.agents.ReadonlyContext?) = emptyList<com.google.adk.kt.tools.BaseTool>()
         }

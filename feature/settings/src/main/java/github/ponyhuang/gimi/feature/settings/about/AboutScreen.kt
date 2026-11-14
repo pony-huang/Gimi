@@ -33,8 +33,8 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
- * 「关于」页：顶部展示应用名称与当前版本，下方列表提供检查更新（内联状态）、项目主页、
- * 隐私政策（wiki 内嵌展示）与日志入口。
+ * 「关于」页：顶部展示应用名称与当前版本，下方按使用频率排列：检查更新（内联状态）、
+ * 日志、项目主页与隐私政策（wiki 内嵌展示）入口。
  */
 @Composable
 fun AboutScreen(
@@ -77,6 +77,13 @@ fun AboutScreen(
                     onClick = { onUpdateAction(UpdateAction.CheckNow) },
                 )
                 PreferenceListItem(
+                    icon = Icons.Default.Description,
+                    title = stringResource(R.string.logs_title),
+                    subtitle = stringResource(R.string.logs_subtitle),
+                    showDivider = true,
+                    onClick = onOpenLogs,
+                )
+                PreferenceListItem(
                     icon = Icons.Default.Language,
                     title = stringResource(R.string.about_project_title),
                     subtitle = stringResource(R.string.about_project_subtitle),
@@ -87,14 +94,7 @@ fun AboutScreen(
                     icon = Icons.Default.PrivacyTip,
                     title = stringResource(R.string.about_privacy_title),
                     subtitle = stringResource(R.string.about_privacy_subtitle),
-                    showDivider = true,
                     onClick = onOpenPrivacyPolicy,
-                )
-                PreferenceListItem(
-                    icon = Icons.Default.Description,
-                    title = stringResource(R.string.logs_title),
-                    subtitle = stringResource(R.string.logs_subtitle),
-                    onClick = onOpenLogs,
                 )
             }
             Spacer(Modifier.height(24.dp))

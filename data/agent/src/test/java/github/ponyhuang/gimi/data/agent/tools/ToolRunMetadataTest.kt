@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.data.agent.tools
 
-import github.ponyhuang.gimi.data.agent.ModelConfig
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import kotlinx.serialization.json.Json
@@ -110,6 +110,7 @@ class ToolRunMetadataTest {
     fun modelRuntimeRoundTripExcludesCredential() {
         val expected = ModelConfig(
             serviceId = "glm",
+            templateId = "glm",
             baseType = ApiProtocol.Anthropic,
             modelId = "glm-4.6",
             apiKey = "secret-key",
@@ -129,6 +130,7 @@ class ToolRunMetadataTest {
 
     private fun modelRuntime() = ModelRuntimeMetadata(
         serviceId = "glm",
+        templateId = "glm",
         baseType = ApiProtocol.Anthropic,
         modelId = "glm-4.6",
         fullBaseUrl = "https://open.bigmodel.cn/api/anthropic",

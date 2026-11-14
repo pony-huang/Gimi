@@ -1,6 +1,10 @@
 package github.ponyhuang.gimi.navigation
 
 import android.Manifest
+import android.content.Intent
+import androidx.core.content.FileProvider
+import github.ponyhuang.gimi.feature.environment.EnvironmentDestination
+import github.ponyhuang.gimi.feature.environment.EnvironmentEntryProvider
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,6 +72,7 @@ import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import kotlin.time.Duration.Companion.milliseconds
 
 /** App-level composition root. Feature modules own destination dispatch and never navigate directly. */
 @Composable
@@ -153,6 +158,7 @@ fun MainScreen(
                         onReturnToChat = returnToChat,
                         onOpenSettings = { navigate(SettingsDestination.Settings) },
                         onOpenPersonalization = { navigate(RecommendationDestination.Settings) },
+                        onOpenRuntimeEnvironment = { navigate(EnvironmentDestination.Overview) },
                         onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
                         sharedMediaUris = currentSharedMediaUris,
                         onSharedMediaConsumed = consumeSharedMedia,
@@ -162,8 +168,7 @@ fun MainScreen(
                     appVersionName = BuildConfig.VERSION_NAME,
                     callbacks = SettingsNavigationCallbacks(
                         onBack = goBack,
-                        onNavigateToSpeechModels = { navigate(ModelSettingsDestination.SpeechServices) },
-                        onNavigateToModelService = {
+                                        onNavigateToModelService = {
                             navigate(ModelSettingsDestination.ServiceList)
                         },
                         onNavigateToDefaultModels = {
@@ -172,7 +177,8 @@ fun MainScreen(
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
                         onNavigateToRemoteAgents = { navigate(RemoteAgentDestination.AgentList) },
                         onNavigateToAppFunctions = { navigate(AppFunctionDestination.Apps) },
-                        onNavigateToSandbox = { navigate(SandboxDestination.Settings) },
+                        onNavigateToSandbox = { navigate(EnvironmentDestination.Overview) },
+                        onNavigateToMobileUse = { navigate(MobileUseDestination.Settings) },
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
                         onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
@@ -185,6 +191,17 @@ fun MainScreen(
                         onNavigateToPrivacyPolicy = { navigate(SettingsDestination.PrivacyPolicy) },
                     ),
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
+                    EnvironmentEntryProvider(destination, goBack, navigate,
+                        onOpenE2b = { navigate(SandboxDestination.Settings) },
+                        onInstallPackage = { path ->
+                            if (!context.packageManager.canRequestPackageInstalls()) {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+                            } else {
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", java.io.File(path))
+                                context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                            }
+                        }) ||
                     SandboxEntryProvider(destination, goBack) ||
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
                     A2aEntryProvider(destination, goBack, navigate) ||
@@ -197,7 +214,6 @@ fun MainScreen(
                         navigate = navigate,
                         onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults()) },
                         onOpenSimpleChatPromptSettings = { navigate(ChatDestination.SimpleChatPromptSettings) },
-                        onOpenMobileUse = { navigate(MobileUseDestination.Settings) },
                     ) ||
                     MemoryEntryProvider(destination, goBack, navigate) ||
                     PermissionEntryProvider(destination, goBack) ||
@@ -227,7 +243,7 @@ fun MainScreen(
         // 与悬浮窗/锁屏一致的空闲自动收起：结果停留 5 秒后隐藏。
         LaunchedEffect(assistantState.phase) {
             if (assistantState.phase.isPresentationResultIdle()) {
-                delay(AssistantResultStayMs)
+                delay(AssistantResultStayMs.milliseconds)
                 assistantSessionCoordinator.hidePresentation()
             }
         }

@@ -5,12 +5,13 @@ import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
@@ -35,23 +36,26 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 
 /**
  * Realtime 默认选择的行为契约。
  *
  * Realtime 模型是全局唯一入口，因此候选范围、音色归属与"未配置"的语义都要在这里钉死：
- * 未接入原生适配器的服务不能出现在候选里；音色覆盖绑定到具体模型，换模型即失效。
+ * 未接入原生适配器的模板不能出现在候选里；音色覆盖绑定到具体模型，换模型即失效。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DefaultModelSettingsRealtimeTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val realtimeSelection = ModelSelection("qwen-audio", "qwen-audio-realtime", "qwen-audio-3.1-realtime-plus")
-    private val otherRealtimeSelection = ModelSelection("qwen-audio", "qwen-audio-realtime", "qwen-audio-3.0-realtime-plus")
+    private val realtimeSelection =
+        ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-audio-3.1-realtime-plus")
+    private val otherRealtimeSelection =
+        ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-audio-3.0-realtime-plus")
 
     @Test
-    fun onlyServicesWithNativeRealtimeSupportAppearAsCandidates() = runTest {
+    fun onlyTemplatesWithNativeRealtimeSupportAppearAsCandidates() = runTest {
         val repository = repository()
         val viewModel = viewModel(repository)
 
@@ -59,7 +63,7 @@ class DefaultModelSettingsRealtimeTest {
             awaitItem()
             var state = awaitItem()
             while (state.realtimeModels.isEmpty()) state = awaitItem()
-            // 未接入原生 Realtime 适配器的服务不出现：它们的 Realtime 模型会静默回落级联，
+            // 未接入原生 Realtime 适配器的模板不出现：它们的 Realtime 模型会静默回落级联，
             // 选它只会得到起不来的会话。
             assertEquals(
                 listOf("qwen-audio-3.1-realtime-plus", "qwen-audio-3.0-realtime-plus"),
@@ -79,7 +83,7 @@ class DefaultModelSettingsRealtimeTest {
             var state = awaitItem()
             while (state.realtimeDefaultVoice.isEmpty()) state = awaitItem()
             assertEquals("longanqian_v3.1", state.realtimeDefaultVoice)
-            // 音色集按模型解析：同一服务下 3.0 与 3.1 的可选音色互不相通。
+            // 音色集按模型解析：同一模板下 3.0 与 3.1 的可选音色互不相通。
             assertEquals(listOf("longanqian_v3.1"), state.realtimeVoiceOptions.map { it.id })
             assertTrue(state.realtimeCustomVoiceAllowed)
             cancelAndIgnoreRemainingEvents()
@@ -123,7 +127,6 @@ class DefaultModelSettingsRealtimeTest {
     fun selectingAVoiceWritesAnOverrideBoundToTheCurrentModel() = runTest {
         val repository = repository(realtimeSelection = realtimeSelection)
         val viewModel = viewModel(repository)
-        viewModel.awaitUiStateReady()
         advanceUntilIdle()
 
         viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeVoice("cloned_voice_id"))
@@ -138,7 +141,6 @@ class DefaultModelSettingsRealtimeTest {
     fun clearingTheVoiceWritesNoOverride() = runTest {
         val repository = repository(realtimeSelection = realtimeSelection)
         val viewModel = viewModel(repository)
-        viewModel.awaitUiStateReady()
         advanceUntilIdle()
 
         viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeVoice(null))
@@ -151,7 +153,6 @@ class DefaultModelSettingsRealtimeTest {
     fun clearingTheRealtimeModelWritesNoSelection() = runTest {
         val repository = repository(realtimeSelection = realtimeSelection)
         val viewModel = viewModel(repository)
-        viewModel.awaitUiStateReady()
         advanceUntilIdle()
 
         viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeModel(null))
@@ -166,25 +167,26 @@ class DefaultModelSettingsRealtimeTest {
         runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
         ttsVoiceRepository = mockk<TtsVoiceRepository> { coEvery { getVoices(any()) } returns emptyList() },
         voiceCapabilities = RealtimeCapableResolver,
+        voiceCatalog = mockk(relaxed = true),
     )
 
-    /** 只有 qwen-audio 声明了原生 Realtime 适配器，另一个服务带 Realtime 标记也不算数。 */
+    /** 只有 qwen 模板声明了原生 Realtime 适配器，另一个模板带 Realtime 标记也不算数。 */
     private object RealtimeCapableResolver : VoiceCapabilityResolver {
-        override fun isSupported(serviceId: String, capability: ModelCapability): Boolean =
-            capability != ModelCapability.Realtime || serviceId == "qwen-audio"
+        override fun isSupported(templateId: String, capability: ModelCapability): Boolean =
+            capability != ModelCapability.Realtime || templateId == "qwen"
 
-        override fun connectionProbe(serviceId: String): SpeechConnectionProbe =
-            throw VoiceCapabilityNotSupported(serviceId, ModelCapability.TTS)
+        override fun connectionProbe(templateId: String): SpeechConnectionProbe =
+            throw VoiceCapabilityNotSupported(templateId, ModelCapability.TTS)
 
-        override fun endpointStrategy(serviceId: String): EndpointStrategy = EndpointStrategy.VendorOwned
+        override fun endpointStrategy(templateId: String): EndpointStrategy = EndpointStrategy.VendorOwned
 
-        override fun realtimeSupport(serviceId: String): RealtimeVoiceSupport? =
-            if (serviceId == "qwen-audio") QwenLikeSupport else null
+        override fun realtimeSupport(templateId: String): RealtimeVoiceSupport? =
+            if (templateId == "qwen") QwenLikeSupport else null
     }
 
     /** 千问式适配器：音色集按模型代际给、允许自由输入、缺省音色同样按代际给。 */
     private object QwenLikeSupport : RealtimeVoiceSupport {
-        override val serviceId: String = "qwen-audio"
+        override val serviceId: String = "qwen"
 
         /** 音色集随模型变化，服务级没有统一表。 */
         override val builtInVoices: List<TtsVoice> = emptyList()
@@ -202,19 +204,11 @@ class DefaultModelSettingsRealtimeTest {
             if (modelId.startsWith("qwen-audio-3.0-")) "longanqian" else "longanqian_v3.1"
     }
 
-    private suspend fun DefaultModelSettingsViewModel.awaitUiStateReady() {
-        uiState.test {
-            awaitItem() // initial empty state
-            awaitItem() // state populated from repository
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
     private fun repository(
         realtimeSelection: ModelSelection? = null,
         realtimeVoice: RealtimeVoiceOverride? = null,
     ): ModelCatalogRepository = mockk(relaxed = true) {
-        every { observeServices() } returns MutableStateFlow(listOf(qwenService(), plainService()))
+        every { observeInstances() } returns MutableStateFlow(listOf(qwenInstance(), plainInstance()))
         every { observeAssistantSelection() } returns MutableStateFlow(null)
         every { observeFastSelection() } returns MutableStateFlow(null)
         every { observeSpeechSelection() } returns MutableStateFlow(null)
@@ -224,19 +218,20 @@ class DefaultModelSettingsRealtimeTest {
         every { observeRealtimeVoice() } returns MutableStateFlow(realtimeVoice)
     }
 
-    /** 声明了原生 Realtime 适配器的语音服务。 */
-    private fun qwenService() = LLMModelSetting(
-        id = "qwen-audio",
+    /** 声明了原生 Realtime 适配器的语音服务实例。 */
+    private fun qwenInstance() = ModelServiceInstance(
+        id = "instance-qwen",
         name = "Qwen",
+        templateId = "qwen",
         isEnabled = true,
-        apiKey = "key",
-        apiBaseUrl = "wss://example.com",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "qwen-audio-realtime",
-                name = "实时语音对话",
+        isOfficialToolsEnabled = false,
+        sharedApiKey = "key",
+        connections = listOf(
+            ServiceConnection(
+                id = "instance-qwen-realtime",
+                capability = ServiceCapability.Realtime,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "wss://example.com",
                 models = listOf(
                     Model("qwen-audio-3.1-realtime-plus", "qwen-audio-3.1-realtime-plus",
                         capabilities = setOf(ModelCapability.Realtime)),
@@ -247,19 +242,20 @@ class DefaultModelSettingsRealtimeTest {
         ),
     )
 
-    /** 带 Realtime 标记但没有原生适配器的服务：不得出现在候选里。 */
-    private fun plainService() = LLMModelSetting(
-        id = "plain-speech",
+    /** 带 Realtime 标记但没有原生适配器的实例：不得出现在候选里。 */
+    private fun plainInstance() = ModelServiceInstance(
+        id = "instance-plain",
         name = "Plain",
+        templateId = "plain-speech",
         isEnabled = true,
-        apiKey = "key",
-        apiBaseUrl = "wss://example.com",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "plain-realtime",
-                name = "实时语音对话",
+        isOfficialToolsEnabled = false,
+        sharedApiKey = "key",
+        connections = listOf(
+            ServiceConnection(
+                id = "instance-plain-realtime",
+                capability = ServiceCapability.Realtime,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "wss://example.com",
                 models = listOf(
                     Model("plain-realtime-model", "plain-realtime-model",
                         capabilities = setOf(ModelCapability.Realtime)),

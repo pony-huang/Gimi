@@ -2,9 +2,6 @@
     <string name="sandbox_screen_title">沙盒</string>
     <string name="sandbox_e2b">E2B</string>
     <string name="sandbox_capabilities_description">支持在隔离沙盒中执行代码和命令、读写文件、浏览目录及上传下载文件。</string>
-    <string name="sandbox_disabled_description">未启用 · 在隔离环境中执行代码与文件操作</string>
-    <string name="sandbox_pending_description">待配置 · 请填写 API Key 并保存</string>
-    <string name="sandbox_configured_description">已配置 · 按聊天独立使用沙盒</string>
     <string name="sandbox_api_url">API 地址</string>
     <string name="sandbox_api_url_help">例如 https://api.e2b.app 或 http://192.168.1.10:3000</string>
     <string name="sandbox_api_key">API Key</string>
@@ -55,8 +52,6 @@
     <string name="sandbox_expand_environment">展开环境变量</string>
     <string name="sandbox_collapse_environment">收起环境变量</string>
     <string name="sandbox_documentation">E2B 文档</string>
-    <string name="sandbox_expand_configuration">展开配置</string>
-    <string name="sandbox_collapse_configuration">收起配置</string>
     <string name="sandbox_proxy_url">沙箱访问地址（可选）</string>
     <string name="sandbox_proxy_url_help">本地填写代理地址，如 http://192.168.1.10:3002；云服务可留空。手机请使用电脑可访问的 IP。</string>
     <string name="sandbox_url_invalid">请输入完整 HTTP 或 HTTPS 地址，不含用户名、密码、查询参数或片段</string>

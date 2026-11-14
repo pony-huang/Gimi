@@ -40,9 +40,10 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
@@ -57,11 +58,11 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
  */
 
 /**
- * 一行模型选项，携带模型及所属服务、分组，用于展示副标题和构造 [ModelSelection]。
+ * 一行模型选项，携带模型及所属实例、连接，用于展示副标题和构造 [ModelSelection]。
  */
 data class EnabledModelRow(
-    val service: LLMModelSetting,
-    val group: ModelGroup,
+    val instance: ModelServiceInstance,
+    val connection: ServiceConnection,
     val model: Model,
 )
 
@@ -165,7 +166,7 @@ fun ModelStatusDisplay(
  */
 @Composable
 fun ModelTitleAndPicker(
-    services: List<LLMModelSetting>,
+    instances: List<ModelServiceInstance>,
     currentSelection: ModelSelection?,
     loadState: CatalogLoadState,
     isAgentRunning: Boolean,
@@ -180,41 +181,32 @@ fun ModelTitleAndPicker(
     onThinkingEnabledChange: (Boolean) -> Unit = { },
 ) {
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
-    // 否则回退到"第一个启用服务 → 第一个非空组 → 第一个模型"。两个都没有则 null（空态）。
-    val displayedModel: EnabledModelRow? = remember(services, currentSelection) {
-        services.resolveSelection(currentSelection) ?: services.asSequence()
+    // 否则回退到"第一个启用实例 → 对话连接 → 第一个模型"。两个都没有则 null（空态）。
+    val displayedModel: EnabledModelRow? = remember(instances, currentSelection) {
+        instances.resolveSelection(currentSelection) ?: instances.asSequence()
             .filter { it.isConfiguredForChat() }
-            .flatMap { service ->
-                service.groups.asSequence().flatMap { group ->
-                    group.models.asSequence()
-                        .filter { it.isChatModel() }
-                        .map { model -> EnabledModelRow(service, group, model) }
-                }
-            }
+            .flatMap { instance -> instance.chatRows() }
             .firstOrNull()
     }
     val displayedModelName = displayedModel?.model?.name
     // 若会话没有显式选择或选择已失效，选择器应与标题/runner 的回退结果一致，
     // 使用户看到当前正在使用的模型已被勾选。
-    val effectiveSelection: ModelSelection? = remember(services, currentSelection) {
-        if (services.resolveSelection(currentSelection) != null) {
+    val effectiveSelection: ModelSelection? = remember(instances, currentSelection) {
+        if (instances.resolveSelection(currentSelection) != null) {
             currentSelection
         } else {
-            services.firstConfiguredChatSelection()
+            instances.firstConfiguredChatSelection()
         }
     }
-    // 抽屉候选：所有已启用且已配置服务下的普通聊天模型。
-    val enabledModels: List<EnabledModelRow> = remember(services) {
-        services.filter { it.isConfiguredForChat() }.flatMap { svc ->
-            svc.groups.flatMap { grp ->
-                grp.models.sortedBy { it.id }.sortedBy { it.name }
-                    .filter { it.isChatModel() }.map { m -> EnabledModelRow(svc, grp, m) }
-            }
+    // 抽屉候选：所有已启用且已配置实例下的普通聊天模型。
+    val enabledModels: List<EnabledModelRow> = remember(instances) {
+        instances.filter { it.isConfiguredForChat() }.flatMap { instance ->
+            instance.chatRows()
         }
     }
     var showModelPicker by remember { mutableStateOf(false) }
     // OpenAI Chat Completions 协议不支持推理强度；未解析出模型时按不支持处理。
-    val reasoningSupported = displayedModel?.service?.apiProtocol != ApiProtocol.OpenaiChatcompletions
+    val reasoningSupported = displayedModel?.connection?.protocol != ApiProtocol.OpenaiChatcompletions
     // chip 上的思考强度标签：思考开启且当前协议支持时显示档位名，否则省略。
     // 会话里留存的档位在切到不支持协议的模型后不再展示，切回后原样恢复。
     val effortLabel = toolConfiguration?.let {
@@ -228,7 +220,8 @@ fun ModelTitleAndPicker(
     ) {
         ModelStatusDisplay(
             modelName = displayedModelName,
-            serviceId = displayedModel?.service?.id,
+            // 品牌图标按厂商模板映射；实例 ID 不能用于查图标。
+            serviceId = displayedModel?.instance?.templateId,
             emptyText = when (loadState) {
                 CatalogLoadState.Loading -> stringResource(R.string.chat_model_loading)
                 CatalogLoadState.Ready -> stringResource(R.string.chat_model_empty_configure)
@@ -261,8 +254,8 @@ fun ModelTitleAndPicker(
             onPick = { row ->
                 onSelectModel(
                     ModelSelection(
-                        serviceId = row.service.id,
-                        groupId = row.group.id,
+                        instanceId = row.instance.id,
+                        connectionId = row.connection.id,
                         modelId = row.model.id,
                     )
                 )
@@ -280,36 +273,50 @@ fun ModelTitleAndPicker(
     }
 }
 
-private fun List<LLMModelSetting>.resolveSelection(selection: ModelSelection?): EnabledModelRow? {
+private fun List<ModelServiceInstance>.resolveSelection(selection: ModelSelection?): EnabledModelRow? {
     if (selection == null) return null
-    val service = firstOrNull {
-        it.id == selection.serviceId && it.isConfiguredForChat()
+    val instance = firstOrNull {
+        it.id == selection.instanceId && it.isConfiguredForChat()
     } ?: return null
-    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return null
-    val model = group.models.firstOrNull {
+    val connection = instance.connection(selection.connectionId) ?: return null
+    val model = connection.models.firstOrNull {
         it.id == selection.modelId && it.isChatModel()
     } ?: return null
-    return EnabledModelRow(service, group, model)
+    return EnabledModelRow(instance, connection, model)
 }
 
-private fun List<LLMModelSetting>.firstConfiguredChatSelection(): ModelSelection? {
+private fun List<ModelServiceInstance>.firstConfiguredChatSelection(): ModelSelection? {
     return asSequence()
         .filter { it.isConfiguredForChat() }
-        .mapNotNull { service ->
-            service.groups.asSequence().mapNotNull { group ->
-                val model = group.models.firstOrNull { it.isChatModel() } ?: return@mapNotNull null
+        .mapNotNull { instance ->
+            instance.conversationConnection?.let { connection ->
+                val model = connection.models.firstOrNull { it.isChatModel() } ?: return@mapNotNull null
                 ModelSelection(
-                    serviceId = service.id,
-                    groupId = group.id,
+                    instanceId = instance.id,
+                    connectionId = connection.id,
                     modelId = model.id,
                 )
-            }.firstOrNull()
+            }
         }
         .firstOrNull()
 }
 
-private fun LLMModelSetting.isConfiguredForChat(): Boolean =
-    isEnabled && apiKey.isNotBlank() && groups.any { group -> group.models.any(Model::isChatModel) }
+/** 实例可服务聊天：启用、对话连接凭据可解析且已选模型中存在可对话模型。 */
+internal fun ModelServiceInstance.isConfiguredForChat(): Boolean {
+    if (!isEnabled) return false
+    val connection = conversationConnection ?: return false
+    if (effectiveApiKey(connection).isBlank()) return false
+    return connection.models.any(Model::isChatModel)
+}
+
+/** 对话连接内可对话模型的选项行；聊天选择器与回退解析共用。 */
+internal fun ModelServiceInstance.chatRows(): List<EnabledModelRow> {
+    val connection = conversationConnection ?: return emptyList()
+    return connection.models
+        .sortedBy { it.id }.sortedBy { it.name }
+        .filter { it.isChatModel() }
+        .map { model -> EnabledModelRow(this, connection, model) }
+}
 
 // 远端拉取的模型不会带语音能力标记（OpenAiCompatibleModelServiceGateway 只取 id），
 // 这里额外按 id/name 中的 "tts" 关键字兜底过滤，避免语音合成模型混入聊天候选。
@@ -317,40 +324,45 @@ internal fun Model.isChatModel(): Boolean =
     ModelCapability.LLM in capabilities && !id.contains("tts", ignoreCase = true) &&
             !name.contains("tts", ignoreCase = true)
 
-internal fun previewModelServices(): List<LLMModelSetting> = listOf(
-    LLMModelSetting(
-        id = "openai",
+internal fun previewModelInstances(): List<ModelServiceInstance> = listOf(
+    previewInstance(
+        id = "instance-openai",
         name = "OpenAI",
-        isEnabled = true,
-        apiKey = "sk-preview",
-        apiBaseUrl = "https://api.openai.com/v1",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "https://api.anthropic.com",
-        groups = listOf(
-            ModelGroup(
-                id = "gpt",
-                name = "GPT",
-                models = listOf(
-                    Model(id = "gpt-4o", name = "GPT-4o"),
-                    Model(id = "gpt-4o-mini", name = "GPT-4o mini"),
-                ),
-            ),
+        templateId = "openai",
+        models = listOf(
+            Model(id = "gpt-4o", name = "GPT-4o"),
+            Model(id = "gpt-4o-mini", name = "GPT-4o mini"),
         ),
     ),
-    LLMModelSetting(
-        id = "deepseek",
+    previewInstance(
+        id = "instance-deepseek",
         name = "DeepSeek",
-        isEnabled = true,
-        apiKey = "preview-only",
-        apiBaseUrl = "https://api.deepseek.com",
-        apiProtocol = ApiProtocol.OpenaiChatcompletions,
-        anthropicBaseUrl = "",
-        groups = listOf(
-            ModelGroup(
-                id = "deepseek",
-                name = "DeepSeek",
-                models = listOf(Model(id = "deepseekv4-flash", name = "deepseekv4-flash")),
-            ),
+        templateId = "deepseek",
+        models = listOf(Model(id = "deepseekv4-flash", name = "deepseekv4-flash")),
+    ),
+)
+
+/** 预览实例 fixture：仅一条对话连接。 */
+internal fun previewInstance(
+    id: String,
+    name: String,
+    templateId: String?,
+    models: List<Model>,
+    protocol: ApiProtocol = ApiProtocol.OpenaiChatcompletions,
+): ModelServiceInstance = ModelServiceInstance(
+    id = id,
+    name = name,
+    templateId = templateId,
+    isEnabled = true,
+    isOfficialToolsEnabled = true,
+    sharedApiKey = "sk-preview",
+    connections = listOf(
+        ServiceConnection(
+            id = "$id-conversation",
+            capability = ServiceCapability.Conversation,
+            protocol = protocol,
+            endpoint = "https://api.example.com/v1",
+            models = models,
         ),
     ),
 )
@@ -388,10 +400,10 @@ private fun ModelStatusDisplayEmptyPreview() {
 private fun ModelTitleAndPickerPreview() {
     GimiTheme {
         ModelTitleAndPicker(
-            services = previewModelServices(),
+            instances = previewModelInstances(),
             currentSelection = ModelSelection(
-                serviceId = "openai",
-                groupId = "gpt",
+                instanceId = "instance-openai",
+                connectionId = "instance-openai-conversation",
                 modelId = "gpt-4o",
             ),
             loadState = CatalogLoadState.Ready,
@@ -403,23 +415,14 @@ private fun ModelTitleAndPickerPreview() {
     }
 }
 
-/** Anthropic 协议服务 fixture：思考强度档位在支持协议下应正常显示。 */
-private fun previewAnthropicModelServices(): List<LLMModelSetting> = listOf(
-    LLMModelSetting(
-        id = "anthropic",
+/** Anthropic 协议实例 fixture：思考强度档位在支持协议下应正常显示。 */
+private fun previewAnthropicModelInstances(): List<ModelServiceInstance> = listOf(
+    previewInstance(
+        id = "instance-anthropic",
         name = "Anthropic",
-        isEnabled = true,
-        apiKey = "sk-preview",
-        apiBaseUrl = "https://api.anthropic.com",
-        apiProtocol = ApiProtocol.Anthropic,
-        anthropicBaseUrl = "https://api.anthropic.com",
-        groups = listOf(
-            ModelGroup(
-                id = "claude",
-                name = "Claude",
-                models = listOf(Model(id = "claude-sonnet", name = "Claude Sonnet")),
-            ),
-        ),
+        templateId = "anthropic",
+        protocol = ApiProtocol.Anthropic,
+        models = listOf(Model(id = "claude-sonnet", name = "Claude Sonnet")),
     ),
 )
 
@@ -428,10 +431,10 @@ private fun previewAnthropicModelServices(): List<LLMModelSetting> = listOf(
 private fun ModelTitleAndPickerEffortVisiblePreview() {
     GimiTheme {
         ModelTitleAndPicker(
-            services = previewAnthropicModelServices(),
+            instances = previewAnthropicModelInstances(),
             currentSelection = ModelSelection(
-                serviceId = "anthropic",
-                groupId = "claude",
+                instanceId = "instance-anthropic",
+                connectionId = "instance-anthropic-conversation",
                 modelId = "claude-sonnet",
             ),
             loadState = CatalogLoadState.Ready,
@@ -452,10 +455,10 @@ private fun ModelTitleAndPickerEffortVisiblePreview() {
 private fun ModelTitleAndPickerEffortHiddenPreview() {
     GimiTheme {
         ModelTitleAndPicker(
-            services = previewModelServices(),
+            instances = previewModelInstances(),
             currentSelection = ModelSelection(
-                serviceId = "deepseek",
-                groupId = "deepseek",
+                instanceId = "instance-deepseek",
+                connectionId = "instance-deepseek-conversation",
                 modelId = "deepseekv4-flash",
             ),
             loadState = CatalogLoadState.Ready,

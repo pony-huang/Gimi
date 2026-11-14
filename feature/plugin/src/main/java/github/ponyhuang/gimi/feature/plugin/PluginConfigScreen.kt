@@ -31,15 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
-import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
@@ -225,15 +224,11 @@ private fun PluginToggleField(
     field: PluginConfigFieldUiState,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    PreferenceListItem(
+    PreferenceSwitchRow(
         icon = Icons.Default.Tune,
         title = field.label,
-        trailingContent = {
-            GimiSwitch(
-                checked = field.value.toBoolean(),
-                onCheckedChange = onCheckedChange,
-            )
-        },
+        checked = field.value.toBoolean(),
+        onCheckedChange = onCheckedChange,
     )
 }
 

@@ -2,8 +2,10 @@ package github.ponyhuang.gimi.data.skills
 
 import app.cash.turbine.test
 import com.google.adk.kt.skills.NewFileSystemSource
+import github.ponyhuang.gimi.domain.skills.model.InstalledSkill
 import github.ponyhuang.gimi.domain.skills.model.SkillImportFailure
 import github.ponyhuang.gimi.domain.skills.model.SkillImportSource
+import github.ponyhuang.gimi.domain.skills.repository.SkillRepository
 import github.ponyhuang.gimi.domain.skills.usecase.InstallSkillArchiveUseCase
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -171,6 +173,101 @@ class SkillRepositoryTest {
     }
 
     @Test
+    fun setEnabledTogglesObservedStateAndSurvivesRepositoryRecreation() = runTest {
+        val enabledStore = FakeEnabledStore()
+        val archive = validArchive("toggle-skill", "Toggle skill")
+        val reader = SkillArchiveReader(
+            okHttpClient = OkHttpClient(),
+            localDocumentOpener = { ByteArrayInputStream(archive) },
+        )
+        val repository = FileSkillRepository(
+            store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
+            archiveReader = reader,
+            enabledStore = enabledStore,
+            scope = this,
+        )
+        val prepared = repository.prepareImport(SkillImportSource.LocalDocument("content://toggle"))
+        repository.commitImport(prepared.id, allowReplace = false)
+
+        repository.setEnabled("toggle-skill", enabled = false)
+        assertEquals(false, awaitInstalled(repository).single().enabled)
+
+        // 新实例从持久化状态合并，验证禁用状态在进程重启后仍然生效。
+        val recreated = FileSkillRepository(
+            store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
+            archiveReader = reader,
+            enabledStore = enabledStore,
+            scope = this,
+        )
+        assertEquals(false, awaitInstalled(recreated).single().enabled)
+
+        recreated.setEnabled("toggle-skill", enabled = true)
+        assertEquals(true, awaitInstalled(recreated).single().enabled)
+    }
+
+    @Test
+    fun removalClearsEnabledStateSoReinstallationDefaultsToEnabled() = runTest {
+        val enabledStore = FakeEnabledStore()
+        val archive = validArchive("removal-skill", "Removal skill")
+        val reader = SkillArchiveReader(
+            okHttpClient = OkHttpClient(),
+            localDocumentOpener = { ByteArrayInputStream(archive) },
+        )
+        val repository = FileSkillRepository(
+            store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
+            archiveReader = reader,
+            enabledStore = enabledStore,
+            scope = this,
+        )
+        val prepared = repository.prepareImport(SkillImportSource.LocalDocument("content://removal"))
+        repository.commitImport(prepared.id, allowReplace = false)
+        repository.setEnabled("removal-skill", enabled = false)
+        repository.remove("removal-skill")
+
+        assertTrue(enabledStore.disabledNames().isEmpty())
+
+        val reinstalled = repository.prepareImport(SkillImportSource.LocalDocument("content://removal"))
+        repository.commitImport(reinstalled.id, allowReplace = false)
+        assertEquals(true, awaitInstalled(repository).single().enabled)
+    }
+
+    @Test
+    fun disabledSkillIsHiddenFromRuntimeSkillSource() = runTest {
+        val enabledStore = FakeEnabledStore()
+        val archive = validArchive("runtime-skill", "Runtime skill")
+        val reader = SkillArchiveReader(
+            okHttpClient = OkHttpClient(),
+            localDocumentOpener = { ByteArrayInputStream(archive) },
+        )
+        val repository = FileSkillRepository(
+            store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
+            archiveReader = reader,
+            enabledStore = enabledStore,
+            scope = this,
+        )
+        val prepared = repository.prepareImport(SkillImportSource.LocalDocument("content://runtime"))
+        repository.commitImport(prepared.id, allowReplace = false)
+        val source = EnabledSkillSource(
+            delegate = NewFileSystemSource(File(root, "skills").absolutePath),
+            disabledNames = enabledStore::disabledNames,
+        )
+
+        assertEquals("runtime-skill", source.listFrontmatters().getOrThrow().single().name)
+        assertTrue(source.loadInstructions("runtime-skill").isSuccess)
+
+        repository.setEnabled("runtime-skill", enabled = false)
+
+        assertTrue(source.listFrontmatters().getOrThrow().isEmpty())
+        assertTrue(source.loadFrontmatter("runtime-skill").isFailure)
+        assertTrue(source.loadInstructions("runtime-skill").isFailure)
+        assertTrue(source.loadResource("runtime-skill", "assets/data.bin").isFailure)
+        assertTrue(source.listResources("runtime-skill", "assets").isFailure)
+
+        repository.setEnabled("runtime-skill", enabled = true)
+        assertEquals("runtime-skill", source.loadFrontmatter("runtime-skill").getOrThrow().name)
+    }
+
+    @Test
     fun importWorkRunsOnConfiguredWorkerDispatcher() = runTest {
         val executor = Executors.newSingleThreadExecutor { task ->
             Thread(task, "skill-import-worker")
@@ -186,9 +283,10 @@ class SkillRepositoryTest {
                     ByteArrayInputStream(archive)
                 },
             )
-            val repository = FileSkillRepository(
+            val             repository = FileSkillRepository(
                 store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
                 archiveReader = reader,
+                enabledStore = FakeEnabledStore(),
                 scope = this,
                 workerDispatcher = dispatcher,
             )
@@ -202,11 +300,41 @@ class SkillRepositoryTest {
         }
     }
 
+    /** 仓储的初始刷新在后台协程执行；等待列表非空后再断言，避免读取初始化前的空快照。 */
+    private suspend fun TestScope.awaitInstalled(repository: SkillRepository): List<InstalledSkill> {
+        var result: List<InstalledSkill> = emptyList()
+        repository.observeInstalled().test {
+            var state = awaitItem()
+            while (state.isEmpty()) state = awaitItem()
+            result = state
+            cancelAndIgnoreRemainingEvents()
+        }
+        return result
+    }
+
     private fun repository(reader: SkillArchiveReader, scope: TestScope) = FileSkillRepository(
         store = SkillArchiveStore(File(root, "skills"), File(root, "staging")),
         archiveReader = reader,
+        enabledStore = FakeEnabledStore(),
         scope = scope,
     )
+
+    /** 模拟宿主持久化的启用状态：禁用名单跨实例保留，删除即清理。 */
+    private class FakeEnabledStore : SkillEnabledStore {
+        private val disabled = mutableSetOf<String>()
+
+        override fun disabledNames(): Set<String> = disabled.toSet()
+
+        override fun setEnabled(name: String, enabled: Boolean) {
+            synchronized(this) {
+                if (enabled) disabled.remove(name) else disabled.add(name)
+            }
+        }
+
+        override fun forget(name: String) {
+            synchronized(this) { disabled.remove(name) }
+        }
+    }
 
     private fun validArchive(name: String, description: String): ByteArray {
         val bytes = ByteArrayOutputStream()

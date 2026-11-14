@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,24 +24,23 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 「个性化选项」页：按用户实际使用频率排列分组。
  *
- * 顺序为「推荐 → 提示词 → 对话界面 → 工具 → 设备控制 → 主题」：
- * 推荐更新是应用的主动能力，失败需要立刻被看到，因此置顶并独立成页；
- * 提示词分组收纳简单聊天预设，会被反复调整，排在第二；
- * 对话界面与工具影响每轮对话的呈现与上下文开销，属于常调但非日常项；
- * 设备控制（Shizuku）用于一次性接入；主题模式统一放在页面底部。
+ * 顺序为「提示词 → 工具 → 对话界面 → 推荐更新 → 主题」：
+ * 提示词分组收纳简单聊天预设，会被反复调整，置顶；
+ * 工具加载与 A2UI 卡片影响每轮对话的工具开销与呈现，属于常调但非日常项；
+ * 推荐更新是后台主动能力，配置一次后极少再动；主题模式统一放在页面底部。
+ * 设备控制（Shizuku）已迁移至设置一级页的「设备控制」分组。
  */
 @Composable
 fun RecommendationSettingsScreen(
     state: RecommendationSettingsUiState,
     onAction: (RecommendationSettingsAction) -> Unit,
     onOpenSimpleChatPromptSettings: () -> Unit = {},
-    onOpenMobileUse: () -> Unit = {},
     onOpenRecommendationUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -52,18 +50,6 @@ fun RecommendationSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            // 推荐更新独立成组：开关、更新间隔与手动刷新都收进专属页面，失败提示也随之上移。
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_update_nav_section)) }
-            item {
-                PreferenceGroupCard {
-                    PreferenceListItem(
-                        icon = Icons.Default.AutoAwesome,
-                        title = stringResource(R.string.recommendation_settings_section),
-                        subtitle = stringResource(R.string.recommendation_update_nav_subtitle),
-                        onClick = onOpenRecommendationUpdate,
-                    )
-                }
-            }
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_prompt_section)) }
             item {
                 PreferenceGroupCard {
@@ -72,21 +58,6 @@ fun RecommendationSettingsScreen(
                         title = stringResource(R.string.recommendation_simple_chat_title),
                         subtitle = stringResource(R.string.recommendation_simple_chat_subtitle),
                         onClick = onOpenSimpleChatPromptSettings,
-                    )
-                }
-            }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_conversation_section)) }
-            item { PreferenceSectionNote(stringResource(R.string.recommendation_a2ui_note)) }
-            item {
-                PreferenceGroupCard {
-                    PreferenceSwitchItem(
-                        icon = a2uiLogo,
-                        title = stringResource(R.string.recommendation_a2ui_title),
-                        subtitle = stringResource(R.string.recommendation_a2ui_subtitle),
-                        checked = state.a2uiEnabled,
-                        onCheckedChange = { checked ->
-                            onAction(RecommendationSettingsAction.SetA2uiEnabled(checked))
-                        },
                     )
                 }
             }
@@ -102,14 +73,30 @@ fun RecommendationSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_device_section)) }
+            item { PreferenceSectionTitle(stringResource(R.string.recommendation_conversation_section)) }
+            item { PreferenceSectionNote(stringResource(R.string.recommendation_a2ui_note)) }
+            item {
+                PreferenceGroupCard {
+                    PreferenceSwitchRow(
+                        icon = a2uiLogo,
+                        title = stringResource(R.string.recommendation_a2ui_title),
+                        description = stringResource(R.string.recommendation_a2ui_subtitle),
+                        checked = state.a2uiEnabled,
+                        onCheckedChange = { checked ->
+                            onAction(RecommendationSettingsAction.SetA2uiEnabled(checked))
+                        },
+                    )
+                }
+            }
+            // 推荐更新独立成组：开关、更新间隔与手动刷新都收进专属页面；配置一次后极少再动，因此后置。
+            item { PreferenceSectionTitle(stringResource(R.string.recommendation_update_nav_section)) }
             item {
                 PreferenceGroupCard {
                     PreferenceListItem(
-                        icon = Icons.Default.Phonelink,
-                        title = stringResource(R.string.recommendation_mobile_use_title),
-                        subtitle = stringResource(R.string.recommendation_mobile_use_subtitle),
-                        onClick = onOpenMobileUse,
+                        icon = Icons.Default.AutoAwesome,
+                        title = stringResource(R.string.recommendation_settings_section),
+                        subtitle = stringResource(R.string.recommendation_update_nav_subtitle),
+                        onClick = onOpenRecommendationUpdate,
                     )
                 }
             }

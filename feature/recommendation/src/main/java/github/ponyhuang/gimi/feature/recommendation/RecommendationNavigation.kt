@@ -23,13 +23,11 @@ fun RecommendationEntryProvider(
     navigate: (NavKey) -> Unit,
     onOpenFastModelSettings: () -> Unit,
     onOpenSimpleChatPromptSettings: () -> Unit = {},
-    onOpenMobileUse: () -> Unit = {},
 ): Boolean = when (destination) {
     RecommendationDestination.Settings -> {
         RecommendationSettingsRoute(
             onBack = onBack,
             onOpenSimpleChatPromptSettings = onOpenSimpleChatPromptSettings,
-            onOpenMobileUse = onOpenMobileUse,
             onOpenRecommendationUpdate = { navigate(RecommendationDestination.UpdateSettings) },
         )
         true

@@ -15,7 +15,7 @@ class OfficialToolSupport @Inject constructor() {
     val all: List<OfficialToolSpec> = listOf(
         OfficialToolSpec(
             toolId = OfficialToolIds.DEEPSEEK_WEB_SEARCH,
-            serviceId = "deepseek",
+            templateId = "deepseek",
             protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             displayName = "DeepSeek web search",
             staticFunctionIds = listOf(OfficialToolIds.DEEPSEEK_WEB_SEARCH),
@@ -24,7 +24,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.DEEPSEEK_WEB_FETCH,
-            serviceId = "deepseek",
+            templateId = "deepseek",
             protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             displayName = "DeepSeek web fetch",
             staticFunctionIds = listOf(OfficialToolIds.DEEPSEEK_WEB_FETCH),
@@ -33,7 +33,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
-            serviceId = "anthropic",
+            templateId = "anthropic",
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "Anthropic web search",
             staticFunctionIds = listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH),
@@ -41,7 +41,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.MINIMAX_WEB_SEARCH,
-            serviceId = "minimax",
+            templateId = "minimax",
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "MiniMax web search",
             staticFunctionIds = listOf(OfficialToolIds.MINIMAX_WEB_SEARCH),
@@ -49,7 +49,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.MINIMAX_IMAGE_GENERATION,
-            serviceId = "minimax",
+            templateId = "minimax",
             protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             displayName = "MiniMax image generation",
             staticFunctionIds = listOf(
@@ -62,7 +62,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.GEMINI_WEB_SEARCH,
-            serviceId = "gemini",
+            templateId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "Google Search",
             staticFunctionIds = listOf(OfficialToolIds.GEMINI_WEB_SEARCH),
@@ -70,7 +70,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.GEMINI_URL_CONTEXT,
-            serviceId = "gemini",
+            templateId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "URL context",
             staticFunctionIds = listOf(OfficialToolIds.GEMINI_URL_CONTEXT),
@@ -78,7 +78,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.GEMINI_GOOGLE_MAPS,
-            serviceId = "gemini",
+            templateId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "Google Maps",
             staticFunctionIds = listOf(OfficialToolIds.GEMINI_GOOGLE_MAPS),
@@ -86,7 +86,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.GLM_WEB_SEARCH,
-            serviceId = "glm",
+            templateId = "glm",
             protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             modelFamilies = setOf("glm"),
             displayName = "GLM web tools",
@@ -95,7 +95,7 @@ class OfficialToolSupport @Inject constructor() {
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.KIMI_WEB_TOOLS,
-            serviceId = "kimi",
+            templateId = "kimi",
             protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             displayName = "Kimi web tools",
             staticFunctionIds = listOf(OfficialToolIds.KIMI_SEARCH, OfficialToolIds.KIMI_SEARCH_PRO, OfficialToolIds.KIMI_FETCH),
@@ -105,40 +105,48 @@ class OfficialToolSupport @Inject constructor() {
         ),
     )
 
-    /** 按来源服务、请求协议与模型家族筛选声明，不检查服务开关。 */
+    /** 按来源模板、请求协议与模型家族筛选声明，不检查实例开关。 */
     fun specsFor(
-        serviceId: String,
+        templateId: String,
         protocol: ApiProtocol,
         modelId: String,
     ): List<OfficialToolSpec> = all.filter { spec ->
-        spec.serviceId == serviceId &&
+        spec.templateId == templateId &&
                 protocol in spec.protocols &&
                 spec.modelBelongsToFamily(modelId)
     }
 
-    /** 当前模型的原生工具与其他已启用来源的独立 API 工具。 */
+    /**
+     * 当前模型的原生工具与其他已启用实例的独立 API 工具。
+     *
+     * [sourceInstances] 是当前启用的全部实例：来源匹配按实例的模板身份，
+     * 凭据归属保持在各实例内，多实例不会错用密钥。
+     */
     fun availableSpecsFor(
-        serviceId: String,
+        templateId: String,
         protocol: ApiProtocol,
         modelId: String,
-        sourceServices: List<LLMModelSetting>,
+        sourceInstances: List<ModelServiceInstance>,
     ): List<OfficialToolSpec> {
-        val services = sourceServices.associateBy(LLMModelSetting::id)
-        val active = specsFor(serviceId, protocol, modelId)
-            .filter { spec -> (services[spec.serviceId]?.canProvideOfficialTools() == true) }
+        val templateByInstance = sourceInstances.associateBy(ModelServiceInstance::id)
+        val active = specsFor(templateId, protocol, modelId)
+            .filter { spec -> templateByInstance.values.any { it.canProvideOfficialTools() && it.templateId == spec.templateId } }
         val crossModel = all.filter { spec ->
-            spec.serviceId != serviceId &&
+            spec.templateId != templateId &&
                 spec.binding is OfficialToolBinding.LocalFunctions &&
                 spec.canBeUsedAcrossModels &&
-                protocolFor(spec.serviceId, services)?.let(spec.protocols::contains) == true &&
-                (services[spec.serviceId]?.canProvideOfficialTools() == true)
+                templateByInstance.values.any { instance ->
+                    instance.templateId == spec.templateId &&
+                        instance.canProvideOfficialTools() &&
+                        instance.conversationConnection?.let { spec.protocols.contains(it.protocol) } == true
+                }
         }
         return (active + crossModel).distinctBy(OfficialToolSpec::toolId)
     }
 
-    /** 服务/协议支持的目录 ID，不收窄模型家族。 */
-    fun supportedToolIds(serviceId: String, protocol: ApiProtocol): Set<String> = all
-        .filter { spec -> spec.serviceId == serviceId && protocol in spec.protocols }
+    /** 模板/协议支持的目录 ID，不收窄模型家族。 */
+    fun supportedToolIds(templateId: String, protocol: ApiProtocol): Set<String> = all
+        .filter { spec -> spec.templateId == templateId && protocol in spec.protocols }
         .map { it.toolId }
         .toSet()
 
@@ -154,14 +162,4 @@ class OfficialToolSupport @Inject constructor() {
                     normalized.startsWith("$f.")
         }
     }
-
-    private fun protocolFor(
-        serviceId: String,
-        services: Map<String, LLMModelSetting>,
-    ): ApiProtocol? = services[serviceId]?.apiProtocol
-
 }
-
-/** 官方工具来源必须同时满足服务启用、官方工具启用和凭据非空。 */
-fun LLMModelSetting.canProvideOfficialTools(): Boolean =
-    isEnabled && isOfficialToolsEnabled && apiKey.isNotBlank()

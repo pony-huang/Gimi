@@ -32,6 +32,7 @@ sealed interface SkillsSettingsAction {
     data object ConfirmReplacement : SkillsSettingsAction
     data object CancelReplacement : SkillsSettingsAction
     data class RequestRemove(val skill: InstalledSkill) : SkillsSettingsAction
+    data class ToggleSkill(val skill: InstalledSkill, val enabled: Boolean) : SkillsSettingsAction
     data object ConfirmRemoval : SkillsSettingsAction
     data object CancelRemoval : SkillsSettingsAction
     data object ConsumeNotice : SkillsSettingsAction

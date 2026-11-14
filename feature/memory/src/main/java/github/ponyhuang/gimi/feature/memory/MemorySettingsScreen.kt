@@ -44,7 +44,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
@@ -65,16 +65,13 @@ fun MemorySettingsScreen(
         ) {
             item {
                 PreferenceGroupCard {
-                    PreferenceSwitchItem(
+                    PreferenceSwitchRow(
                         icon = Icons.Default.Psychology,
                         title = stringResource(R.string.memory_enabled_title),
-                        subtitle = stringResource(R.string.memory_enabled_subtitle),
+                        description = stringResource(R.string.memory_enabled_subtitle),
                         checked = state.memoryEnabled,
                         onCheckedChange = {
                             onAction(MemorySettingsAction.SetMemoryEnabled(it))
-                        },
-                        onClick = {
-                            onAction(MemorySettingsAction.SetMemoryEnabled(!state.memoryEnabled))
                         },
                     )
                 }
@@ -95,23 +92,24 @@ fun MemorySettingsScreen(
             }
             item {
                 PreferenceGroupCard {
-                    PreferenceSwitchItem(
-                        icon = mem0Icon,
-                        iconContainer = Color.Transparent,
-                        iconTint = Color.Unspecified,
-                        iconSize = 24.dp,
+                    PreferenceSwitchRow(
+                        // Mem0 是多彩品牌图标，必须关闭 Icon 默认的单色 tint，
+                        // 否则整个 logo 会被 LocalContentColor 染成纯色方块。
+                        leadingIcon = {
+                            Icon(
+                                mem0Icon,
+                                contentDescription = null,
+                                modifier = it,
+                                tint = Color.Unspecified,
+                            )
+                        },
                         title = stringResource(R.string.memory_mem0_enabled_title),
-                        subtitle = stringResource(R.string.memory_mem0_enabled_subtitle),
+                        description = stringResource(R.string.memory_mem0_enabled_subtitle),
                         showDivider = state.mem0Enabled,
                         checked = state.mem0Enabled,
-                        switchEnabled = state.memoryEnabled,
+                        enabled = state.memoryEnabled,
                         onCheckedChange = {
                             onAction(MemorySettingsAction.SetMem0Enabled(it))
-                        },
-                        onClick = {
-                            if (state.memoryEnabled) {
-                                onAction(MemorySettingsAction.SetMem0Enabled(!state.mem0Enabled))
-                            }
                         },
                     )
                     // Token 配置仅在 Mem0 开启后展开，关闭时整块隐藏。

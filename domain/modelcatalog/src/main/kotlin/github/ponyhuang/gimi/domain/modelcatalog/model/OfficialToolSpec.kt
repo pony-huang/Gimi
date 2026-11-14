@@ -4,8 +4,8 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
  * 官方工具的纯目录描述，不持有凭据、SDK 类型或工具构造闭包。
  *
  * @property toolId 厂商唯一、用于会话配置的目录 ID。
- * @property serviceId 提供凭据的模型服务 ID。
- * @property protocols 来源服务支持的 API 协议。
+ * @property templateId 提供凭据与协议能力的厂商模板 ID；实例凭据归属由运行时解析。
+ * @property protocols 来源模板支持的 API 协议。
  * @property modelFamilies 当前聊天模型的家族前缀限制；空集合表示不限。
  * @property displayName Agent 检索候选的来源名称。
  * @property staticFunctionIds 固定函数 ID；空列表表示需要动态加载。
@@ -15,7 +15,7 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
  */
 data class OfficialToolSpec(
     val toolId: String,
-    val serviceId: String,
+    val templateId: String,
     val protocols: Set<ApiProtocol>,
     val modelFamilies: Set<String> = emptySet(),
     val displayName: String,

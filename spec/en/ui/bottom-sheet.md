@@ -26,7 +26,11 @@ only resize affordance is the drag handle at the top.
 | `GimiSheetBase` | Modal shell, drag handle, continuous height, slot skeleton, insets |
 | `GimiSheet` | Derived: title row + body + optional footer |
 | `GimiSearchSheet` | Derived: optional title row + search row + body + optional footer |
-| `GimiSheetOptionRow` / `GimiSheetSwitchRow` | Rows used inside a sheet (moved out of the old `GimiBottomSheet`) |
+| `GimiSheetOptionRow` | Mutually-exclusive option rows inside a sheet (moved out of the old `GimiBottomSheet`) |
+
+Switch rows inside sheets use `PreferenceSwitchRow`
+(`core/designsystem/.../ui/preference`), shared with the settings pages for one
+geometry and row-level toggle interaction.
 
 All three live in `core/designsystem/.../ui/components`. `GimiSheetBase` owns
 the layout; the derived components only decide what goes into the title, search

@@ -6,7 +6,7 @@ import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -127,6 +127,7 @@ class OfficialToolsetRequestTest {
         modelId: String = "model",
     ) = ModelRuntimeMetadata(
         serviceId = "service",
+        templateId = null,
         baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = modelId,
         fullBaseUrl = "https://example.com",

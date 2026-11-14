@@ -31,9 +31,6 @@
     <string name="recommendation_tool_loading_title">工具加载</string>
     <string name="recommendation_tool_loading_always">全量加载</string>
     <string name="recommendation_tool_loading_on_demand">按需加载</string>
-    <string name="recommendation_device_section">设备控制</string>
-    <string name="recommendation_mobile_use_title">Shizuku</string>
-    <string name="recommendation_mobile_use_subtitle">Agent 后台操作其他应用</string>
     <string name="recommendation_theme_section">主题</string>
     <string name="recommendation_theme_mode_title">主题模式</string>
     <string name="recommendation_theme_system">跟随系统</string>

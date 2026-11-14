@@ -24,6 +24,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.junit.Assert.*
 import org.junit.Test
+import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+import github.ponyhuang.gimi.data.modelaccess.CascadedVoiceModel
 
 /** 后端只读预设状态；测试提供空仓库表示不使用自定义提示词。 */
 private fun emptySimpleChatPrompts(): SimpleChatPromptRepository = object : SimpleChatPromptRepository {

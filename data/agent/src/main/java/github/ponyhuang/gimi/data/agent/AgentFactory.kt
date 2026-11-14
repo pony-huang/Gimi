@@ -15,6 +15,9 @@ import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import javax.inject.Inject
 import javax.inject.Singleton
+import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
 
 /**
  * 一次 Agent 构建的产物。

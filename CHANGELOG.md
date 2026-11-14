@@ -2,6 +2,23 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [1.0.0-beta.3](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2026-11-14)
+
+
+### Features 新特性
+
+* **模型服务 Model services:** 统一模型服务配置：按模板创建独立服务实例，实例加载时自动对账、补齐模板新增的连接 / Unify model service configuration: independent service instances created from templates, with startup reconciliation backfilling new template connections into existing instances ([6f787f4](https://github.com/pony-huang/Gimi/commit/6f787f4496e03afff61f5244e1e71bade9d98fdd))
+* **厂商接入 Vendor access:** 抽取 `data:modelaccess` 厂商访问层：适配器与官方工具按厂商重组（anthropic/qwen/openai/minimax/mimo、openaicompatible 协议族、跨厂商共享语音目录 VoiceCatalogResolver） / Extract the `data:modelaccess` vendor access module; regroup adapters and official tools by vendor (anthropic/qwen/openai/minimax/mimo, the openaicompatible protocol family, and the cross-vendor shared voice catalog via VoiceCatalogResolver) ([6f787f4](https://github.com/pony-huang/Gimi/commit/6f787f4496e03afff61f5244e1e71bade9d98fdd))
+* **本地环境 Runtime environment:** 新增本地 Debian 运行环境：环境页全新改版、环境变量编辑、技能桥接、Shizuku 暴露，配套独立 UID 的 companion runtime APK / Add a local Debian runtime environment: redesigned environment screens, environment variable editing, skills bridging, and Shizuku exposure, backed by a companion runtime APK with an independent UID ([6f787f4](https://github.com/pony-huang/Gimi/commit/6f787f4496e03afff61f5244e1e71bade9d98fdd))
+* **语音 Voice:** 接入 DeepSeek ASR/TTS（走专用 tools 端点）；未配置朗读音色时按模型自动回落第一个内置音色 / Integrate DeepSeek ASR/TTS via dedicated tools endpoints; default an unset TTS voice to the first built-in voice per model ([6f787f4](https://github.com/pony-huang/Gimi/commit/6f787f4496e03afff61f5244e1e71bade9d98fdd))
+* **UI:** 统一协议命名简称（Completions/Messages），新增共享开关行组件 PreferenceSwitchRow / Unify protocol naming (Completions/Messages) and introduce the shared PreferenceSwitchRow component ([6f787f4](https://github.com/pony-huang/Gimi/commit/6f787f4496e03afff61f5244e1e71bade9d98fdd))
+
+
+### Bug Fixes 修复
+
+* **modelsettings:** 服务详情页改用共享的左右滑动转场 / Use the shared left-right slide transition for service detail pages ([c8cba0d](https://github.com/pony-huang/Gimi/commit/c8cba0d4f27451dae41a4cb62909275ed0e9f7f6))
+* 重置 environment-runtime API 版本为 1；沙箱环境变量编辑器与本地环境页风格对齐；跨会话共享运行时 HOME（持久化 ncm-cli 等工具的登录态） / Reset the environment-runtime API version to 1; align the sandbox env-var editor with the local environment style; share runtime HOME across sessions to persist tool logins such as ncm-cli ([d200a72](https://github.com/pony-huang/Gimi/commit/d200a72a5de54fceb66ddab2fc2ef0d7df18dd5b))
+
 ## [1.0.0-beta.2](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-11-12)
 
 

@@ -18,10 +18,16 @@ listOf("debug", "release").forEach { buildType ->
     android.sourceSets.getByName(buildType).assets.srcDir(
         layout.buildDirectory.dir("generated/environmentAssets/$buildType").get().asFile,
     )
-    // 资产源集的消费方（资产合并、release lintVital 模型生成）都需先拷贝配套 APK，
-    // 否则 Gradle 隐式依赖校验会在 release 构建失败（lintVital 只在 release 存在）。
+    // 资产源集的直读消费方（资产合并、lint 分析与模型生成）都需先拷贝配套 APK，
+    // 否则 Gradle 隐式依赖校验会构建失败；lintVital 仅 release 存在，lint 分析按变体命名。
     tasks.matching {
-        it.name in setOf("merge${capitalized}Assets", "generate${capitalized}LintVitalReportModel")
+        it.name in setOf(
+            "merge${capitalized}Assets",
+            "lintVitalAnalyze$capitalized",
+            "lintAnalyze$capitalized",
+            "generate${capitalized}LintVitalReportModel",
+            "generate${capitalized}LintModel",
+        )
     }.configureEach { dependsOn(packageRuntime) }
 }
 

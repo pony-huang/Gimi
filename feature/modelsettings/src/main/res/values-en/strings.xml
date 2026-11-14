@@ -70,11 +70,11 @@
     <string name="modelsettings_dialog_pick_voice">Select playback voice</string>
     <string name="modelsettings_dialog_pick_realtime_model">Select Realtime model</string>
     <string name="modelsettings_dialog_pick_realtime_voice">Select Realtime voice</string>
-    <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Model Services first.</string>
+    <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Models first.</string>
 
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
-    <string name="modelsettings_list_title">Model services</string>
-    <string name="modelsettings_defaults_screen_title">Default models</string>
+    <string name="modelsettings_list_title">Models</string>
+    <string name="modelsettings_defaults_screen_title">Defaults</string>
     <string name="modelsettings_detail_title">Service details</string>
 
     <string name="modelsettings_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
@@ -175,7 +175,7 @@
     <!-- Unified model services: list, add catalog and default-model entries -->
     <string name="modelsettings_search_service">Search services or providers</string>
     <string name="modelsettings_list_section_preferences">Preferences</string>
-    <string name="modelsettings_defaults_entry_title">Default models</string>
+    <string name="modelsettings_defaults_entry_title">Defaults</string>
     <string name="modelsettings_defaults_entry_subtitle">Choose models for chat, speech input and reading</string>
     <string name="modelsettings_capability_count_chat">Chat %1$d</string>
     <string name="modelsettings_capability_count_recognition">Recognition %1$d</string>

@@ -3,14 +3,14 @@
     <string name="settings_sandbox_subtitle">Local environment and E2B sandbox</string>
     <string name="settings_title">Settings</string>
 
-    <string name="settings_group_model">Models</string>
+    <string name="settings_group_model">Configuration</string>
     <string name="settings_memory_title">Memory</string>
     <string name="settings_memory_subtitle">Local and cloud memory</string>
 
-    <string name="settings_model_service_title">Model services</string>
+    <string name="settings_model_service_title">Models</string>
     <string name="settings_model_service_subtitle">Chat and speech services, keys and models</string>
 
-    <string name="settings_default_model_title">Default models</string>
+    <string name="settings_default_model_title">Defaults</string>
     <string name="settings_default_model_subtitle">Default model for each feature</string>
 
     <string name="settings_mcp_title">MCP</string>
@@ -65,7 +65,7 @@
     <string name="update_open_app_details">Open app details</string>
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
-    <string name="settings_recommendations_title">Personalization options</string>
+    <string name="settings_recommendations_title">Personalization</string>
     <string name="settings_recommendations_subtitle">Smart recommendations, interactive cards and tool loading</string>
 
     <string name="logs_title">Logs</string>

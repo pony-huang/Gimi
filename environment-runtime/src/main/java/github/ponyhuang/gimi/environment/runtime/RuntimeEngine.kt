@@ -211,6 +211,11 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         val native = context.applicationInfo.nativeLibraryDir
         val workPath = "/home/workspace/" + digest(session.toByteArray())
         val workspace = File(root, workPath.trimStart('/')).apply { mkdirs() }
+        // HOME 全局共享、不随会话隔离：工具的登录态/配置（~/.config、~/.netease_mcp_device.json 等）
+        // 必须跨会话持久，否则每个新会话都要重新登录。会话隔离只作用于工作目录 workPath。
+        // 不指向 /home/workspace 根，避免 ~ 下列出所有会话目录导致 agent 越权串目录。
+        val homePath = "/home/agent"
+        File(root, "home/agent").mkdirs()
         val guestPidPath = "$workPath/.gimi-jobs/$id.pid"
         val pidFile = contained(workspace, ".gimi-jobs/$id.pid")
         pidFile.parentFile!!.mkdirs()
@@ -220,7 +225,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         builder.environment().apply {
             put("LD_LIBRARY_PATH", native); put("PROOT_LOADER", "$native/libproot-loader.so")
             put("PROOT_TMP_DIR", context.cacheDir.absolutePath); put("PROOT_NO_SECCOMP", "1")
-            put("HOME", workPath); put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+            put("HOME", homePath); put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
             put("LANG", "C.UTF-8")
             val vars = variables(); vars.keys().forEach { put(it, vars.getString(it)) }
         }

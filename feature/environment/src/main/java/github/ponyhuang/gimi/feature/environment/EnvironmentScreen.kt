@@ -353,5 +353,6 @@ private fun EnvironmentScreenPreview(page: EnvironmentDestination, state: Enviro
 
 @Composable
 private fun EnvironmentLink(label: Int, icon: ImageVector? = null, enabled: Boolean = true, onClick: () -> Unit) {
-    PreferenceListItem(icon = icon, title = stringResource(label), onClick = if (enabled) onClick else null)
+    // 禁用态保留 onClick 交给 rowEnabled 处理，让列表项呈现统一的置灰外观。
+    PreferenceListItem(icon = icon, title = stringResource(label), onClick = onClick, rowEnabled = enabled)
 }

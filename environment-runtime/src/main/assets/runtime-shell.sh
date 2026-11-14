@@ -2,7 +2,7 @@
 trap 'exit 143' TERM INT
 if ! printf '%s\n' "$$" > "$3"; then exit 125; fi
 
-# 每次执行以当前会话 HOME 计算命令目录，支持用户配置的 npm prefix。
+# HOME 为全局共享目录（跨会话持久，承载工具登录态/配置），据此计算命令目录以支持用户配置的 npm prefix。
 PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
 export PATH
 if command -v npm >/dev/null 2>&1; then

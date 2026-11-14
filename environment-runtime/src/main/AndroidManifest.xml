@@ -10,7 +10,7 @@
         <package android:name="github.ponyhuang.gimi.debug" />
     </queries>
     <application android:icon="@mipmap/ic_runtime" android:roundIcon="@mipmap/ic_runtime" android:label="@string/runtime_name" android:allowBackup="false" android:extractNativeLibs="true">
-        <meta-data android:name="github.ponyhuang.gimi.environment.API_VERSION" android:value="4" />
+        <meta-data android:name="github.ponyhuang.gimi.environment.API_VERSION" android:value="1" />
         <provider
             android:name=".RuntimeDocumentsProvider"
             android:authorities="github.ponyhuang.gimi.environment.runtime.documents"

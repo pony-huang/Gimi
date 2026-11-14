@@ -87,14 +87,18 @@ internal fun ThemeModeSegmentedGroup(
                         activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         activeBorderColor = MaterialTheme.colorScheme.primary,
                     ),
-                    icon = {
-                        Icon(
-                            imageVector = option.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
-                        )
+                    // material3 新版选中段渲染为内嵌胶囊，icon 槽会画到胶囊边界外；图标并入 label 保证随文字一起居中。
+                    icon = {},
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
+                            )
+                            Text(stringResource(option.labelRes), maxLines = 1)
+                        }
                     },
-                    label = { Text(stringResource(option.labelRes), maxLines = 1) },
                 )
             }
         }

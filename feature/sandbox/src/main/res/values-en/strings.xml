@@ -19,7 +19,7 @@
     <string name="sandbox_template_waiting">Waiting for build</string>
     <string name="sandbox_template_error">Build failed</string>
     <string name="sandbox_template_unknown">Status unknown</string>
-    <string name="sandbox_templates_hint">Open the list to load templates from this key’s project</string>
+    <string name="sandbox_templates_hint">Templates load from this key’s project</string>
     <string name="sandbox_templates_loading">Loading templates…</string>
     <string name="sandbox_templates_empty">No project templates; use the default or enter one manually</string>
     <string name="sandbox_templates_count">Loaded %1$d project templates</string>

@@ -37,6 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,45 +148,46 @@ fun SandboxSettingsScreen(
             }
             item {
                 PreferenceSectionTitle(stringResource(R.string.sandbox_environment))
+                PreferenceSectionNote(stringResource(R.string.sandbox_environment_help))
                 PreferenceGroupCard {
-                    PreferenceFormContent {
-                        Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        state.environment.forEachIndexed { index, entry ->
-                            key(entry.id) {
-                                SandboxEnvironmentGroup(entry, !state.busy,
-                                    showDivider = index < state.environment.lastIndex, onAction)
-                            }
-                        }
-                        TextButton(
-                            onClick = { onAction(SandboxSettingsAction.AddEnvironment) },
-                            enabled = !state.busy,
-                            modifier = Modifier.align(Alignment.Start),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 6.dp))
+                    state.environment.forEachIndexed { index, entry ->
+                        key(entry.id) {
+                            SandboxEnvironmentGroup(entry, !state.busy,
+                                showDivider = index < state.environment.lastIndex, onAction)
                         }
                     }
+                }
+                TextButton(
+                    onClick = { onAction(SandboxSettingsAction.AddEnvironment) },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 6.dp))
                 }
             }
         }
     }
 }
 
+/** 与本地环境变量组保持一致的交互形态：等宽摘要行收纳展开态，值默认掩码并可切换可见性。 */
 @Composable
 private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boolean, showDivider: Boolean, onAction: (SandboxSettingsAction) -> Unit) {
     val rotation by animateFloatAsState(if (entry.expanded) 180f else 0f, tween(300, easing = FastOutSlowInEasing), label = "Environment arrow")
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    var valueVisible by rememberSaveable(entry.id) { mutableStateOf(false) }
+    Column {
         Surface(onClick = { onAction(SandboxSettingsAction.ToggleEnvironment(entry.id)) }, enabled = enabled, color = Color.Transparent) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 // 折叠摘要只展示名称；值可能是令牌，不应在浏览列表时直接暴露。
                 Text(entry.name.ifBlank { stringResource(R.string.sandbox_new_environment) }, Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Monospace)
-                Icon(Icons.Default.ExpandMore, stringResource(if (entry.expanded) R.string.sandbox_collapse_environment else R.string.sandbox_expand_environment), Modifier.rotate(rotation))
+                Icon(Icons.Default.ExpandMore, stringResource(if (entry.expanded) R.string.sandbox_collapse_environment else R.string.sandbox_expand_environment),
+                    Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         SandboxExpansion(entry.expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 PreferenceTextField(
                     value = entry.name,
                     onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentName(entry.id, it)) },
@@ -200,6 +204,13 @@ private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boo
                     label = { Text(stringResource(R.string.sandbox_environment_value)) },
                     singleLine = true,
                     enabled = enabled,
+                    visualTransformation = if (valueVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { valueVisible = !valueVisible }, enabled = enabled) {
+                            Icon(if (valueVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                stringResource(if (valueVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key))
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 IconButton(onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) }, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
@@ -208,7 +219,8 @@ private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boo
             }
         }
         if (showDivider) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
         }
     }
 }

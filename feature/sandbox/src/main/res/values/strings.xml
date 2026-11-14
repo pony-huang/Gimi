@@ -19,7 +19,7 @@
     <string name="sandbox_template_waiting">等待构建</string>
     <string name="sandbox_template_error">构建失败</string>
     <string name="sandbox_template_unknown">状态未知</string>
-    <string name="sandbox_templates_hint">展开列表以加载当前凭据所属项目的模板</string>
+    <string name="sandbox_templates_hint">打开列表自动加载本凭据项目的模板</string>
     <string name="sandbox_templates_loading">正在加载模板…</string>
     <string name="sandbox_templates_empty">项目暂无模板，可使用默认模板或手动输入</string>
     <string name="sandbox_templates_count">已加载 %1$d 个项目模板</string>

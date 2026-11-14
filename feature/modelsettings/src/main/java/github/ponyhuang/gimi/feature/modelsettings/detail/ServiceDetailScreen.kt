@@ -26,7 +26,7 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.FlashOn
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -213,7 +213,7 @@ private fun DetailPage(
         )
         if (state.supportsTools) {
             PreferenceListItem(
-                icon = Icons.Outlined.FlashOn,
+                icon = Icons.Outlined.Build,
                 title = stringResource(R.string.modelsettings_official_tools),
                 subtitle = stringResource(R.string.modelsettings_official_tools_subtitle),
                 onClick = { onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.OfficialTools)) },

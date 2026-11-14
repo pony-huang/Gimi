@@ -107,7 +107,7 @@
     <string name="chat_model_picker_current">Current</string>
     <string name="chat_model_picker_back">Back</string>
     <string name="chat_model_picker_close">Close</string>
-    <string name="chat_model_empty_enable_first">No models available. Please enable at least one model in Model Services first.</string>
+    <string name="chat_model_empty_enable_first">No models available. Please enable at least one model in Models first.</string>
 
     <string name="chat_voice_default_transcribe_error">Speech recognition is not configured</string>
     <string name="chat_voice_no_audio_captured">No audio captured. Please try again.</string>
@@ -137,8 +137,8 @@
     <string name="chat_time_date">%1$d/%2$d</string>
     <string name="chat_drawer_new_conversation">New chat</string>
     <string name="chat_drawer_voice_call">Voice call</string>
-    <string name="chat_drawer_personalize">Personalization options</string>
-    <string name="chat_drawer_runtime">Runtime environment</string>
+    <string name="chat_drawer_personalize">Personalization</string>
+    <string name="chat_drawer_runtime">Runtime</string>
     <string name="chat_drawer_empty_history">No recent conversations</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>
@@ -159,7 +159,7 @@
     <string name="chat_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
 
     <!-- ChatNotice text (consumed by :app LaunchedEffect -> Toast/notification) -->
-    <string name="chat_notice_configure_chat_model">Please configure and enable a chat model in Model services first</string>
+    <string name="chat_notice_configure_chat_model">Please configure and enable a chat model in Models first</string>
     <string name="chat_notice_model_switch_blocked">The assistant is still generating a reply. Please wait before switching models.</string>
     <string name="chat_notice_parallel_limit">Up to 3 conversation tasks can run at once</string>
     <string name="chat_notice_current_conversation_busy">The current conversation is busy. Try again shortly.</string>
@@ -215,7 +215,7 @@
     <string name="chat_timeline_tool_awaiting_confirmation">Awaiting confirmation</string>
     <string name="chat_timeline_tool_unknown">Status unknown</string>
     <string name="chat_drawer_manage">Manage</string>
-    <string name="chat_drawer_recent_conversations">Recent conversations</string>
+    <string name="chat_drawer_recent_conversations">Recents</string>
     <string name="chat_drawer_done">Done</string>
     <string name="chat_drawer_search">Search conversations</string>
     <string name="chat_drawer_clear_search">Clear search</string>
@@ -368,9 +368,9 @@
     <string name="voice_settings_stt_title">Speech recognition</string>
     <string name="voice_settings_tts_title">Speech synthesis</string>
     <string name="voice_settings_realtime_title">Realtime voice</string>
-    <string name="voice_settings_stt_page">Speech recognition settings</string>
-    <string name="voice_settings_tts_page">Speech synthesis settings</string>
-    <string name="voice_settings_realtime_page">Realtime voice settings</string>
+    <string name="voice_settings_stt_page">Speech recognition</string>
+    <string name="voice_settings_tts_page">Speech synthesis</string>
+    <string name="voice_settings_realtime_page">Realtime voice</string>
     <string name="voice_settings_stt_model">Recognition model</string>
     <string name="voice_settings_tts_model">Synthesis model</string>
     <string name="voice_settings_tts_voice">Playback voice</string>
@@ -392,7 +392,7 @@
     <string name="voice_capability_asr">audio understanding</string>
     <string name="voice_capability_tts">speech synthesis</string>
     <string name="voice_capability_not_supported">This model has no %1$s integration</string>
-    <string name="voice_realtime_unavailable">Configure a Realtime model in Default models first.</string>
+    <string name="voice_realtime_unavailable">Configure a Realtime model in Defaults first.</string>
     <string name="voice_realtime_mode_detail">End-to-end Realtime, audio in and out, nothing saved</string>
     <string name="voice_realtime_assistant_mode_detail">End-to-end Realtime, authorized tools, nothing saved yet</string>
     <string name="voice_reconnect_notice">Reconnected</string>

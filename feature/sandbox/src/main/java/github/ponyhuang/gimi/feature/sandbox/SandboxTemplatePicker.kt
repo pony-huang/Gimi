@@ -89,7 +89,7 @@ internal fun SandboxTemplatePicker(state: SandboxSettingsUiState, onAction: (San
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         // 状态提示与刷新合并为一行内联操作，不再占用居中的填充按钮，保留保存为页面唯一主操作。
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 when (state.templateLoadState) {
                     SandboxTemplateLoadState.IDLE -> stringResource(R.string.sandbox_templates_hint)

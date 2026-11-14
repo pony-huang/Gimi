@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -163,7 +164,7 @@ fun PreferenceGroupCard(
  * @property checked 与 [onCheckedChange] 同时提供时整行改为 toggleable（Role.Switch），
  * 涟漪覆盖整行；开关行请直接使用 [PreferenceSwitchRow]。
  * 此时行内尾部的开关组件应传空回调仅作展示，避免重复语义与局部涟漪。
- * @property rowEnabled 行级交互（点击或整行开关）的可用性；只影响交互，不改文字与图标外观。
+ * @property rowEnabled 行级交互（点击或整行开关）的可用性；为 false 且行本身带交互时，图标与标题同步降为 38% 透明度的禁用态。
  * @param leadingIcon 自定义图标槽位；提供时以透明背景替换默认图标，沿用列表的对齐尺寸。
  */
 @Composable
@@ -189,6 +190,16 @@ fun PreferenceListItem(
 ) {
     val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     val containerSize = if (compact) maxOf(GimiListDefaults.LeadingSize, iconSize) else 34.dp
+    // 有可点击/开关交互但 rowEnabled=false 才视为禁用态做视觉降级；
+    // 本就不带交互的静态信息行保持原色，不误伤。
+    val disabled = rowEnabled.not() &&
+        (onClick != null || onLongClick != null || (checked != null && onCheckedChange != null))
+    val resolvedTitleColor = when {
+        disabled && titleColor.isUnspecified -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        disabled -> titleColor.copy(alpha = titleColor.alpha * 0.38f)
+        else -> titleColor
+    }
+    val resolvedIconTint = if (disabled) iconTint.copy(alpha = iconTint.alpha * 0.38f) else iconTint
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -230,7 +241,7 @@ fun PreferenceListItem(
                 } else if (icon != null) Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = iconTint,
+                    tint = resolvedIconTint,
                     modifier = Modifier.size(iconSize),
                 )
             }
@@ -244,7 +255,7 @@ fun PreferenceListItem(
                     Text(
                         text = title,
                         style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
-                        color = titleColor,
+                        color = resolvedTitleColor,
                         maxLines = if (compact) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )

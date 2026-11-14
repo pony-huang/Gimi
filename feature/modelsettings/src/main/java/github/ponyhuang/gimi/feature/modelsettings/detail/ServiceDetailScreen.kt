@@ -2,6 +2,11 @@ package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,6 +103,16 @@ fun ServiceDetailScreen(
             )
             else -> AnimatedContent(
                 targetState = state.page,
+                // 与「添加到聊天」抽屉同一套切页动效：进入下一级自右向左滑入，返回时自左向右滑回。
+                transitionSpec = {
+                    val towards = if (targetState.ordinal > initialState.ordinal) {
+                        AnimatedContentTransitionScope.SlideDirection.Left
+                    } else {
+                        AnimatedContentTransitionScope.SlideDirection.Right
+                    }
+                    slideIntoContainer(towards = towards, animationSpec = tween(220)) + fadeIn(tween(160)) togetherWith
+                        slideOutOfContainer(towards = towards, animationSpec = tween(220)) + fadeOut(tween(120))
+                },
                 label = "service-editor-page",
             ) { page ->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {

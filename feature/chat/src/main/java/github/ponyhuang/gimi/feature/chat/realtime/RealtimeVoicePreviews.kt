@@ -16,6 +16,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
@@ -99,6 +100,10 @@ private fun VoiceChatPreview() {
     GimiTheme {
         RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(
             phase = RealtimeVoicePhase.Speaking, listening = true,
+            inputAttachments = listOf(FileAttachment(
+                mimeType = "application/pdf", id = "preview-pdf", sizeBytes = 2048,
+                displayName = "人工智能简史.pdf", fileId = "file_preview", fileVendor = "deepseek",
+            )),
             inputText = "帮我想一个不赶时间的周末。", spokenText = "可以，把这个周末留一点空白。",
             speakingText = "周六先睡到自然醒，再去附近走走。",
             responseText = "可以，把这个周末留一点空白。周六先睡到自然醒，再去附近走走。找一家安静的小店。"),

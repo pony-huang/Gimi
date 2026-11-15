@@ -4,8 +4,10 @@ import com.anthropic.client.AnthropicClient
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageChat
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -48,6 +50,23 @@ class ClaudeStreamingIntegrationTest {
     fun tearDown() {
         client.close()
         server.shutdown()
+    }
+
+    @Test
+    fun uploadedFilesIncludeRequiredBetaHeaderForBothTransports() = runBlocking {
+        for (adapter in listOf(model, DeepSeekMessageChat("deepseek-flash", client))) {
+            for (stream in listOf(false, true)) {
+                if (stream) enqueueStream(start(), finish(), """{"type":"message_stop"}""")
+                else enqueueMessage()
+                adapter.generateContent(LlmRequest(contents = listOf(Content(
+                    role = Role.USER,
+                    parts = listOf(Part(fileData = FileData(
+                        mimeType = "application/pdf", fileUri = "gimi-file://anthropic/file_01",
+                    ))),
+                ))), stream = stream).toList()
+                assertEquals("files-api-2025-04-14", server.takeRequest().getHeader("anthropic-beta"))
+            }
+        }
     }
 
     @Test

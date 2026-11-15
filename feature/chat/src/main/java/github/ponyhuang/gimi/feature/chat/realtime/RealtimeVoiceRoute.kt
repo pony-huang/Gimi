@@ -237,6 +237,9 @@ fun RealtimeVoiceRoute(
                 onStopClick = {}, isGenerating = composer.submitting,
                 messageData = composer.draft, onMessageDataChange = viewModel::updateDraft,
                 attachmentCapabilities = composer.capabilities,
+                addToChatState = github.ponyhuang.gimi.feature.chat.ChatAddToChatState(
+                    vendorTemplateId = composer.vendorTemplateId,
+                ),
                 attachmentUploadStates = composer.uploads,
                 isFileUploadEnabled = composer.fileUploadEnabled,
                 onRetryAttachmentUpload = viewModel::uploadDocument,

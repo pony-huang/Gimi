@@ -240,6 +240,7 @@ class RealtimeVoiceViewModel @Inject constructor(
                     )
                 } else resolved?.model?.multimodal ?: MultimodalCapabilities(null, null, null)
                 composer.update { it.copy(capabilities = capabilities,
+                    vendorTemplateId = resolved?.templateId,
                     fileUploadEnabled = capabilities.documentInput?.ingestMode == FileIngestMode.FILE_REFERENCE) }
                 resolved?.templateId
             }.distinctUntilChanged().collectLatest { vendor ->

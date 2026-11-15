@@ -65,6 +65,12 @@ internal class ClaudeRequestConverter(
         val messages = contents.mapNotNull(::contentToAnthropicMessageParam)
         val builder = MessageCreateParams.builder().model(modelName).maxTokens(maxTokens.toLong())
             .messages(if (cache == null) messages else messages.withCacheBreakpoint(cache))
+        // 兼容 Messages 服务仍要求文件 beta 头；历史消息中的文件引用也必须覆盖。
+        if (contents.any { content -> content.parts.any { part ->
+                part.fileData?.fileUri?.let(VendorFileReference::parse) != null
+            } }) {
+            builder.putAdditionalHeader("anthropic-beta", "files-api-2025-04-14")
+        }
         val system = request.config.systemInstruction?.parts?.mapNotNull { it.text }?.joinToString("\n").orEmpty()
         if (system.isNotBlank()) {
             if (cache == null) builder.system(system)

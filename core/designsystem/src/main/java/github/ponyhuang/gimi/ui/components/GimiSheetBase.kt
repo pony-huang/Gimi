@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -157,6 +158,10 @@ fun GimiSheetBase(
     val scope = rememberCoroutineScope()
     val controller = remember(sheetState, scope) { GimiSheetController(sheetState, scope) }
     var dismissed by remember { mutableStateOf(false) }
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    // 深色页面与设置画布同为纯黑，浮层使用独立表面以辨认圆角边界。
+    val sheetColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else preferenceCanvasColor()
 
     fun notifyDismissed() {
         if (dismissed) return
@@ -172,8 +177,8 @@ fun GimiSheetBase(
         // 内容滚动因此永远不会带动抽屉。
         sheetGesturesEnabled = false,
         dragHandle = null,
-        containerColor = preferenceCanvasColor(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = sheetColor,
+        shape = sheetShape,
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalGimiSheetController provides controller) {

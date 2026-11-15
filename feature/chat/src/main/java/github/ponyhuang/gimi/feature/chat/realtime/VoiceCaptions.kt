@@ -79,7 +79,10 @@ internal fun VoiceCaptions(
     }
     Column(modifier) {
         if (inputAttachments.isNotEmpty()) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 130.dp).verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 130.dp).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.End,
+            ) {
                 MessageAttachments(inputAttachments, onOpenDocument)
             }
             Spacer(Modifier.height(8.dp))
@@ -115,7 +118,7 @@ internal fun VoiceCaptions(
                 }
                 // enabled=false 同时禁止拖动、鼠标滚轮和用户滚动语义；文本仍保留完整可访问内容。
                 Column(Modifier.fillMaxSize().verticalScroll(scroll, enabled = false).padding(vertical = 24.dp)) {
-                    Text(annotated, fontSize = 29.sp, lineHeight = 43.sp, letterSpacing = (-.5).sp,
+                    Text(annotated, fontSize = 24.sp, lineHeight = 36.sp, letterSpacing = (-.5).sp,
                         onTextLayout = { layout = it })
                 }
                 if (scroll.value > 0) Box(Modifier.fillMaxWidth().height(24.dp)

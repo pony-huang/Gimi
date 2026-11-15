@@ -71,6 +71,12 @@ internal class DeepSeekMessageRequestConverter(
             .withLatestReminder(latestReminder?.invoke())
         val builder = MessageCreateParams.builder().model(modelName).maxTokens(maxTokens.toLong())
             .messages(if (cache == null) messages else messages.withCacheBreakpoint(cache))
+        // DeepSeek 的文件引用仍要求 beta 头，重放历史附件时同样需要携带。
+        if (contents.any { content -> content.parts.any { part ->
+                part.fileData?.fileUri?.let(VendorFileReference::parse) != null
+            } }) {
+            builder.putAdditionalHeader("anthropic-beta", "files-api-2025-04-14")
+        }
         val system = request.config.systemInstruction?.parts?.mapNotNull { it.text }?.joinToString("\n").orEmpty()
         if (system.isNotBlank()) {
             if (cache == null) builder.system(system)

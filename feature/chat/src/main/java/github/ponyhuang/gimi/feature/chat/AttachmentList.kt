@@ -521,6 +521,7 @@ private fun PersistedFileAttachment(
         Text(
             text = attachment.displayName,
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = 8.dp),
             maxLines = 1,
         )

@@ -15,6 +15,8 @@ data class VoiceComposerUiState(
     val noticeRevision: Long = 0,
     val capabilities: MultimodalCapabilities = MultimodalCapabilities(null, null, null),
     val fileUploadEnabled: Boolean = false,
+    /** 当前输入模型所属厂商模板，供共享附件抽屉显示品牌图标。 */
+    val vendorTemplateId: String? = null,
     val uploadedFiles: List<UploadedFileEntry> = emptyList(),
     val uploads: Map<String, DraftUploadState> = emptyMap(),
 )

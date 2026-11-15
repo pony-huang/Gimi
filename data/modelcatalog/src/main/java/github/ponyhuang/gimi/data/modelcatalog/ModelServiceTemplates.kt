@@ -174,6 +174,12 @@ object ModelServiceTemplates {
         homepageUrl = "https://bailian.console.aliyun.com/",
         keyHelpUrl = "https://bailian.console.aliyun.com/?tab=model#/api-key",
         connections = listOf(
+            // 对话开放双协议（与 Kimi/GLM/MiMo 同款形态）：MaaS 端点同时提供
+            // OpenAI 兼容 Completions 与 Anthropic Messages 两种对话协议。
+            chatConnection(
+                defaultEndpoint = "https://maas.qianwenaiapi.com/compatible-mode/v1",
+                additionalEndpoints = mapOf(ApiProtocol.Anthropic to "https://maas.qianwenaiapi.com/apps/anthropic"),
+            ),
             vendorSpeechConnection(
                 ServiceCapability.Recognition,
                 SpeechEndpoints.QWEN_AUDIO_CN,

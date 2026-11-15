@@ -44,6 +44,7 @@ class ModelServiceTemplatesTest {
             "mimo" to "https://api.xiaomimimo.com/anthropic",
             "kimi" to "https://api.moonshot.cn/anthropic",
             "glm" to "https://open.bigmodel.cn/api/anthropic",
+            "qwen" to "https://maas.qianwenaiapi.com/apps/anthropic",
         )
         for ((id, endpoint) in anthropicEndpoints) {
             assertEquals(
@@ -65,9 +66,9 @@ class ModelServiceTemplatesTest {
             setOf(ServiceCapability.Conversation, ServiceCapability.Recognition, ServiceCapability.Synthesis),
             templates.getValue("minimax").connections.map { it.capability }.toSet(),
         )
-        // 百炼没有对话集成：模板只承载语音连接
+        // 百炼模板承载对话 + 语音连接
         assertEquals(
-            setOf(ServiceCapability.Recognition, ServiceCapability.Synthesis, ServiceCapability.Realtime),
+            setOf(ServiceCapability.Conversation, ServiceCapability.Recognition, ServiceCapability.Synthesis, ServiceCapability.Realtime),
             templates.getValue("qwen").connections.map { it.capability }.toSet(),
         )
         // DeepSeek 的语音是固定的 /v1/tools 端点，模板同样承载识别/合成连接

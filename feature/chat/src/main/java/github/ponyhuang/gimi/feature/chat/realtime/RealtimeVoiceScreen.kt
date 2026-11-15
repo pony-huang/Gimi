@@ -329,6 +329,7 @@ fun RealtimeVoiceScreen(
                     onCall = if (started) onEnd else onStartCall,
                     onMute = onToggleMute,
                     composerContent = composerContent,
+                    settingsEnabled = modesEditable,
                 )
             }
         },

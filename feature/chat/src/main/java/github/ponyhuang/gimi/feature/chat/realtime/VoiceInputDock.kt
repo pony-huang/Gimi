@@ -41,6 +41,7 @@ internal fun VoiceInputDock(
     onCall: () -> Unit,
     onMute: () -> Unit,
     composerContent: @Composable () -> Unit,
+    settingsEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val editing = state.composer.editing
@@ -56,7 +57,7 @@ internal fun VoiceInputDock(
                 if (editing) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.voice_input_paused), Modifier.weight(1f).padding(start = 8.dp),
                         style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
-                    DockButton(Icons.Default.Tune, stringResource(R.string.voice_more_options), onSettings, enabled)
+                    DockButton(Icons.Default.Tune, stringResource(R.string.voice_more_options), onSettings, enabled && settingsEnabled)
                     DockButton(Icons.Default.CallEnd, stringResource(R.string.voice_end), onCall, enabled, contentColor = colors.error)
                     DockButton(Icons.Default.MicOff, stringResource(R.string.voice_input_paused), {}, false)
                 }
@@ -77,8 +78,8 @@ internal fun VoiceInputDock(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        DockButton(Icons.Default.Tune, stringResource(R.string.voice_more_options), onSettings, enabled && !editing, filled = true)
-                        DockButton(Icons.Default.Keyboard, stringResource(R.string.voice_input_open), onChat, enabled && !editing, filled = true)
+                        DockButton(Icons.Default.Tune, stringResource(R.string.voice_more_options), onSettings, enabled && settingsEnabled && !editing, filled = true)
+                        DockButton(Icons.Default.Keyboard, stringResource(R.string.voice_input_open), onChat, enabled && state.active && !editing, filled = true)
                         DockButton(
                             if (state.active) Icons.Default.CallEnd else Icons.Default.Call,
                             stringResource(if (state.active) R.string.voice_end else R.string.voice_start),
@@ -89,7 +90,7 @@ internal fun VoiceInputDock(
                         DockButton(
                             if (state.voice.muted) Icons.Default.MicOff else Icons.Default.Mic,
                             stringResource(if (state.voice.muted) R.string.voice_unmute else R.string.voice_mute),
-                            onMute, enabled && !editing, filled = true,
+                            onMute, enabled && state.active && !editing, filled = true,
                         )
                     }
                 }

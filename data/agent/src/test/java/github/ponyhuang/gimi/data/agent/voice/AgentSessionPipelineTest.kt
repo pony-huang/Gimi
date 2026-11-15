@@ -34,6 +34,11 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** 级联模型测试用隔离存储，真实恢复与重试由 SimpleVoiceConversationTest 覆盖。 */
+private fun stubSimpleVoice(): javax.inject.Provider<SimpleVoiceConversation> = javax.inject.Provider {
+    mockk { every { bind(any()) } returns mockk(relaxed = true) }
+}
+
 /** 聊天模式 Agent 会话与 TTS 管线的组合行为：增量字幕、按句合成、事件顺序与收尾。 */
 class AgentSessionPipelineTest {
     private val pcm = byteArrayOf(1, 0, 2, 0)
@@ -107,7 +112,7 @@ class AgentSessionPipelineTest {
         val agentVoice = VoiceAgentConversation(
             scriptedRunner(execution), mockk(), mockk(relaxed = true), mockk(),
         )
-        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools())
+        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
     }
 
     @Test
@@ -149,7 +154,7 @@ class AgentSessionPipelineTest {
                 modelText("今天天气不错。", partial = true),
             ))), mockk(), mockk(relaxed = true), mockk(),
         )
-        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools())
+        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
         val session = backend.open(configuration)
         val events = withTimeout(10_000) { session.respond("你好", "").toList() }
         assertEquals(listOf("你好。", "今天天气不错。"),

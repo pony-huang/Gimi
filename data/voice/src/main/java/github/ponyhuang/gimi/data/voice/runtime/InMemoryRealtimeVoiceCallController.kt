@@ -130,7 +130,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
         val active = repository.createSession(
             RealtimeVoiceConfiguration(
                 mode = mode,
-                conversationId = if (mode == RealtimeVoiceMode.Chat) targetId else null,
+                conversationId = if (!mode.isRealtimeEngine) targetId else null,
                 modelSelection = selection,
                 // 自定义音色随会话固定；null 表示用所选模型在该厂商下的缺省音色。
                 realtimeVoice = if (mode.isRealtimeEngine) realtimeVoiceId else null,

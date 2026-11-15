@@ -27,6 +27,13 @@ import org.junit.Test
 import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
 import github.ponyhuang.gimi.data.modelaccess.CascadedVoiceModel
 
+/** 级联模型测试用隔离存储，真实恢复与重试由 SimpleVoiceConversationTest 覆盖。 */
+private fun stubSimpleVoice(
+    call: SimpleVoiceConversation.Call = mockk(relaxed = true),
+): javax.inject.Provider<SimpleVoiceConversation> = javax.inject.Provider {
+    mockk { every { bind(any()) } returns call }
+}
+
 /** 后端只读预设状态；测试提供空仓库表示不使用自定义提示词。 */
 private fun emptySimpleChatPrompts(): SimpleChatPromptRepository = object : SimpleChatPromptRepository {
     override val presets = MutableStateFlow(emptyList<SimpleChatPromptPreset>())
@@ -78,7 +85,8 @@ class AdkVoiceAudioBackendTest {
                 flowOf(pcm)
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open()
+            val persistence = mockk<SimpleVoiceConversation.Call>(relaxed = true)
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
             val text = StringBuilder()
             val spoken = mutableListOf<String>()
             var firstAudio = true
@@ -95,6 +103,7 @@ class AdkVoiceAudioBackendTest {
                             launch {
                                 assertArrayEquals(pcm, event.audio.toList().single())
                                 spoken += event.text.value
+                                session.confirmPlayback(event.id, event.text.value)
                             }
                         }
                     }
@@ -103,6 +112,11 @@ class AdkVoiceAudioBackendTest {
             assertEquals("第一句。尾句", text.toString())
             assertEquals(listOf("第一句。", "尾句"), spoken)
             assertEquals(spoken, requested)
+            session.finishTurn()
+            verify(exactly = 1) {
+                persistence.enqueue(match { it.role == Role.USER && it.parts.single().text == " 用户输入 " })
+                persistence.enqueue(match { it.role == Role.MODEL && it.parts.single().text == "第一句。尾句" })
+            }
             session.close()
             session.close()
             assertThrows(IllegalStateException::class.java) { runBlocking { session.transcribe(pcm).toList() } }
@@ -126,7 +140,7 @@ class AdkVoiceAudioBackendTest {
                 } else flowOf(pcm)
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             val first = launch {
                 coroutineScope {
                     session.respond("上一轮", "").collect { event ->
@@ -162,7 +176,7 @@ class AdkVoiceAudioBackendTest {
                 awaitCancellation()
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             val first = launch {
                 coroutineScope {
                     session.respond("旧问题", "").collect { event ->
@@ -202,7 +216,7 @@ class AdkVoiceAudioBackendTest {
             val native = mockk<Model>()
             coEvery { native.connect(any()) } returns connection
             coEvery { models.create() } returns native
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             var heard = ""
             val visible = StringBuilder()
             coroutineScope {
@@ -230,7 +244,7 @@ class AdkVoiceAudioBackendTest {
             every { textModel.generateContent(any(), true) } returns flowOf(text("回答。", true))
             every { synthesis.synthesize(any()) } throws IllegalStateException("unavailable")
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             try {
                 coroutineScope {
                     session.respond("输入", "").collect { event ->
@@ -258,7 +272,7 @@ class AdkVoiceAudioBackendTest {
         val native = mockk<Model>()
         coEvery { native.connect(any()) } returns connection
         coEvery { models.create() } returns native
-        val events = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools()).open().respond("输入", "").toList()
+        val events = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open().respond("输入", "").toList()
         assertEquals(listOf(VoiceAudioEvent.Interrupted), events)
         coVerify(exactly = 1) { connection.closeSession() }
     }

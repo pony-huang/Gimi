@@ -2,8 +2,8 @@ package github.ponyhuang.gimi.feature.chat.realtime
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
@@ -42,6 +42,8 @@ fun RealtimeVoiceHost(
     onOpenVoiceRequestConsumed: () -> Unit = {},
     /** 语音页目标可见性回调；宿主据此关闭抽屉手势等被全屏覆盖层影响的交互。 */
     onVoiceVisibleChange: (Boolean) -> Unit = {},
+    onOpenDrawer: () -> Unit = {},
+    drawerOpen: Boolean = false,
     textContent: @Composable (onOpenVoice: () -> Unit) -> Unit,
 ) {
     val viewModel: RealtimeVoiceViewModel = hiltViewModel()
@@ -51,7 +53,7 @@ fun RealtimeVoiceHost(
     val transition = rememberTransition(visibility, label = "Voice navigation")
     val progress by transition.animateFloat(
         transitionSpec = { tween(VoiceNavigationDurationMillis, easing = FastOutSlowInEasing) },
-        label = "Chat slide",
+        label = "Chat fade",
     ) { if (it) 1f else 0f }
     // 把目标可见性上报给宿主（含进程还在通话、Activity 重建的初始状态），
     // 供宿主在语音页全屏期间关闭抽屉手势等交互。
@@ -72,25 +74,25 @@ fun RealtimeVoiceHost(
         }
     }
     Box(Modifier.fillMaxSize().clipToBounds()) {
-        // 保持文字页面组合，往返语音页不丢失草稿和滚动位置。
-        Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * progress }) {
+        // 两页交叉淡入淡出，保留文字页面组合以延续草稿和滚动位置。
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - progress }) {
             textContent({ if (visibility.isIdle) visibility.targetState = true })
         }
         transition.AnimatedVisibility(
             visible = { it },
-            enter = slideInHorizontally(
+            enter = fadeIn(
                 animationSpec = tween(VoiceNavigationDurationMillis, easing = FastOutSlowInEasing),
-                initialOffsetX = { it },
             ),
-            exit = slideOutHorizontally(
+            exit = fadeOut(
                 animationSpec = tween(VoiceNavigationDurationMillis, easing = FastOutSlowInEasing),
-                targetOffsetX = { it },
             ),
         ) {
             RealtimeVoiceRoute(
                 conversationId = conversationId, selection = selection, conversationTitle = conversationTitle,
                 active = visibility.isIdle && visibility.currentState && visibility.targetState,
                 onDismiss = { visibility.targetState = false },
+                onOpenDrawer = onOpenDrawer,
+                drawerOpen = drawerOpen,
             )
         }
     }

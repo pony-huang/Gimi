@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.SmartToy
@@ -252,6 +253,7 @@ fun RealtimeVoiceScreen(
     onEnd: () -> Unit,
     // 左胶囊「回聊天」：结束通话并返回文字聊天；后台续跑只保留给系统后台切换。
     onBack: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {},
     // 右胶囊「新会话」：仅待启动态可用；助手模式新建持久化会话并换绑，轻聊/实时模式无会话可换（置灰）。
     onNewSession: () -> Unit = {},
     // 底栏「更多选项」在通话中被点击：抽屉开不了，只提示先结束通话。
@@ -336,13 +338,23 @@ fun RealtimeVoiceScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).padding(horizontal = 28.dp)) {
             Box(Modifier.fillMaxWidth().height(64.dp)) {
-                // 左胶囊：只留回聊天（结束通话）；中性底色适配主题场景（48dp 点击区 + 上下内缩 2dp 的 44dp 可视高度）。
+                // 左胶囊与文字聊天对齐：菜单｜回聊天，保留独立的 48dp 点击区。
                 Box(Modifier.align(Alignment.CenterStart).offset(x = (-12).dp)) {
                     Surface(Modifier.matchParentSize().padding(vertical = 2.dp), shape = CircleShape,
                         color = scene.capsuleFill, border = BorderStroke(1.dp, scene.capsuleLine)) {}
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onOpenDrawer,
+                            enabled = !started && !uiState.switching,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(Icons.Default.Menu, stringResource(R.string.chat_open_drawer),
+                                modifier = Modifier.size(24.dp),
+                                tint = if (!started && !uiState.switching) scene.inkDim else scene.inkDisabled)
+                        }
+                        VoiceHeaderDivider(scene)
                         IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.voice_back_to_chat),
+                            Icon(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.voice_back_to_chat),
                                 modifier = Modifier.size(24.dp), tint = scene.inkDim)
                         }
                     }

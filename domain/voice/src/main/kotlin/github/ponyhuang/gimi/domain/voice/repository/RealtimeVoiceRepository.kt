@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * 语音模式。
  *
- * - [Simple]：简单聊天（对话模式），级联链路 + 内存上下文，无工具、无持久化。
+ * - [Simple]：简单聊天（对话模式），级联链路，沿用当前会话恢复和保存历史，无工具。
  * - [Chat]：完整聊天，接入完整 chat agent（工具、持久化与文字聊天一致）。
  * - [Realtime]：原生全双工实时语音（实时轻聊），常驻会话、服务端判轮，仅支持 Realtime 类型服务；
  *   无工具、无持久化，转写只进字幕。
@@ -23,7 +23,7 @@ val RealtimeVoiceMode.isRealtimeEngine: Boolean
 
 /**
  * 单次通话的固定配置；聊天模式必须显式绑定已有会话及其模型，不能隐式新建聊天。
- * @property conversationId 已打开的聊天 ID，简单聊天不使用它。
+ * @property conversationId 已打开的聊天 ID，轻聊和聊天模式共用它，轻聊为空时解析当前会话。
  * @property modelSelection 当前聊天的模型选择，通话期间保持不变。
  * @property realtimeVoice Realtime 模式的自定义会话音色；null 表示使用所选模型在该厂商下的缺省音色。
  *   音色与模型强绑定（跨代际的音色集互不相同），因此覆盖值由调用方按当前模型解析后传入。
@@ -43,7 +43,7 @@ data class RealtimeVoiceConfiguration(
 }
 
 /**
- * 创建实时语音会话。简单聊天无工具、无持久化；聊天模式直接接入完整 chat agent
+ * 创建实时语音会话。简单聊天保存当前会话历史，无工具；聊天模式直接接入完整 chat agent
  * （工具、技能与文字聊天一致），工具确认在语音通话中全部自动批准。
  */
 interface RealtimeVoiceRepository {

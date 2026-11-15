@@ -73,6 +73,7 @@ class AdkVoiceAudioBackend @Inject constructor(
     private val simpleChatPrompts: SimpleChatPromptRepository,
     private val agentVoice: Provider<VoiceAgentConversation>,
     private val assistantTools: RealtimeAssistantTools,
+    private val simpleVoice: Provider<SimpleVoiceConversation>,
 ) : VoiceAudioBackend {
     override fun open(configuration: RealtimeVoiceConfiguration): VoiceAudioBackendSession =
         if (configuration.mode == RealtimeVoiceMode.Chat) AgentSession(configuration) else SimpleSession(configuration)
@@ -127,10 +128,13 @@ class AdkVoiceAudioBackend @Inject constructor(
             ?: simpleChatPrompts.presets.value.firstOrNull { it.id == id }?.content
     }
 
-    /** 简单聊天：级联模型 + 内存上下文，无工具、无持久化。 */
+    /** 轻聊沿用当前会话，恢复历史并保存已听回复，级联请求始终不装配工具。 */
     private inner class SimpleSession(private val configuration: RealtimeVoiceConfiguration) : VoiceAudioBackendSession {
         private val mutex = Mutex()
         private val heardHistory = ArrayDeque<Pair<Content, String>>()
+        private val conversation = simpleVoice.get().bind(configuration.conversationId)
+        private var restoredHistory = emptyList<Content>()
+        private val playedSegments = linkedMapOf<String, String>()
         private var pendingInput: Content? = null
         @Volatile private var closed = false
 
@@ -139,7 +143,9 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         override suspend fun isAvailable(): Boolean {
             check(!closed)
-            return models.isAvailable(configuration.modelSelection)
+            if (!models.isAvailable(configuration.modelSelection)) return false
+            conversation.acquire().takeIf { it.isNotEmpty() }?.let { restoredHistory = it }
+            return true
         }
 
         override fun transcribe(pcm16: ByteArray): Flow<RecognitionEvent> = flow {
@@ -151,9 +157,14 @@ class AdkVoiceAudioBackend @Inject constructor(
             require(text.isNotBlank() || attachments.isNotEmpty())
             mutex.withLock {
                 check(!closed)
+                conversation.acquire().takeIf { it.isNotEmpty() }?.let { restoredHistory = it }
+                finishTurnLocked()
                 pendingInput?.let { heardHistory.addLast(it to previousSpokenText) }
                 while (heardHistory.size > 32) heardHistory.removeFirst()
                 pendingInput = voiceManualContent(text, attachments)
+                synchronized(playedSegments) { playedSegments.clear() }
+                conversation.enqueue(requireNotNull(pendingInput))
+                conversation.flush()
                 val model = models.create(configuration.modelSelection)
                 // 简单聊天可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
                 // 「无工具」声明始终叠加（级联链路确实无任何工具）。
@@ -174,6 +185,7 @@ class AdkVoiceAudioBackend @Inject constructor(
                 val pendingTranscript = StringBuilder()
                 try {
                     connection.sendHistory(buildList {
+                        addAll(restoredHistory)
                         for ((input, spoken) in heardHistory) {
                             add(input)
                             if (spoken.isNotBlank()) add(Content.fromText(Role.MODEL, spoken))
@@ -250,17 +262,33 @@ class AdkVoiceAudioBackend @Inject constructor(
             }
         }.flowOn(Dispatchers.IO)
 
-        override fun confirmPlayback(segmentId: String, text: String) {}
+        override fun confirmPlayback(segmentId: String, text: String) {
+            synchronized(playedSegments) { playedSegments.putIfAbsent(segmentId, text) }
+        }
 
-        override suspend fun finishTurn() {}
+        override suspend fun finishTurn() = mutex.withLock { finishTurnLocked() }
 
-        override suspend fun retryPersistence() {}
+        private suspend fun finishTurnLocked() {
+            val spoken = synchronized(playedSegments) {
+                playedSegments.values.joinToString("").also { playedSegments.clear() }
+            }
+            if (spoken.isNotBlank()) conversation.enqueue(Content.fromText(Role.MODEL, spoken))
+            conversation.flush()
+        }
+
+        override suspend fun retryPersistence() = finishTurn()
 
         override suspend fun close() {
             mutex.withLock {
-                closed = true
-                heardHistory.clear()
-                pendingInput = null
+                if (closed) return@withLock
+                try {
+                    finishTurnLocked()
+                } finally {
+                    closed = true
+                    conversation.release()
+                    heardHistory.clear()
+                    pendingInput = null
+                }
             }
         }
     }

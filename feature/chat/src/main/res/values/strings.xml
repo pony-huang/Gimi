@@ -430,7 +430,7 @@
     <string name="voice_more_options_blocked">通话中不能打开更多选项，请先结束通话</string>
     <string name="voice_mode_selected">已选择</string>
     <string name="voice_chat_unavailable">请先打开一个已配置模型的聊天</string>
-    <string name="voice_simple_mode_detail">级联 LLM+TTS+ASR，只聊此刻，不保存记录</string>
+    <string name="voice_simple_mode_detail">级联 LLM+TTS+ASR，保存聊天记录，不接入工具</string>
     <string name="voice_chat_mode_detail">级联 LLM+TTS+ASR，可用工具，文字保留在当前会话</string>
     <string name="voice_prompt_presets">轻聊预设</string>
     <string name="voice_prompt_preset_none">不使用预设</string>

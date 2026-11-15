@@ -179,7 +179,7 @@ fun ChatRoute(
 
     ChatDrawer(
         open = drawerOpen,
-        gesturesEnabled = !voicePageVisible,
+        gesturesEnabled = !voicePageVisible || drawerOpen,
         onOpenChange = { drawerOpen = it },
         searchFocusRequester = searchFocusRequester,
         onSearchExpanded = {
@@ -236,6 +236,8 @@ fun ChatRoute(
             openVoiceRequest = voiceOpenRequest,
             onOpenVoiceRequestConsumed = { voiceOpenRequest = 0 },
             onVoiceVisibleChange = { voicePageVisible = it },
+            onOpenDrawer = { drawerOpen = true },
+            drawerOpen = drawerOpen,
         ) { onOpenVoice ->
             ChatScaffold(
                 state = uiState,

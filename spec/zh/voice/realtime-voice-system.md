@@ -26,7 +26,7 @@ VAD 逐 32 ms 帧给语音概率
    v
 整段话语 PCM ─> 识别 ─> 最终文字（中间结果只用于界面显示）
    │
-   ├─ Simple：级联 Voice 模型，32 对内存上下文，无工具
+   ├─ Simple：级联 Voice 模型，持久化会话历史，无工具
    └─ Chat  ：完整 chat agent，工具全自动批准，文字由 ADK Runner 写会话
    │
    v
@@ -90,11 +90,11 @@ VAD 逐 32 ms 帧给语音概率
 |---|---|---|---|
 | 默认 | 每次进入通话都是它 | 需显式切换 | 需显式切换 |
 | 引擎 | 级联 Voice 模型 | 完整 chat agent（ADK Runner） | 经 `backend.openDuplex()` 的原生 Realtime 模型（`OpenAiRealtimeModel` / `QwenRealtimeModel`，工厂按 serviceId 分流） |
-| 上下文 | 32 对内存 `heardHistory`，进程内 | ADK Session 里的完整历史 | 服务端会话；**重连即新会话，上下文不重放** |
+| 上下文 | 恢复当前会话历史，加上通话内最近 32 对上下文 | ADK Session 里的完整历史 | 服务端会话；**重连即新会话，上下文不重放** |
 | 已听粒度 | 只有**完整播完**的句子进入上下文 | 由 Runner 落完整模型事件 | 无——转写只进字幕 |
 | 工具 | 无 | 与文字聊天一致，确认全部自动批准 | Realtime：无。RealtimeAssistant：客户端执行的 function 工具（授权的本地/MCP/插件/应用函数/沙盒来源），确认全部自动批准（见[实时助手工具](#实时助手工具)） |
-| 落库 | 无 | Runner 写 Session；本层只发变更通知 | 无 |
-| 占用 | 无 | `AgentRuntimeGate` 租约（`REALTIME_VOICE`） | 无 |
+| 落库 | 当前会话；用户输入与完整播完的句子 | Runner 写 Session；本层只发变更通知 | 无 |
+| 占用 | `AgentRuntimeGate` 租约（`REALTIME_VOICE`） | `AgentRuntimeGate` 租约（`REALTIME_VOICE`） | 无 |
 | 前置条件 | — | 必须已有 `conversationId` + `modelSelection` | 必须已配置默认 Realtime 模型（见[默认 Realtime 选择](#默认-realtime-选择)）；未配置时入口引导到默认模型页 |
 
 `RealtimeVoiceConfiguration` 用 `require` 把 Chat 与 Realtime 的前置条件写死：
@@ -274,19 +274,11 @@ STT/TTS/ASR，级联选择永远不会误拾取）。实时会话仍是常驻全
 
 以下是当前代码的真实状态，不是待办建议。改这块之前请先确认它们是否已被修掉。
 
-1. **持久化契约名存实亡**。`confirmPlayback()` / `finishTurn()` /
-   `retryPersistence()` 在 Simple 与 Agent 两个 session 里都是空实现，而
-   `VoiceAudioBackend` 的接口注释仍在描述旧的「稳定片段 ID 去重」「失败保留事件 ID
-   供重试」语义。真实影响：
-   - 「保存失败」根本不会发生，因此 `Persistence` 只在两处可达：Chat 模式进入时目标
-     会话已被删除，以及 `close()` 提交阶段抛异常（此时界面已在收尾）。
-   - `retry()` 里的「重试保存」分支恒判成功；界面上的 `voice_save_failed` /
-     `voice_retry_save` 是不可达路径。
-   - `InMemoryRealtimeVoiceCallControllerTest` 里「`Persistence` 阻止模式切换」的
-     断言仍然有效，但它验证的是**控制器对失败的反应**（注入假会话），不是真实后端
-     行为。
-   - 这是契约层面的债，不是线上 bug。真正的风险在于后来者照接口注释以为「播放确认
-     与持久化重试已实现」，在这些空实现上继续叠功能。
+1. **Chat 模式的播放回执仍为空实现**。AgentSession 依赖 Runner 落盘，
+   `confirmPlayback()` / `finishTurn()` / `retryPersistence()` 在该模式下仍不执行操作。
+   SimpleSession 现在在生成前保存用户输入，在话轮结束时保存完整播完的句子，
+   恢复当前聊天历史并持有运行时租约，持久化重试沿用稳定事件 ID。
+   两个原生实时模式仍只显示字幕，不保存会话事件。
 2. **聊天模式的「已听粒度」没有落到存储**。ADK Runner 写的是完整模型事件，
    被打断的回答在重开聊天时会照原样显示。Simple 模式则相反，只有播完的句子进上下文。
    两种模式在这一点上行为不一致。

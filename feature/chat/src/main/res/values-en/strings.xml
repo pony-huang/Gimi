@@ -420,7 +420,7 @@
     <string name="voice_more_options_blocked">End the call before opening more options</string>
     <string name="voice_mode_selected">Selected</string>
     <string name="voice_chat_unavailable">Open a chat with a configured model first</string>
-    <string name="voice_simple_mode_detail">Cascaded LLM+TTS+ASR, nothing saved</string>
+    <string name="voice_simple_mode_detail">Cascaded LLM+TTS+ASR, saved history, no tools</string>
     <string name="voice_chat_mode_detail">Cascaded LLM+TTS+ASR, tools on, text stays in this chat</string>
     <string name="voice_prompt_presets">Quick chat prompts</string>
     <string name="voice_prompt_preset_none">No preset</string>

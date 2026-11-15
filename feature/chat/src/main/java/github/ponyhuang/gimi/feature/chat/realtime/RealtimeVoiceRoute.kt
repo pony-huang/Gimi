@@ -45,6 +45,8 @@ fun RealtimeVoiceRoute(
     conversationTitle: String,
     active: Boolean = true,
     onDismiss: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
+    drawerOpen: Boolean = false,
 ) {
     val viewModel: RealtimeVoiceViewModel = hiltViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,7 +65,7 @@ fun RealtimeVoiceRoute(
     // 只冻结展示快照，麦克风和后台通话仍立即由控制器释放。
     SideEffect { if (active && !leaving) presentedState = state }
     // 进入页面只登记会话绑定参数（模式预选可用性与「开始通话」使用），不启动通话。
-    LaunchedEffect(viewModel, active) {
+    LaunchedEffect(viewModel, active, conversationId, selection, conversationTitle) {
         if (active) viewModel.prepare(conversationId, selection, conversationTitle)
     }
     val context = LocalContext.current
@@ -190,7 +192,7 @@ fun RealtimeVoiceRoute(
         }
         viewModel.end()
     }
-    BackHandler { backToChat() }
+    BackHandler(enabled = !drawerOpen) { backToChat() }
     // 展示快照（含退场冻结帧）同时决定主按钮状态，避免离场动画期间闪回「开始通话」。
     val presented = if (active && !leaving) state else presentedState
     RealtimeVoiceScreen(
@@ -223,6 +225,9 @@ fun RealtimeVoiceRoute(
         onNewSession = viewModel::newSession,
         onEnd = hangUp,
         onBack = backToChat,
+        onOpenDrawer = {
+            if (active && !state.active && !state.switching) onOpenDrawer()
+        },
         onEditInput = viewModel::editInput,
         onOpenDocument = { attachment -> openDocumentAttachment(context, attachment) },
         composerContent = {

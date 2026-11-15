@@ -29,7 +29,7 @@ VAD emits a speech probability per 32 ms frame
    v
 whole-utterance PCM -> recognition -> final text (partials are display-only)
    |
-   +- Simple: cascaded voice model, 32 in-memory pairs, no tools
+   +- Simple: cascaded voice model, saved conversation history, no tools
    +- Chat  : full chat agent, every tool confirmation auto-approved, text written by the ADK Runner
    |
    v
@@ -116,11 +116,11 @@ the change checklist:
 |---|---|---|---|
 | Default | Every call starts here | Requires explicit switch | Requires explicit switch |
 | Engine | Cascaded voice model | Full chat agent (ADK Runner) | Native Realtime model via `backend.openDuplex()` (`OpenAiRealtimeModel` / `QwenRealtimeModel`, dispatched by serviceId) |
-| Context | 32 in-memory pairs in `heardHistory`, process-local | Full history in the ADK Session | Server session; **a reconnect is a new session, context is not replayed** |
+| Context | Restored conversation history plus 32 in-call pairs | Full history in the ADK Session | Server session; **a reconnect is a new session, context is not replayed** |
 | Heard granularity | Only **fully played-out** sentences enter context | Runner persists complete model events | None — transcripts are caption-only |
 | Tools | None | Same as text chat; every confirmation auto-approved | Realtime: none. RealtimeAssistant: client-executed function tools from the authorized local/MCP/plugin/app-function/sandbox sources, every confirmation auto-approved (see [Realtime assistant tools](#realtime-assistant-tools)) |
-| Persistence | None | Runner writes the Session; this layer only notifies | None |
-| Occupancy | None | `AgentRuntimeGate` lease (`REALTIME_VOICE`) | None |
+| Persistence | Current conversation; user input and fully played sentences | Runner writes the Session; this layer only notifies | None |
+| Occupancy | `AgentRuntimeGate` lease (`REALTIME_VOICE`) | `AgentRuntimeGate` lease (`REALTIME_VOICE`) | None |
 | Preconditions | — | Requires an existing `conversationId` + `modelSelection` | Requires a configured default Realtime model (see [Default Realtime selection](#default-realtime-selection)); entry is guided to the default-models page when none is configured |
 
 `RealtimeVoiceConfiguration` hard-codes Chat's and Realtime's preconditions with
@@ -340,23 +340,12 @@ Simple and Chat submit text and attachments through their existing model/agent p
 The following reflects the actual state of the code, not a to-do list. Confirm
 each item is still true before relying on it — or before assuming it was fixed.
 
-1. **The persistence contract is a shell.** `confirmPlayback()` / `finishTurn()` /
-   `retryPersistence()` are no-ops in both the Simple and Agent sessions, while
-   the `VoiceAudioBackend` interface comments still describe the old semantics
-   ("stable segment IDs for deduplication", "keep the event ID so an explicit
-   retry can reuse it"). Real consequences:
-   - "Save failed" can never happen, so `Persistence` is reachable in only two
-     places: the target conversation was deleted when entering Chat mode, and
-     `close()` throwing during submission (when the UI is already tearing down).
-   - The "retry saving" branch in `retry()` always reports success; the
-     `voice_save_failed` / `voice_retry_save` UI paths are unreachable.
-   - The "`Persistence` blocks mode switching" assertion in
-     `InMemoryRealtimeVoiceCallControllerTest` remains valid, but it verifies the
-     **controller's reaction to a failure** (injected fake session), not real
-     backend behaviour.
-   - This is contract-level debt, not a production bug. The real risk is a
-     newcomer trusting the interface comments, assuming playback confirmation and
-     persistence retry are implemented, and layering features on these no-ops.
+1. **Chat playback receipts remain no-ops.** AgentSession relies on the Runner for
+   persistence, so `confirmPlayback()` / `finishTurn()` / `retryPersistence()` do
+   nothing there. SimpleSession now saves user input before generation and fully
+   played sentences at turn completion. It restores the current conversation,
+   holds a runtime lease, and retains stable event IDs across persistence retries.
+   Both native realtime modes remain caption-only and do not save conversation events.
 2. **Chat mode's "heard granularity" is not persisted.** The ADK Runner stores
    complete model events, so an interrupted answer reappears verbatim when the
    chat is reopened. Simple mode is the opposite: only played-out sentences enter

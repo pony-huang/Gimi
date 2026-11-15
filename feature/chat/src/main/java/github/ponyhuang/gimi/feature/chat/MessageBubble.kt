@@ -5,7 +5,9 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -90,8 +92,8 @@ fun MessageBubble(
             // 完全无可见内容的用户消息（如历史回显的空事件）：不渲染空气泡。
             return
         }
-        // 用户消息：灰底气泡只包正文，复制操作行与助手回答的操作行一样
-        // 隔离在气泡下方（ChatGPT 式）；纯图片消息无正文时没有复制入口。
+        // 用户消息：灰底气泡只包正文，附件 chip 排在正文上方、文本贴底部；
+        // 复制操作行与助手回答的操作行一样隔离在气泡下方（ChatGPT 式）。
         Column(modifier = modifier) {
             if (images.isNotEmpty()) {
                 // 用户图片一律以无边框自适应卡片排在气泡上方：
@@ -104,6 +106,15 @@ fun MessageBubble(
                     modifier = if (images.isNotEmpty()) Modifier.padding(top = 4.dp) else Modifier,
                 ) {
                     Column {
+                        MessageAttachments(
+                            attachments = otherAttachments,
+                            onOpenDocument = onOpenDocument,
+                            // 附件在气泡首行：去掉行内顶部间距，避免与气泡内边距叠加。
+                            firstRowTopPadding = 0.dp,
+                        )
+                        if (otherAttachments.isNotEmpty() && visibleTextParts.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                        }
                         visibleTextParts.forEach { part ->
                             RenderTextPart(
                                 part = part,
@@ -112,10 +123,6 @@ fun MessageBubble(
                                 fillAvailableWidth = false,
                             )
                         }
-                        MessageAttachments(
-                            attachments = otherAttachments,
-                            onOpenDocument = onOpenDocument,
-                        )
                     }
                 }
                 userReplyTextForCopy(visibleTextParts)?.let { text ->

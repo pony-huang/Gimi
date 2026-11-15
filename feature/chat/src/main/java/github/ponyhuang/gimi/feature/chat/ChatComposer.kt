@@ -64,6 +64,7 @@ import androidx.core.net.toUri
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
@@ -131,6 +132,16 @@ public fun ChatComposer(
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
     onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
+    /** 文档草稿的厂商上传状态（键为草稿 reference）；chip 三态与发送门控的数据源。 */
+    uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    attachmentUploadStates: Map<String, DraftUploadState> = emptyMap(),
+    /** 当前选择是否启用厂商文件上传；决定文档草稿是否需要预热上传与发送门控。 */
+    isFileUploadEnabled: Boolean = false,
+    /** 上传失败的 chip 原地重试。 */
+    onRetryAttachmentUpload: (DraftAttachment) -> Unit = {},
+    /** 新导入的文档草稿触发厂商上传（仅启用上传链路时实际生效）。 */
+    onDocumentDraftImported: (DraftAttachment) -> Unit = {},
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
     attachmentsEnabled: Boolean = true,
@@ -143,7 +154,15 @@ public fun ChatComposer(
     val onCancelTranscription by rememberUpdatedState(onCancelVoiceTranscription)
     val currentIsGenerating by rememberUpdatedState(isGenerating)
     val currentTranscriptionMode by rememberUpdatedState(voiceTranscriptionMode)
+    val currentOnRetryUpload by rememberUpdatedState(onRetryAttachmentUpload)
+    val currentOnDocumentDraftImported by rememberUpdatedState(onDocumentDraftImported)
     var isSubmitting by remember { mutableStateOf(false) }
+
+    // 上传链路启用时，未拿到 file 引用的文档草稿阻塞发送：消灭"传完/没传完"混合态，
+    // 保证消息形态唯一（发送时 file_id 必然就绪）。
+    val documentUploadPending = isFileUploadEnabled && messageData.attachments.any {
+        it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+    }
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var showPermissionMode by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -178,6 +197,16 @@ public fun ChatComposer(
                         attachmentCapabilities.documentInput?.supportedMimeTypes
                 }.orEmpty()
                 require(attachment.mimeType in supported) { attachmentUnsupportedMessage }
+                if (attachment.category == AttachmentCategory.DOCUMENT) {
+                    // 上传链路的文档在选择入口就拒绝超限文件，避免导入归档后才失败。
+                    val documentInput = attachmentCapabilities.documentInput
+                    if (documentInput?.ingestMode == FileIngestMode.FILE_REFERENCE &&
+                        attachment.sizeBytes > documentInput.maxUploadBytes
+                    ) {
+                        val limitMb = documentInput.maxUploadBytes / (1024 * 1024)
+                        require(false) { context.getString(R.string.chat_attachment_too_large, limitMb) }
+                    }
+                }
                 imported += attachment
             }
             mergeAttachmentSelection(messageData.attachments, imported)
@@ -199,6 +228,10 @@ public fun ChatComposer(
                 deleteManagedDrafts(context, result.replaced)
                 deleteManagedDrafts(context, imported.filterNot { it in result.attachments })
                 onDraftChange(currentMessageData.copy(attachments = result.attachments))
+                // chip 阶段预热上传：选完即传，发送时 file_id 必然就绪。
+                imported.filter {
+                    it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+                }.forEach { currentOnDocumentDraftImported(it) }
             }
         }
     }
@@ -257,6 +290,12 @@ public fun ChatComposer(
 
     fun submitMessage(submitted: MessageData) {
         if (isSubmitting || currentIsGenerating || (submitted.text.isBlank() && submitted.attachments.isEmpty())) return
+        if (isFileUploadEnabled && submitted.attachments.any {
+                it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+            }
+        ) {
+            return
+        }
         keyboardController?.hide()
         isSubmitting = true
         onSubmit(submitted) { isSubmitting = false }
@@ -474,6 +513,8 @@ public fun ChatComposer(
                                     showToolChip = addToChatState.configuration != null,
                                     fullAccess = addToChatState.fullAccess,
                                     attachmentsEnabled = attachmentsEnabled,
+                                    attachmentUploadStates = attachmentUploadStates,
+                                    onRetryAttachmentUpload = { currentOnRetryUpload(it) },
                                 ),
                             )
                         }
@@ -494,6 +535,12 @@ public fun ChatComposer(
     if (showAttachmentOptions && attachmentsEnabled) {
         ChatAddToChatSheet(
             state = addToChatState,
+            uploadedFiles = uploadedFiles,
+            uploadedFilesEnabled = isFileUploadEnabled,
+            onAttachUploadedFile = { entry ->
+                onAttachUploadedFile(entry)
+                showAttachmentOptions = false
+            },
             onDismiss = { showAttachmentOptions = false },
             onTakePhoto = {
                 showAttachmentOptions = false

@@ -208,15 +208,20 @@ internal fun decodeTemplateConnections(json: String): List<TemplateConnection> =
 
 private const val TAG = "ModelTemplateDatabase"
 
-/** 内置目录与既有行的候选模型合并：既有模型保留，缺失的内置模型补齐。 */
+/**
+ * 模板定义（协议集合、默认端点、端点策略）以内置清单为准，只合并候选模型目录：
+ * 既有行可能来自旧版本，若保留其协议集合，模板收紧后的约束（如 DeepSeek / MiniMax
+ * 对话固定 Messages）对老安装永远不生效。既有（含远端刷新得到）的候选模型保留，缺失的内置
+ * 模型补齐，内置新增的能力连接直接采用内置定义。
+ */
 internal fun mergeTemplateCatalogs(
     existing: List<TemplateConnection>,
     defaults: List<TemplateConnection>,
-): List<TemplateConnection> = existing.map { connection ->
-    val default = defaults.firstOrNull { it.capability == connection.capability } ?: return@map connection
-    val existingIds = connection.catalog.mapTo(HashSet()) { it.id }
-    connection.copy(catalog = connection.catalog + default.catalog.filterNot { it.id in existingIds })
-} + defaults.filterNot { default -> existing.any { it.capability == default.capability } }
+): List<TemplateConnection> = defaults.map { default ->
+    val stored = existing.firstOrNull { it.capability == default.capability } ?: return@map default
+    val existingIds = stored.catalog.mapTo(HashSet()) { it.id }
+    default.copy(catalog = stored.catalog + default.catalog.filterNot { it.id in existingIds })
+}
 
 /** Persistence-only model origin used to reconcile remote and manually entered models. */
 @Serializable

@@ -29,7 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.INLINE_DEFINITIONS
 
 @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)
 class InlineToolSearchPersistenceTest {

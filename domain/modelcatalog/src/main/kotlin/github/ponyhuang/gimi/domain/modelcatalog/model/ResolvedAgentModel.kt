@@ -13,4 +13,10 @@ data class ResolvedAgentModel(
     val modelBaseUrl: String,
     /** 该模型是否可接收图片输入。 */
     val supportsImages: Boolean = false,
+    /**
+     * 文档附件的进入方式：[FileIngestMode.FILE_REFERENCE] 表示实例已开启厂商文件上传，
+     * 协议适配器需支持 file 引用块；[FileIngestMode.PATH_TEXT] 表示文档不传输内容、
+     * 以本地路径文本送达模型；[FileIngestMode.INLINE] 维持 base64 内联语义。
+     */
+    val documentIngestMode: FileIngestMode = FileIngestMode.INLINE,
 )

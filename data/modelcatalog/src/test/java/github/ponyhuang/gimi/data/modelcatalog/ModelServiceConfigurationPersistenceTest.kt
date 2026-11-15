@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import androidx.room.Room
 import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelRole
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
@@ -25,6 +26,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.encodeToString
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -239,6 +241,181 @@ class ModelServiceConfigurationPersistenceTest {
     }
 
     @Test
+    fun deepSeekDraftWithForbiddenProtocolIsNormalizedOnSave() = runBlocking {
+        val repository = readyRepository()
+        val saved = repository.saveNewInstance(
+            lockedMessagesLegacyDraft("deepseek", "https://api.deepseek.com", "deepseek-chat"),
+        )!!
+        val conversation = saved.conversationConnection!!
+        assertEquals(ApiProtocol.Anthropic, conversation.protocol)
+        assertEquals("https://api.deepseek.com/anthropic", conversation.endpoint)
+        assertEquals(listOf("deepseek-chat"), conversation.models.map { it.id })
+
+        // 用户自建中转地址不是官方旧地址：端点保持不动，但协议仍强制为 Messages
+        val relay = repository.saveNewInstance(
+            lockedMessagesLegacyDraft("deepseek", "https://relay.example.com/v1", "deepseek-chat"),
+        )!!
+        assertEquals(ApiProtocol.Anthropic, relay.conversationConnection!!.protocol)
+        assertEquals("https://relay.example.com/v1", relay.conversationConnection!!.endpoint)
+    }
+
+    @Test
+    fun miniMaxDraftWithForbiddenProtocolIsNormalizedOnSave() = runBlocking {
+        val repository = readyRepository()
+        val saved = repository.saveNewInstance(
+            lockedMessagesLegacyDraft("minimax", "https://api.minimaxi.com/v1", "MiniMax-M2.7"),
+        )!!
+        val conversation = saved.conversationConnection!!
+        assertEquals(ApiProtocol.Anthropic, conversation.protocol)
+        assertEquals("https://api.minimaxi.com/anthropic", conversation.endpoint)
+        assertEquals(listOf("MiniMax-M2.7"), conversation.models.map { it.id })
+        // 语音连接是厂商自有端点，不受对话协议收紧影响
+        val recognition = saved.connection(ServiceCapability.Recognition)!!
+        assertEquals(ApiProtocol.OpenaiChatcompletions, recognition.protocol)
+        assertEquals("https://api.minimaxi.com/v1", recognition.endpoint)
+
+        // 用户自建中转地址保持不动，但协议仍强制为 Messages
+        val relay = repository.saveNewInstance(
+            lockedMessagesLegacyDraft("minimax", "https://relay.example.com/v1", "MiniMax-M2.7"),
+        )!!
+        assertEquals(ApiProtocol.Anthropic, relay.conversationConnection!!.protocol)
+        assertEquals("https://relay.example.com/v1", relay.conversationConnection!!.endpoint)
+    }
+
+    @Test
+    fun legacyDeepSeekCompletionsSnapshotIsForcedToMessagesOnRestart() = runBlocking {
+        readyRepository() // 初始化模板目录与首份快照
+        val legacyInstance = StoredInstance(
+            id = "svc-legacy-deepseek",
+            name = "DeepSeek",
+            templateId = "deepseek",
+            isEnabled = true,
+            isOfficialToolsEnabled = true,
+            sharedApiKey = "deepseek-key",
+            connections = listOf(
+                StoredConnection(
+                    id = "conn-legacy-conversation",
+                    capability = "Conversation",
+                    protocol = "OpenaiChatcompletions",
+                    endpoint = "https://api.deepseek.com/v1",
+                    models = listOf(StoredModel("deepseek-chat", "deepseek-chat")),
+                ),
+            ),
+        )
+        preferences.edit().putString(
+            "encrypted_configuration",
+            "cipher:" + modelCatalogJson.encodeToString(StoredConfiguration(listOf(legacyInstance))),
+        ).commit()
+
+        val restored = readyRepository()
+        val conversation = restored.currentInstance("svc-legacy-deepseek")!!.conversationConnection!!
+        assertEquals(ApiProtocol.Anthropic, conversation.protocol)
+        assertEquals("https://api.deepseek.com/anthropic", conversation.endpoint)
+        assertEquals(listOf("deepseek-chat"), conversation.models.map { it.id })
+        // 聊天分派同样以模板约束为准，不会把旧协议交给模型工厂
+        val resolved = restored.resolveChatModel(
+            ModelSelection("svc-legacy-deepseek", "conn-legacy-conversation", "deepseek-chat"),
+        )!!
+        assertEquals(ApiProtocol.Anthropic, resolved.protocol)
+        assertEquals("https://api.deepseek.com/anthropic", resolved.modelBaseUrl)
+        // Room 里升级前的双协议模板行也必须被内置约束覆盖
+        assertEquals(
+            listOf(ApiProtocol.Anthropic),
+            restored.template("deepseek")!!.connection(ServiceCapability.Conversation)!!.protocols,
+        )
+    }
+
+    @Test
+    fun legacyMiniMaxCompletionsSnapshotIsForcedToMessagesOnRestart() = runBlocking {
+        readyRepository() // 初始化模板目录与首份快照
+        val legacyInstance = StoredInstance(
+            id = "svc-legacy-minimax",
+            name = "MiniMax",
+            templateId = "minimax",
+            isEnabled = true,
+            isOfficialToolsEnabled = true,
+            sharedApiKey = "minimax-key",
+            connections = listOf(
+                StoredConnection(
+                    id = "conn-legacy-conversation",
+                    capability = "Conversation",
+                    protocol = "OpenaiChatcompletions",
+                    endpoint = "https://api.minimaxi.com/v1",
+                    models = listOf(StoredModel("MiniMax-M2.7", "MiniMax-M2.7")),
+                ),
+                StoredConnection(
+                    id = "conn-legacy-recognition",
+                    capability = "Recognition",
+                    protocol = "OpenaiChatcompletions",
+                    endpoint = "https://api.minimaxi.com/v1",
+                    models = listOf(StoredModel("asr-1.0", "asr-1.0")),
+                ),
+            ),
+        )
+        preferences.edit().putString(
+            "encrypted_configuration",
+            "cipher:" + modelCatalogJson.encodeToString(StoredConfiguration(listOf(legacyInstance))),
+        ).commit()
+
+        val restored = readyRepository()
+        val instance = restored.currentInstance("svc-legacy-minimax")!!
+        val conversation = instance.conversationConnection!!
+        assertEquals(ApiProtocol.Anthropic, conversation.protocol)
+        assertEquals("https://api.minimaxi.com/anthropic", conversation.endpoint)
+        assertEquals(listOf("MiniMax-M2.7"), conversation.models.map { it.id })
+        // 语音连接原样保留，未被误判为需要回落的旧协议
+        assertEquals(
+            ApiProtocol.OpenaiChatcompletions,
+            instance.connection(ServiceCapability.Recognition)!!.protocol,
+        )
+        // 聊天分派与 Room 模板行同样以内置约束为准
+        val resolved = restored.resolveChatModel(
+            ModelSelection("svc-legacy-minimax", "conn-legacy-conversation", "MiniMax-M2.7"),
+        )!!
+        assertEquals(ApiProtocol.Anthropic, resolved.protocol)
+        assertEquals("https://api.minimaxi.com/anthropic", resolved.modelBaseUrl)
+        assertEquals(
+            listOf(ApiProtocol.Anthropic),
+            restored.template("minimax")!!.connection(ServiceCapability.Conversation)!!.protocols,
+        )
+    }
+
+    @Test
+    fun staleTemplateRowCannotReopenForbiddenProtocol() = runBlocking {
+        // 老安装里 Room 仍保存着双协议的 DeepSeek 模板行，且带用户刷新出来的候选模型
+        val staleConnection = StoredTemplateConnection(
+            capability = "Conversation",
+            protocols = listOf("OpenaiChatcompletions", "Anthropic"),
+            defaultEndpoints = mapOf(
+                "OpenaiChatcompletions" to "https://api.deepseek.com",
+                "Anthropic" to "https://api.deepseek.com/anthropic",
+            ),
+            endpointPolicy = "UserConfigured",
+            endpointSchemes = setOf("http", "https"),
+            catalog = listOf(StoredModel("deepseek-reasoner", "deepseek-reasoner")),
+        )
+        database.modelTemplateDao().upsertAll(
+            listOf(
+                ModelTemplateEntity(
+                    templateId = "deepseek",
+                    displayName = "DeepSeek",
+                    displayOrder = 4,
+                    connectionsJson = modelCatalogJson.encodeToString(listOf(staleConnection)),
+                    homepageUrl = "https://www.deepseek.com/",
+                    keyHelpUrl = "https://platform.deepseek.com/api_keys",
+                ),
+            ),
+        )
+
+        val repository = readyRepository()
+        val chat = repository.template("deepseek")!!.connection(ServiceCapability.Conversation)!!
+        assertEquals(listOf(ApiProtocol.Anthropic), chat.protocols)
+        assertFalse(chat.supports(ApiProtocol.OpenaiChatcompletions))
+        // 既有候选目录不因模板定义对齐而丢失
+        assertEquals(listOf("deepseek-reasoner"), chat.catalog.map { it.id })
+    }
+
+    @Test
     fun draftWithoutSelectedModelsIsRejected() = runBlocking {
         val repository = readyRepository()
         val draft = openAiDraft(sharedApiKey = "fake-key").copy(
@@ -415,6 +592,34 @@ class ModelServiceConfigurationPersistenceTest {
                     connection.toConnection().copy(models = listOf(Model("gpt-4.1", "gpt-4.1")))
                 } else {
                     connection.toConnection()
+                }
+            },
+        )
+    }
+
+    /** 模拟协议收紧前保存的草稿：Completions 协议 + 指定端点（DeepSeek / MiniMax）。 */
+    private fun lockedMessagesLegacyDraft(
+        templateId: String,
+        endpoint: String,
+        modelId: String,
+    ): ModelServiceDraft {
+        val template = ModelServiceTemplates.fromId(templateId)!!
+        return ModelServiceDraft(
+            instanceId = null,
+            templateId = templateId,
+            name = template.name,
+            isOfficialToolsEnabled = true,
+            sharedApiKey = "$templateId-key",
+            connections = template.connections.map { connection ->
+                val base = connection.toConnection()
+                if (connection.capability == ServiceCapability.Conversation) {
+                    base.copy(
+                        protocol = ApiProtocol.OpenaiChatcompletions,
+                        endpoint = endpoint,
+                        models = listOf(Model(modelId, modelId)),
+                    )
+                } else {
+                    base
                 }
             },
         )

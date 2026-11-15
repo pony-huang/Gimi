@@ -25,10 +25,22 @@ class ModelServiceTemplatesTest {
             listOf(ApiProtocol.Anthropic),
             templates.getValue("anthropic").connection(ServiceCapability.Conversation)?.protocols,
         )
-        // 双协议厂商的 Anthropic 默认地址是厂商专属路径
+        // DeepSeek / MiniMax 对话固定 Messages：Completions 既不可选，也不能通过持久化取值绕过；
+        // 旧 OpenAI 兼容地址只作为迁移识别端点保留，不在 protocols 中。
+        val lockedMessages = mapOf(
+            "deepseek" to ("https://api.deepseek.com/anthropic" to "https://api.deepseek.com"),
+            "minimax" to ("https://api.minimaxi.com/anthropic" to "https://api.minimaxi.com/v1"),
+        )
+        for ((id, endpoints) in lockedMessages) {
+            val (messagesEndpoint, legacyEndpoint) = endpoints
+            val chat = templates.getValue(id).connection(ServiceCapability.Conversation)!!
+            assertEquals(listOf(ApiProtocol.Anthropic), chat.protocols)
+            assertFalse(chat.supports(ApiProtocol.OpenaiChatcompletions))
+            assertEquals(messagesEndpoint, chat.defaultEndpoint(ApiProtocol.Anthropic))
+            assertEquals(legacyEndpoint, chat.defaultEndpoints[ApiProtocol.OpenaiChatcompletions])
+        }
+        // 仍开放双协议的厂商，其 Anthropic 默认地址是厂商专属路径
         val anthropicEndpoints = mapOf(
-            "deepseek" to "https://api.deepseek.com/anthropic",
-            "minimax" to "https://api.minimaxi.com/anthropic",
             "mimo" to "https://api.xiaomimimo.com/anthropic",
             "kimi" to "https://api.moonshot.cn/anthropic",
             "glm" to "https://open.bigmodel.cn/api/anthropic",
@@ -63,6 +75,21 @@ class ModelServiceTemplatesTest {
             setOf(ServiceCapability.Conversation, ServiceCapability.Recognition, ServiceCapability.Synthesis),
             templates.getValue("deepseek").connections.map { it.capability }.toSet(),
         )
+    }
+
+    @Test
+    fun miniMaxSpeechConnectionsAreUnaffectedByTheChatProtocolLock() {
+        val template = ModelServiceTemplates.fromId("minimax")!!
+        for (capability in listOf(ServiceCapability.Recognition, ServiceCapability.Synthesis)) {
+            val connection = template.connection(capability)!!
+            // 语音走厂商自有端点，不参与对话协议切换，收紧对话协议不应误伤它们
+            assertEquals(listOf(ApiProtocol.OpenaiChatcompletions), connection.protocols)
+            assertEquals(
+                "https://api.minimaxi.com/v1",
+                connection.defaultEndpoint(connection.protocols.first()),
+            )
+            assertEquals(EndpointPolicy.VendorManaged, connection.endpointPolicy)
+        }
     }
 
     @Test

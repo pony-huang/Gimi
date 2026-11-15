@@ -111,10 +111,15 @@ internal fun DefaultComposerInputContent(
     val transcribing = params.voiceInputState as? VoiceInputUiState.Transcribing
     val isTranscribing = transcribing != null
 
+    // 上传中的文档草稿阻塞发送（Enter 与发送按钮一致），保证发送时 file_id 必然就绪。
+    val uploadBlocking = params.attachmentUploadStates.values.any {
+        it is DraftUploadState.Uploading || it is DraftUploadState.Failed
+    }
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
         isTranscribing -> null
-        params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty() ->
+        (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty()) &&
+            !uploadBlocking ->
             ComposerTrailingButton.Send
         else -> null
     }
@@ -146,6 +151,8 @@ internal fun DefaultComposerInputContent(
             AttachmentList(
                 attachments = params.messageData.attachments,
                 onRemoveAttachment = params.onRemoveAttachment,
+                uploadStates = params.attachmentUploadStates,
+                onRetryUpload = params.onRetryAttachmentUpload,
             )
             Box(modifier = Modifier.fillMaxWidth()) {
                 BasicTextField(
@@ -164,7 +171,7 @@ internal fun DefaultComposerInputContent(
                             val isBareEnter = event.type == KeyEventType.KeyDown &&
                                 (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
                                 !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed
-                            val canSend = !params.isGenerating &&
+                            val canSend = !params.isGenerating && !uploadBlocking &&
                                 (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty())
                             if (isBareEnter && canSend) {
                                 params.onSendClick()

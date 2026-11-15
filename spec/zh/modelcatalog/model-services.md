@@ -31,7 +31,8 @@
 
 - 一条 `ServiceConnection` 对应一个 `ServiceCapability`（Conversation / Recognition / Synthesis / Realtime），一一对应，不合并。
 - 识别连接同时容纳专用转写（STT）与音频理解（ASR）模型；协议适配按模型声明的能力分派，实例不可只按整批判定。
-- 双协议厂商（OpenAI 兼容 + Anthropic 兼容）的模板连接必须**成对给出两个协议的默认端点**（MiniMax / MiMo 曾漏配 Anthropic 路径，切换协议时端点会错误回落）。
+- 仍开放双协议的厂商（MiMo / Kimi / GLM，OpenAI 兼容 + Anthropic 兼容）的模板连接必须**成对给出两个协议的默认端点**（MiniMax / MiMo 曾漏配 Anthropic 路径，切换协议时端点会错误回落）。
+- **DeepSeek / MiniMax 对话固定 Anthropic Messages**：模板 `protocols` 只含 `ApiProtocol.Anthropic`，默认端点分别是官方 `https://api.deepseek.com/anthropic` 与 `https://api.minimaxi.com/anthropic`，接口页只展示只读协议值、不提供切换。旧 OpenAI 兼容地址（`https://api.deepseek.com`、`https://api.minimaxi.com/v1`）仅作为迁移识别用的默认端点保留（不在 `protocols` 中，因此不可选）。语音连接走厂商自有端点，不参与对话协议约束，不受收紧影响。协议约束在四处共同生效：模板定义、Room 模板行合并（`mergeTemplateCatalogs` 以内置清单为准）、启动对账/保存归一（旧快照强制回落并回贴官方端点，用户自建中转地址不动）、`resolveChatModel` 运行时兜底。注意：非模板默认域名的地址（自建中转、MiniMax 国际站 `api.minimax.io` 等）不会被自动回贴，协议强制后需把端点改成对应的 `/anthropic` 路径，否则 Messages 请求仍会打到 `/v1`。
 
 ### 凭据收敛
 

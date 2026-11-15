@@ -31,10 +31,15 @@
     <string name="chat_add_to_chat_close">Close</string>
     <string name="chat_add_to_chat_back">Back</string>
     <string name="chat_add_to_chat_photos">Photos</string>
-    <string name="chat_add_to_chat_files">Files</string>
+    <string name="chat_add_to_chat_files">Local files</string>
     <string name="chat_attachment_mixed_types">Select only one file type at a time</string>
     <string name="chat_attachment_read_failed">Could not read the selected attachment</string>
     <string name="chat_attachment_unsupported">The current model does not support this attachment type</string>
+    <string name="chat_attachment_too_large">File exceeds the %1$d MB upload limit</string>
+    <string name="chat_model_picker_file_lock_notice">This conversation has uploaded files and is locked to %1$s</string>
+    <string name="chat_model_picker_locked_cd">Locked to the current vendor</string>
+    <string name="chat_drawer_uploaded_files">Files</string>
+    <string name="chat_attachment_upload_failed">Upload failed · Tap to retry</string>
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_reasoning_effort_off">Off</string>
     <string name="chat_reasoning_effort_title">Thinking effort</string>
@@ -182,6 +187,7 @@
     <string name="chat_attachment_sent_image_preview">Sent image preview</string>
     <string name="chat_attachment_close_preview">Close image preview</string>
     <string name="chat_attachment_file_missing">File missing</string>
+    <string name="chat_attachment_open_unsupported">Vendor files can\'t be downloaded to open</string>
     <string name="chat_remote_image">Remote image %1$d</string>
     <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
     <string name="chat_recommendations_title">Recommended for you</string>
@@ -435,4 +441,6 @@
     <string name="voice_prompt_preset_mine_note">Prompts you wrote, editable and removable at any time</string>
     <string name="voice_prompt_preset_view">View prompt</string>
     <string name="voice_prompt_preset_view_close">Close</string>
+    <string name="chat_uploaded_files_description">Choose an uploaded file</string>
+    <string name="chat_uploaded_files_empty">No uploaded files yet</string>
 </resources>

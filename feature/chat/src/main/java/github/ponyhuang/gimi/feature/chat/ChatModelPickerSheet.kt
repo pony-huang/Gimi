@@ -32,6 +32,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +92,8 @@ internal fun ChatModelPickerSheet(
     reasoningEnabled: Boolean = true,
     onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onThinkingEnabledChange: (Boolean) -> Unit = { },
+    /** 会话因包含厂商 file 引用附件而锁定的厂商模板 ID；null 表示未锁定。 */
+    lockedVendor: String? = null,
 ) {
     // 页级状态放在抽屉层：一级页标题是"选择模型"，二级页是厂商名，标题行要跟着页级切；
     // 标题与主体共用同一份状态与同一份切页动效，切页时两者才会同步位移。
@@ -132,6 +136,7 @@ internal fun ChatModelPickerSheet(
                 onThinkingEnabledChange = onThinkingEnabledChange,
                 selectedServiceId = selectedServiceId,
                 onSelectService = { selectedServiceId = it },
+                lockedVendor = lockedVendor,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -205,6 +210,7 @@ private fun ChatModelPickerBody(
     onThinkingEnabledChange: (Boolean) -> Unit,
     selectedServiceId: String?,
     onSelectService: (String?) -> Unit,
+    lockedVendor: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val providers = options
@@ -228,6 +234,7 @@ private fun ChatModelPickerBody(
                 providers = providers,
                 selection = selection,
                 onOpenProvider = onSelectService,
+                lockedVendor = lockedVendor,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -270,6 +277,7 @@ private fun ProviderListContent(
     providers: List<ProviderOption>,
     selection: ModelSelection?,
     onOpenProvider: (String) -> Unit,
+    lockedVendor: String? = null,
     modifier: Modifier = Modifier,
 ) {
     // 主体用 heightIn(max) 给了有界高度，LazyColumn 在这种约束下会直接把主体撑满，
@@ -291,8 +299,30 @@ private fun ProviderListContent(
                 ),
             )
         }
+        if (lockedVendor != null) {
+            // 厂商锁定说明：file_id 是账号级资源，同厂商内换模型允许；跨厂商切换被禁用。
+            Row(
+                Modifier.padding(horizontal = GimiListDefaults.HorizontalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.chat_model_picker_file_lock_notice, lockedVendor),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         providers.forEach { provider ->
             val containsCurrent = selection?.instanceId == provider.instance.id
+            // 锁定语义：仅当前厂商（file_id 归属厂商）可进二级页，其他厂商行置灰 + 锁图标。
+            val locked = lockedVendor != null && provider.instance.templateId != lockedVendor
             GimiPickerItemRow(
                 title = provider.instance.name,
                 subtitle = stringResource(
@@ -300,6 +330,7 @@ private fun ProviderListContent(
                     provider.modelCount,
                 ),
                 selected = false,
+                enabled = !locked,
                 onClick = { onOpenProvider(provider.instance.id) },
                 modifier = Modifier.padding(
                     horizontal = GimiListDefaults.HorizontalPadding,
@@ -322,12 +353,21 @@ private fun ProviderListContent(
                             )
                             Spacer(Modifier.width(8.dp))
                         }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (locked) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = stringResource(R.string.chat_model_picker_locked_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 role = Role.Button,

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SettingsEthernet
+import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,6 +75,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.domain.modelcatalog.model.FILE_UPLOAD_TEMPLATE_IDS
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
@@ -217,6 +218,15 @@ private fun DetailPage(
                 title = stringResource(R.string.modelsettings_official_tools),
                 subtitle = stringResource(R.string.modelsettings_official_tools_subtitle),
                 onClick = { onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.OfficialTools)) },
+            )
+        }
+        if (state.template?.id in FILE_UPLOAD_TEMPLATE_IDS) {
+            PreferenceSwitchRow(
+                icon = Icons.Outlined.UploadFile,
+                title = stringResource(R.string.modelsettings_file_upload),
+                description = stringResource(R.string.modelsettings_file_upload_subtitle),
+                checked = state.isFileUploadEnabled,
+                onCheckedChange = { onAction(ModelServiceDetailAction.FileUploadChanged(it)) },
             )
         }
     }

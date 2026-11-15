@@ -4,16 +4,21 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.models.openai.ChatCompletions
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.OpenAiCompatibleChatCompletions
 import com.google.adk.kt.types.HttpOptions
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
 import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.Claude
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.AnthropicToolLoadingRequestConverter
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.toolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageChat
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageToolLoadingRequestConverter
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.isOfficialDeepSeekAnthropicEndpoint
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.latestReminderContent
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.toolLoadingMode
 
 /**
  * 解析后的模型配置（[AgentLLMModelFactory.createModel] 用）。
@@ -36,6 +41,8 @@ data class ModelConfig(
     val apiKey: String,
     val fullBaseUrl: String,
     val supportsImages: Boolean = false,
+    /** 文档进入方式；FILE_REFERENCE 表示实例已开启厂商文件上传（协议适配器支持 file 块），PATH_TEXT 表示文档以本地路径文本送达、不传输内容。 */
+    val documentIngestMode: FileIngestMode = FileIngestMode.INLINE,
 )
 
 /**
@@ -57,6 +64,7 @@ data class ModelRuntimeMetadata(
     val modelId: String,
     val fullBaseUrl: String,
     val supportsImages: Boolean = false,
+    val documentIngestMode: FileIngestMode = FileIngestMode.INLINE,
 )
 
 fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntimeMetadata(
@@ -66,6 +74,7 @@ fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntimeMetadata
     modelId = modelId,
     fullBaseUrl = fullBaseUrl,
     supportsImages = supportsImages,
+    documentIngestMode = documentIngestMode,
 )
 
 @Singleton
@@ -106,25 +115,51 @@ class AgentLLMModelFactory @Inject constructor(
 
 
     fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
+        documentIngestMode = cfg.documentIngestMode,
         delegate = when (cfg.baseType) {
             // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
-            ApiProtocol.OpenaiChatcompletions -> ChatCompletions(
-                name = cfg.modelId,
-                apiKey = cfg.apiKey,
-                httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
-            )
+            // 实例开启文件上传时改用 fork 的 file 块适配器：ADK 官方实现是 final class 且
+            // 无转换器注入点，无法发出 file 引用块（2026-11 ADK 1.5.0 现状）。
+            ApiProtocol.OpenaiChatcompletions ->
+                if (cfg.documentIngestMode == FileIngestMode.FILE_REFERENCE) {
+                    OpenAiCompatibleChatCompletions(
+                        name = cfg.modelId,
+                        apiKey = cfg.apiKey,
+                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                    )
+                } else {
+                    ChatCompletions(
+                        name = cfg.modelId,
+                        apiKey = cfg.apiKey,
+                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                    )
+                }
 
-            ApiProtocol.Anthropic -> Claude(
-                name = cfg.modelId,
-                requestConverter = AnthropicToolLoadingRequestConverter(
-                    cfg.modelId, 8196,
-                    toolLoadingMode(cfg.toRuntimeMetadata()),
-                )::convert,
-                client = AnthropicOkHttpClient.builder()
-                    .baseUrl(cfg.fullBaseUrl)
-                    .apiKey(cfg.apiKey)
-                    .build(),
-            )
+            ApiProtocol.Anthropic ->
+                if (isOfficialDeepSeekAnthropicEndpoint(cfg.toRuntimeMetadata())) {
+                    // 仅官方端点走 DeepSeek 专属适配器：首轮注入 title 参数、转换器注入
+                    // latest_reminder；第三方代理回落通用 Claude 适配器，零扩展字段风险。
+                    DeepSeekMessageChat(
+                        name = cfg.modelId,
+                        requestConverter = DeepSeekMessageToolLoadingRequestConverter(
+                            cfg.modelId, 8196,
+                            toolLoadingMode(cfg.toRuntimeMetadata()),
+                            latestReminder = { latestReminderContent() },
+                        )::convert,
+                        client = AnthropicOkHttpClient.builder()
+                            .baseUrl(cfg.fullBaseUrl)
+                            .apiKey(cfg.apiKey)
+                            .build(),
+                    )
+                } else {
+                    Claude(
+                        name = cfg.modelId,
+                        client = AnthropicOkHttpClient.builder()
+                            .baseUrl(cfg.fullBaseUrl)
+                            .apiKey(cfg.apiKey)
+                            .build(),
+                    )
+                }
 
             // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
             ApiProtocol.Gemini -> Gemini(
@@ -166,5 +201,6 @@ class AgentLLMModelFactory @Inject constructor(
         apiKey = apiKey,
         fullBaseUrl = modelBaseUrl,
         supportsImages = supportsImages,
+        documentIngestMode = documentIngestMode,
     )
 }

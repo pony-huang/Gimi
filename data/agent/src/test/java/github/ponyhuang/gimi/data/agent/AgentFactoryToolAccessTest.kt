@@ -54,7 +54,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import github.ponyhuang.gimi.data.modelaccess.ModelConfig
 import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.TOOL_SEARCH_NAME
 
 /**
  * 两种工具访问模式的 Agent 组装验证。

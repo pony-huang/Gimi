@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
@@ -43,6 +44,15 @@ fun ServiceDetailRoute(
     val context = LocalContext.current
     LaunchedEffect(instanceId, templateId, origin) {
         viewModel.onAction(ModelServiceDetailAction.Load(instanceId, templateId, origin))
+    }
+    // 子页（模型 / 接口设置 / 官方工具 / 保存建议）与未保存草稿都属于编辑器内部层级：
+    // 系统返回键与返回手势必须先交回编辑器处理。否则 NavDisplay 会把整个详情弹栈，
+    // 用户在「接口设置」按返回会直接回到模型服务列表，跳过详情页并丢掉子页上下文。
+    BackHandler(
+        enabled = !state.isDiscardDialogVisible &&
+            (state.page != ServiceEditorPage.Detail || state.hasUnsavedChanges),
+    ) {
+        viewModel.onAction(ModelServiceDetailAction.Back)
     }
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->

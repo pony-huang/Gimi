@@ -64,6 +64,8 @@ data class ChatUiState(
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
     val availableLLMModelSettings: List<ModelServiceInstance> = emptyList(),
+    /** 输入框文档草稿的厂商上传状态；键为草稿 reference，见 [ChatFileUploadCoordinator]。 */
+    val draftUploadStates: Map<String, DraftUploadState> = emptyMap(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
     val toolConfiguration: ConversationToolConfiguration? = null,

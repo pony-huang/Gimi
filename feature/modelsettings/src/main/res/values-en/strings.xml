@@ -234,6 +234,7 @@
     <string name="modelsettings_search_models">Search model name or ID</string>
     <string name="modelsettings_category_all">All</string>
     <string name="modelsettings_field_protocol">Protocol</string>
+    <string name="modelsettings_protocol_locked_hint">This service uses a fixed API protocol and cannot be changed.</string>
     <string name="modelsettings_field_endpoint">Endpoint</string>
     <string name="modelsettings_field_credential_source">Credential source</string>
     <string name="modelsettings_credential_shared">Use shared key</string>
@@ -296,4 +297,6 @@
     <string name="modelsettings_protocol_openai">Completions</string>
     <string name="modelsettings_protocol_anthropic">Messages</string>
     <string name="modelsettings_protocol_gemini">Gemini</string>
+    <string name="modelsettings_file_upload">Files</string>
+    <string name="modelsettings_file_upload_subtitle">When enabled, all models of this vendor accept document attachments, which are uploaded to the vendor file service</string>
 </resources>

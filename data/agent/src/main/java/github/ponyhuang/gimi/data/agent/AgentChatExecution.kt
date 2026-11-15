@@ -13,6 +13,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -56,12 +57,17 @@ class AgentChatExecution internal constructor(
         val parts = if (resumeInvocationId != null) emptyList() else buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             fileAttachments.forEach { attachment ->
+                // 厂商 file 引用（上传直发/抽屉复用）与本地路径共用 FileData 通道：
+                // FILE_REFERENCE 模式下 file 引用在解析边界直通，本地文档路径降级占位。
+                val vendorUri = attachment.fileVendor?.let { vendor ->
+                    attachment.fileId?.let { VendorFileReference.uri(vendor, it) }
+                }
                 add(
                     Part(
                         fileData = FileData(
                             mimeType = attachment.mimeType,
                             displayName = attachment.displayName,
-                            fileUri = requireNotNull(attachment.payloadReference) {
+                            fileUri = vendorUri ?: requireNotNull(attachment.payloadReference) {
                                 "Managed attachment reference is missing"
                             },
                         ),

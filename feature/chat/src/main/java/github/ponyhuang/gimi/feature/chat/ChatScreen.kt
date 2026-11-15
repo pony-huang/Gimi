@@ -83,6 +83,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -108,6 +109,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * 删除、`viewModel.send` 实际调用、模型服务切换时的 runner 重建。本 Composable 不持有这些
  * 副作用。
  */
+private val detectConversationVendorLock =
+    github.ponyhuang.gimi.domain.conversation.usecase.DetectConversationVendorLockUseCase()
+
 @SuppressLint("FrequentlyChangingValue")
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -148,6 +152,14 @@ fun ChatScaffold(
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
     onRetryA2ui: (String) -> Unit = {},
+    /** 上传失败的 chip 原地重试。 */
+    onRetryAttachmentUpload: (github.ponyhuang.gimi.domain.conversation.model.DraftAttachment) -> Unit = {},
+    /** 新导入的文档草稿触发厂商上传。 */
+    onDocumentDraftImported: (github.ponyhuang.gimi.domain.conversation.model.DraftAttachment) -> Unit = {},
+    /** 抽屉"上传的文件"回填请求流；把 file 引用草稿插入输入框。 */
+    uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    attachFileRequests: Flow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = kotlinx.coroutines.flow.emptyFlow(),
 ) {
 
     val listState = rememberLazyListState()
@@ -173,6 +185,54 @@ fun ChatScaffold(
             ?.findModel(selection)
             ?.multimodal
             ?: MultimodalCapabilities()
+    }
+    // 实例级"文件上传"开关推导出的 FILE_REFERENCE 能力决定上传链路与发送门控。
+    val isFileUploadEnabled = attachmentCapabilities.documentInput?.ingestMode ==
+        github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE
+    // 抽屉"文件"行的厂商图标：与 uploadedFiles 数据源按同一方式解析当前实例模板。
+    val currentVendorTemplateId = remember(state.availableLLMModelSettings, state.currentModelSelection) {
+        state.availableLLMModelSettings
+            .firstOrNull { it.id == state.currentModelSelection?.instanceId }?.templateId
+    }
+    // 厂商锁定从消息推导：会话里存在带 fileId 的附件即锁定到其厂商。
+    val lockedVendor = remember(state.messages) { detectConversationVendorLock(state.messages) }
+    // 抽屉复用请求：把已上传文件回填为 file 引用草稿（file_id 就绪态，零上传）。
+    LaunchedEffect(Unit) {
+        attachFileRequests.collect { entry ->
+            val draft = github.ponyhuang.gimi.domain.conversation.model.DraftAttachment(
+                reference = github.ponyhuang.gimi.domain.conversation.model.VendorFileReference.uri(
+                    entry.vendor,
+                    entry.fileId,
+                ),
+                displayName = entry.displayName,
+                mimeType = entry.mimeType,
+                sizeBytes = entry.bytes,
+                category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.from(
+                    entry.mimeType,
+                    entry.displayName,
+                ) ?: return@collect,
+                fileId = entry.fileId,
+                fileVendor = entry.vendor,
+            )
+            val current = composerDraft
+            if (current.attachments.none { it.reference == draft.reference }) {
+                composerDraft = current.copy(attachments = current.attachments + draft)
+            }
+        }
+    }
+    // 上传完成即把草稿替换为携带 file 引用的副本；发送门控据此放行。
+    LaunchedEffect(state.draftUploadStates) {
+        val ready = state.draftUploadStates.mapNotNull { (reference, uploadState) ->
+            (uploadState as? DraftUploadState.Ready)?.let { reference to it }
+        }.toMap()
+        if (ready.isEmpty()) return@LaunchedEffect
+        val current = composerDraft
+        val updated = current.copy(
+            attachments = current.attachments.map { draft ->
+                ready[draft.reference]?.let { draft.copy(fileId = it.fileId, fileVendor = it.vendor) } ?: draft
+            },
+        )
+        if (updated != current) composerDraft = updated
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by rememberSaveable(state.sessionId) { mutableStateOf(true) }
@@ -390,8 +450,15 @@ fun ChatScaffold(
                                     } else {
                                         null
                                     },
+                                    vendorTemplateId = currentVendorTemplateId,
                                 ),
                                 attachmentCapabilities = attachmentCapabilities,
+                                uploadedFiles = uploadedFiles,
+                                onAttachUploadedFile = onAttachUploadedFile,
+                                attachmentUploadStates = state.draftUploadStates,
+                                isFileUploadEnabled = isFileUploadEnabled,
+                                onRetryAttachmentUpload = onRetryAttachmentUpload,
+                                onDocumentDraftImported = onDocumentDraftImported,
                                 onMcpServerEnabledChange = onMcpServerEnabledChange,
                                 onFullAccessChange = onFullAccessChange,
                                 onOfficialToolOpened = onOfficialToolOpened,
@@ -417,6 +484,7 @@ fun ChatScaffold(
                                         reasoningEnabled = !isAgentRunning,
                                         onReasoningEffortChange = onReasoningEffortChange,
                                         onThinkingEnabledChange = onThinkingEnabledChange,
+                                        lockedVendor = lockedVendor,
                                     )
                                 },
                             )

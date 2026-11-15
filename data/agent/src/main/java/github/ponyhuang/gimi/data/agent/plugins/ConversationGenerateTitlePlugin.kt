@@ -14,6 +14,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
 import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.CONVERSATION_TITLE_METADATA_KEY
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.ConversationTitle
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
@@ -162,6 +163,16 @@ class ConversationGenerateTitlePlugin(
         // 获取最终结果
         val pending = pendingTitles[context.invocationId]
         if (pending != null && !response.partial) {
+            // 厂商适配器开启会话标题时（如 DeepSeek 轻聊场景），首轮响应顺带返回标题；
+            // 命中即完成标题流，省掉独立的标题模型请求。
+            val inlineTitle = (response.customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) as? String)
+                ?.let(ConversationTitle::generated)
+            if (inlineTitle != null) {
+                pendingTitles.remove(context.invocationId)
+                completeTitleFlow(context, inlineTitle)
+                Log.i(TAG, "Inline conversation title captured for ${context.invocationId}: $inlineTitle")
+                return response
+            }
             response.content?.parts
                 ?.filter { it.thought != true }
                 ?.mapNotNull { it.text }

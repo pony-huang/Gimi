@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Metadata owned by the app for an ADK session. Session events remain in ADK's database.
@@ -89,13 +90,45 @@ interface ConversationMetadataDao {
     }
 }
 
+/** 一条已上传到厂商文件服务的注册记录；fileId 是厂商侧真源，本地只存展示元数据。 */
+@Entity(
+    tableName = "uploaded_files",
+    indices = [
+        Index(value = ["vendor"], name = "index_uploaded_files_vendor"),
+    ],
+)
+data class UploadedFileEntity(
+    @PrimaryKey
+    val fileId: String,
+    val vendor: String,
+    val displayName: String,
+    val mimeType: String,
+    val bytes: Long,
+    val createdAtEpochSeconds: Long,
+)
+
+@Dao
+interface UploadedFileDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: UploadedFileEntity)
+
+    @Query("SELECT * FROM uploaded_files WHERE vendor = :vendor ORDER BY createdAtEpochSeconds DESC")
+    fun observeForVendor(vendor: String): Flow<List<UploadedFileEntity>>
+
+    /** 厂商侧文件被删除后移除本地记录；不存在时静默幂等。 */
+    @Query("DELETE FROM uploaded_files WHERE fileId = :fileId AND vendor = :vendor")
+    suspend fun delete(fileId: String, vendor: String)
+}
+
 @Database(
-    entities = [ConversationMetadataEntity::class],
-    version = 5,
+    entities = [ConversationMetadataEntity::class, UploadedFileEntity::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {
     abstract fun conversationMetadataDao(): ConversationMetadataDao
+
+    abstract fun uploadedFileDao(): UploadedFileDao
     companion object {
         const val DATABASE_NAME = "conversation-metadata.db"
     }

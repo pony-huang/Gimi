@@ -246,6 +246,7 @@
     <string name="modelsettings_category_all">全部</string>
     <!-- 接口设置 -->
     <string name="modelsettings_field_protocol">接口协议</string>
+    <string name="modelsettings_protocol_locked_hint">该服务固定使用此接口协议，不可更换。</string>
     <string name="modelsettings_field_endpoint">接口地址</string>
     <string name="modelsettings_field_credential_source">密钥来源</string>
     <string name="modelsettings_credential_shared">使用共享密钥</string>
@@ -311,4 +312,6 @@
     <string name="modelsettings_protocol_openai">Completions</string>
     <string name="modelsettings_protocol_anthropic">Messages</string>
     <string name="modelsettings_protocol_gemini">Gemini</string>
+    <string name="modelsettings_file_upload">文件</string>
+    <string name="modelsettings_file_upload_subtitle">开启后该厂商全部模型支持文档附件，文档将上传至厂商文件服务</string>
 </resources>

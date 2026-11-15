@@ -11,6 +11,11 @@ enum class FileIngestMode {
     INLINE,
     /** Files must first be uploaded to the vendor's file management API, then referenced by file_id. */
     FILE_REFERENCE,
+    /**
+     * 文件内容不随请求传输，仅以本地绝对路径文本送达模型；是否用环境文件导入工具
+     * （如 `import_file_to_environment`）读取由 agent 自行决定，环境未配置时亦不特殊处理。
+     */
+    PATH_TEXT,
 }
 
 interface HasIngestMode {

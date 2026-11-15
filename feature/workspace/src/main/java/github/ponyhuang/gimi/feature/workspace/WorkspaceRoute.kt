@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.workspace
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +32,12 @@ fun WorkspaceRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // 多选是页面内的临时层级：系统返回键与返回手势先退出多选，与标题栏关闭图标一致。
+    // 否则会直接弹栈离开工作区，用户刚勾选的上下文一起丢失。
+    BackHandler(enabled = state.isSelecting && state.pendingDeletePaths.isEmpty()) {
+        viewModel.onAction(WorkspaceAction.ExitSelection)
+    }
 
     LaunchedEffect(state.deleteResult) {
         val result = state.deleteResult ?: return@LaunchedEffect

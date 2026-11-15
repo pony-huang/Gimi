@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
@@ -87,6 +93,8 @@ class ChatViewModel @Inject constructor(
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val speechSettings: SpeechSettingsRepository,
     private val attachments: ChatAttachmentRepository,
+    private val fileUploadGateway: github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway,
+    private val fileUploadRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
     private val prepareChatSend: PrepareChatSendUseCase,
     private val validateChatAttachments: ValidateChatAttachmentsUseCase,
     officialFunctionCatalog: OfficialToolFunctionCatalog,
@@ -99,6 +107,18 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val fileUploads = ChatFileUploadCoordinator(
+        scope = viewModelScope,
+        gateway = fileUploadGateway,
+        registry = fileUploadRegistry,
+        resolveConnection = { selection -> modelServices.resolveConnection(selection) },
+        isFileUploadEnabled = { selection ->
+            modelServices.currentInstances().firstOrNull { it.id == selection.instanceId }
+                ?.findModel(selection)?.multimodal?.documentInput?.ingestMode ==
+                github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE
+        },
+    )
 
     private val voiceDictation = VoiceDictationCoordinator(
         scope = viewModelScope,
@@ -267,6 +287,12 @@ class ChatViewModel @Inject constructor(
      * 字段；UI 只订阅 `uiState` 一条流即可同时拿到消息、streaming 标志、会话 id 与会话列表。
      */
     init {
+        viewModelScope.launch {
+            fileUploads.states.collect { states ->
+                _uiState.update { it.copy(draftUploadStates = states) }
+            }
+        }
+
         viewModelScope.launch {
             repository.conversations.collect { convs ->
                 _uiState.update { state ->
@@ -527,6 +553,49 @@ class ChatViewModel @Inject constructor(
     }
 
     private var resolvingSubmission = false
+
+    /** 触发文档草稿的厂商上传（chip 阶段预热）；重试复用同一路径。 */
+    fun uploadDocumentDraft(draft: DraftAttachment) {
+        val selection = _uiState.value.currentModelSelection ?: return
+        fileUploads.upload(draft, selection)
+    }
+
+    /** 清理上传状态：附件移除或发送完成后调用。 */
+    fun clearDocumentUploads(references: Collection<String>) {
+        fileUploads.clear(references)
+    }
+
+    /** 当前厂商已上传文件的注册记录；抽屉"上传的文件"列表数据源（按当前厂商过滤）。 */
+    val uploadedFiles: StateFlow<List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry>> =
+        _uiState
+            .map { state ->
+                val selection = state.currentModelSelection
+                state.availableLLMModelSettings
+                    .firstOrNull { it.id == selection?.instanceId }?.templateId
+            }
+            .distinctUntilChanged()
+            .flatMapLatest { vendor ->
+                if (vendor == null) {
+                    flowOf(emptyList())
+                } else {
+                    fileUploadRegistry.entriesFor(vendor)
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _attachFileRequests =
+        kotlinx.coroutines.flow.MutableSharedFlow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry>(
+            extraBufferCapacity = 4,
+        )
+
+    /** 抽屉点击"上传的文件"后的回填请求；聊天页据此把 file 引用草稿插入输入框。 */
+    val attachFileRequests: kotlinx.coroutines.flow.SharedFlow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> =
+        _attachFileRequests
+
+    /** 抽屉复用：请求把已上传文件回填为输入框 chip（同厂商 file_id 即就绪态）。 */
+    fun requestAttachVendorFile(entry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) {
+        _attachFileRequests.tryEmit(entry)
+    }
 
     /** 发送只回报真实接管结果；准备过程属于 ViewModel，不依赖输入框协程的生命周期。 */
     fun send(

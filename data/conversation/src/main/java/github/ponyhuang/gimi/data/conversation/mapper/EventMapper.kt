@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToolName
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
@@ -191,6 +192,15 @@ object EventMapper {
             if (mimeType == null || reference == null) {
                 Log.w(TAG, "Dropping file attachment without mime/reference: ${file.displayName.orEmpty()}")
                 return null
+            }
+            // 厂商 file 引用（gimi-file://）：本地无副本，按引用附件映射，重放直通 file_id。
+            VendorFileReference.parse(reference)?.let { (vendor, fileId) ->
+                return FileAttachment.fromVendorReference(
+                    vendor = vendor,
+                    fileId = fileId,
+                    mimeType = mimeType,
+                    displayName = file.displayName.orEmpty(),
+                )
             }
             val payload = File(reference.removePrefix("file://"))
             val attachment = runCatching {

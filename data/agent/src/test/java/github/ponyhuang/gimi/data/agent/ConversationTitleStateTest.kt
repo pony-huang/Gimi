@@ -14,6 +14,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin
+import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.CONVERSATION_TITLE_METADATA_KEY
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +25,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 
 /**
  * 标题写入会话状态的时机与可见性。
@@ -73,6 +74,42 @@ class ConversationTitleStateTest {
                 event.author == "user" && event.content?.parts.orEmpty().any { it.text == "你好" }
             },
         )
+    }
+
+    @Test
+    fun inlineVendorTitleCompletesTheFlowWithoutASeparateRequest() = runTest {
+        val sessions: SessionService = InMemorySessionService()
+        var modelCalls = 0
+        val model = object : Model {
+            override val name = "title-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                // 厂商适配器开启会话标题时（如 DeepSeek 轻聊）：首轮响应顺带携带标题（customMetadata）。
+                modelCalls++
+                emit(LlmResponse(
+                    content = Content(role = Role.MODEL, parts = listOf(Part(text = "第一次回答"))),
+                    customMetadata = mapOf(CONVERSATION_TITLE_METADATA_KEY to "北京明天天气"),
+                ))
+            }
+        }
+        val factory = mockk<AgentLLMModelFactory>(relaxed = true) {
+            every { selectFastModelConfig() } returns null
+        }
+        val runner = InMemoryRunner(
+            App(
+                appName = AgentChatRunner.APP_NAME,
+                rootAgent = LlmAgent(name = "agent", model = model),
+                plugins = listOf(ConversationGenerateTitlePlugin(factory)),
+            ),
+            sessionService = sessions,
+        )
+        val execution = AgentChatExecution("user", "session", runner, emptyMap())
+
+        execution.send("你好").toList()
+
+        val full = sessions.getSession(SessionKey(AgentChatRunner.APP_NAME, "user", "session"))!!
+        // 标题内联命中后不再发起独立的标题模型请求。
+        assertEquals(1, modelCalls)
+        assertEquals("北京明天天气", full.state[TITLE_STATE_KEY])
     }
 
     private companion object {

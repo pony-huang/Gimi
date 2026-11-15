@@ -10,10 +10,10 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.serialization.adkJson
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.ToolLoadingMode
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.toolLoadingMode
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.DEFERRED_CATALOG
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.ToolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.toolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DEFERRED_CATALOG
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.INLINE_DEFINITIONS
 
 internal fun inlinePendingKey(agentName: String): String = "gimi.inline_tools.pending:$agentName"
 

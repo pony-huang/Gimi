@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.domain.conversation.usecase
 
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import javax.inject.Inject
@@ -38,25 +39,34 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
         val model = instances.firstOrNull { it.id == selection.instanceId }
             ?.findModel(selection)
             ?: return ChatAttachmentValidationFailure.ModelUnavailable
-        val (supportedMimeTypes, maxInlineBytes) = when (drafts.first().category) {
+        val (supportedMimeTypes, perFileLimit, skipsInlineTotalLimit) = when (drafts.first().category) {
             AttachmentCategory.IMAGE -> model.multimodal.vision?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
+                Triple(it.supportedMimeTypes, it.maxInlineBytes, false)
             }
             AttachmentCategory.AUDIO -> model.multimodal.audioInput?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
+                Triple(it.supportedMimeTypes, it.maxInlineBytes, false)
             }
-            AttachmentCategory.DOCUMENT -> model.multimodal.documentInput?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
+            AttachmentCategory.DOCUMENT -> model.multimodal.documentInput?.let { document ->
+                when (document.ingestMode) {
+                    // 路径文本模式不随请求传输内容：仅做 MIME 过滤，大小限制交给读取工具。
+                    FileIngestMode.PATH_TEXT -> Triple(document.supportedMimeTypes, null, true)
+                    // FILE_REFERENCE 模式走厂商上传限额（maxUploadBytes），内联总量限制不适用。
+                    FileIngestMode.FILE_REFERENCE ->
+                        Triple(document.supportedMimeTypes, document.maxUploadBytes, true)
+                    FileIngestMode.INLINE, FileIngestMode.NOT_SUPPORTED ->
+                        Triple(document.supportedMimeTypes, document.maxInlineBytes, false)
+                }
             }
         } ?: return ChatAttachmentValidationFailure.CategoryUnsupported
         val unsupported = drafts.firstOrNull {
             it.mimeType !in supportedMimeTypes ||
-                maxInlineBytes?.let { limit -> it.sizeBytes > limit } == true
+                perFileLimit?.let { limit -> it.sizeBytes > limit } == true
         }
         if (unsupported != null) {
             return ChatAttachmentValidationFailure.UnsupportedOrTooLarge(unsupported.displayName)
         }
-        if (drafts.first().category == AttachmentCategory.DOCUMENT &&
+        if (!skipsInlineTotalLimit &&
+            drafts.first().category == AttachmentCategory.DOCUMENT &&
             drafts.sumOf(DraftAttachment::sizeBytes) > MAX_DOCUMENT_REQUEST_BYTES
         ) {
             return ChatAttachmentValidationFailure.DocumentTotalSizeLimitExceeded

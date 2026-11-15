@@ -2,6 +2,16 @@ package github.ponyhuang.gimi.feature.chat
 
 import android.util.Log
 import app.cash.turbine.test
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUpload
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileContentResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileListResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileObjectResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUploadResult
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
@@ -2158,6 +2168,8 @@ class ChatViewModelCharacterizationTest {
                 speechPlaybackController = playback,
                 speechSettings = speechSettings,
                 attachments = attachments,
+                fileUploadGateway = FakeVendorFileUploadGateway(),
+                fileUploadRegistry = FakeUploadedFileRegistry(),
                 prepareChatSend = PrepareChatSendUseCase(sessionResolver, conversations, prepareChatTurn, agent),
                 validateChatAttachments = ValidateChatAttachmentsUseCase(),
                 toolAuthorization = toolAuthorization,
@@ -2329,4 +2341,57 @@ private class FakeToolApprovalRepository : ToolApprovalRepository {
 
     override fun isAutoApproved(toolName: String): Boolean =
         _fullAccess.value || toolName in _alwaysAllowedToolNames.value
+}
+
+
+/** 特征测试用的上传网关 fake：恒返回失败（特征链路不依赖上传成功路径）。 */
+private class FakeVendorFileUploadGateway : VendorFileGateway {
+    override suspend fun upload(
+        vendor: String,
+        endpoint: String,
+        apiKey: String,
+        request: VendorFileUpload,
+    ): VendorFileUploadResult = VendorFileUploadResult.Failure(VendorFileFailureReason.VENDOR_ERROR)
+
+    override suspend fun listFiles(
+        vendor: String,
+        endpoint: String,
+        apiKey: String,
+        limit: Int?,
+        cursor: String?,
+    ): VendorFileListResult = VendorFileListResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun getFile(
+        vendor: String,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileObjectResult = VendorFileObjectResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun deleteFile(
+        vendor: String,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileDeleteResult = VendorFileDeleteResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun getContent(
+        vendor: String,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileContentResult = VendorFileContentResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+}
+
+/** 特征测试用的注册表 fake：内存记录。 */
+private class FakeUploadedFileRegistry : UploadedFileRegistry {
+    private val entries = mutableListOf<UploadedFileEntry>()
+    override suspend fun record(entry: UploadedFileEntry) {
+        entries.add(entry)
+    }
+    override fun entriesFor(vendor: String): Flow<List<UploadedFileEntry>> =
+        MutableStateFlow(entries.filter { it.vendor == vendor })
+    override suspend fun remove(vendor: String, fileId: String) {
+        entries.removeAll { it.vendor == vendor && it.fileId == fileId }
+    }
 }

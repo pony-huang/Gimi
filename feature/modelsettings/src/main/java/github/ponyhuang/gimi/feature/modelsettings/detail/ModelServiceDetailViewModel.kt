@@ -25,6 +25,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.usecase.DeletionImpactUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.DeleteModelInstanceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelCandidatesUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelInstanceUseCase
+import github.ponyhuang.gimi.domain.modelcatalog.usecase.SetModelInstanceFileUploadUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveModelInstanceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.RefreshModelCatalogUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SaveModelInstanceUseCase
@@ -62,6 +63,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private val saveNewInstance: SaveNewModelInstanceUseCase,
     private val saveInstance: SaveModelInstanceUseCase,
     private val setInstanceEnabled: SetModelInstanceEnabledUseCase,
+    private val setFileUploadEnabled: SetModelInstanceFileUploadUseCase,
     private val deleteInstance: DeleteModelInstanceUseCase,
     private val deletionImpact: DeletionImpactUseCase,
     private val updateDefaults: UpdateDefaultModelSettingsUseCase,
@@ -101,6 +103,7 @@ class ModelServiceDetailViewModel @Inject constructor(
             ModelServiceDetailAction.ToggleConnectionKeyVisibility ->
                 _uiState.update { it.copy(isConnectionKeyVisible = !it.isConnectionKeyVisible) }
             is ModelServiceDetailAction.EnabledChanged -> changeEnabled(action.enabled)
+            is ModelServiceDetailAction.FileUploadChanged -> changeFileUpload(action.enabled)
             is ModelServiceDetailAction.OfficialToolsEnabledChanged -> editDraft {
                 it.copy(isOfficialToolsEnabled = action.value)
             }
@@ -133,6 +136,7 @@ class ModelServiceDetailViewModel @Inject constructor(
             is ModelServiceDetailAction.ConnectionProtocolChanged ->
                 changeConnection(action.connectionId) { connection, template ->
                     val templateConnection = template?.connection(connection.capability)
+                    // 单协议模板（如 DeepSeek 固定 Messages）不再接受任何协议切换动作。
                     if (templateConnection != null && action.protocol !in templateConnection.protocols) {
                         connection
                     } else {
@@ -249,7 +253,10 @@ class ModelServiceDetailViewModel @Inject constructor(
             _uiState.update { state ->
                 when {
                     instance == null || state.isSaving -> state
-                    else -> state.copy(isEnabled = instance.isEnabled)
+                    else -> state.copy(
+                        isEnabled = instance.isEnabled,
+                        isFileUploadEnabled = instance.isFileUploadEnabled,
+                    )
                 }
             }
         }
@@ -563,6 +570,30 @@ class ModelServiceDetailViewModel @Inject constructor(
                     }
                 },
             )
+        }
+    }
+
+    private fun changeFileUpload(enabled: Boolean) {
+        val state = _uiState.value
+        val id = state.draft?.instanceId ?: return
+        if (state.isMutationBlocked || state.isSaving || state.isFileUploadEnabled == enabled) return
+        viewModelScope.launch {
+            try {
+                when (val result = runWhenAgentIdle { setFileUploadEnabled(id, enabled) }) {
+                    AgentMutationResult.BlockedByActiveAgent ->
+                        _effects.tryEmit(
+                            ModelServiceDetailEffect.ShowToast(ModelServiceDetailNotice.AgentMutationBlocked),
+                        )
+                    is AgentMutationResult.Applied -> if (!result.value) {
+                        _uiState.update { it.copy(errorRes = R.string.modelsettings_write_failed) }
+                    }
+                    // 开关状态由仓库观察回流同步。
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update { it.copy(errorRes = R.string.modelsettings_write_failed) }
+            }
         }
     }
 

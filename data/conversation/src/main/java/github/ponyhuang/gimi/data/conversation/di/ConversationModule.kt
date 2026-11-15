@@ -22,6 +22,8 @@ import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
 import github.ponyhuang.gimi.domain.conversation.export.ConversationExportRepository
+import github.ponyhuang.gimi.data.conversation.local.UploadedFileDao
+import github.ponyhuang.gimi.data.conversation.repository.DefaultUploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
@@ -112,5 +114,17 @@ object ConversationModule {
     fun provideConversationSessionResolver(
         implementation: DefaultConversationSessionResolver,
     ): ConversationSessionResolver = implementation
+
+    @Provides
+    @Singleton
+    fun provideUploadedFileDao(
+        database: ConversationMetadataDatabase,
+    ): UploadedFileDao = database.uploadedFileDao()
+
+    @Provides
+    @Singleton
+    fun provideUploadedFileRegistry(
+        implementation: DefaultUploadedFileRegistry,
+    ): github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry = implementation
 
 }

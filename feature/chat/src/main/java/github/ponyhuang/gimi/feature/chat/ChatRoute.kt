@@ -60,6 +60,7 @@ fun ChatRoute(
     SessionExportEffects(exportViewModel)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()
+    val uploadedFiles by viewModel.uploadedFiles.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
     val chatNoticeConfigureChatModel = stringResource(R.string.chat_notice_configure_chat_model)
@@ -325,6 +326,11 @@ fun ChatRoute(
                     currentSessionId.isNotBlank() && !uiState.isInitializing
                 }.orEmpty(),
                 onSharedMediaConsumed = onSharedMediaConsumed,
+                onRetryAttachmentUpload = viewModel::uploadDocumentDraft,
+        onDocumentDraftImported = viewModel::uploadDocumentDraft,
+        attachFileRequests = viewModel.attachFileRequests,
+                uploadedFiles = uploadedFiles,
+                onAttachUploadedFile = viewModel::requestAttachVendorFile,
                 onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
                 onRetryFailedTurn = {
                     viewModel.onAction(ChatAction.RetryFailedTurn)

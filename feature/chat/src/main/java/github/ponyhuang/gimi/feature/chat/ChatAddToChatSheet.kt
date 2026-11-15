@@ -92,6 +92,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
+import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.launch
 
@@ -103,10 +104,14 @@ private enum class AddToChatPage {
     HOME,
     MCP,
     OFFICIAL_TOOL,
+    UPLOADED_FILES,
 }
 
 @Composable
 internal fun ChatAddToChatSheet(
+    uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    uploadedFilesEnabled: Boolean = false,
     state: ChatAddToChatState,
     onDismiss: () -> Unit,
     onTakePhoto: () -> Unit,
@@ -130,12 +135,12 @@ internal fun ChatAddToChatSheet(
             .coerceAtMost(ToolSheetListMaxHeight)
         GimiSheetBase(
             onDismissRequest = onDismiss,
-            initialHeight = SheetHeight.Fraction(0.45f),
+            initialHeight = SheetHeight.Fraction(0.9f),
             maxHeight = SheetHeight.Fraction(0.9f),
-            // 首页只有几个入口，列表页要放得下工具清单：按页切换主体高度上限。
+            // 主体按内容测量，给首页足够上限，避免入口被压入滚动区域。
             height = when (page) {
-                AddToChatPage.HOME -> SheetHeight.Fraction(0.45f)
-                AddToChatPage.MCP, AddToChatPage.OFFICIAL_TOOL -> SheetHeight.Fraction(0.9f)
+                AddToChatPage.HOME -> SheetHeight.Fraction(0.9f)
+                AddToChatPage.MCP, AddToChatPage.OFFICIAL_TOOL, AddToChatPage.UPLOADED_FILES -> SheetHeight.Fraction(0.9f)
             },
         ) {
             AnimatedContent(
@@ -169,6 +174,7 @@ internal fun ChatAddToChatSheet(
                     ) {
                             GimiSheetTitleRow(
                                 title = when (currentPage) {
+                                    AddToChatPage.UPLOADED_FILES -> stringResource(R.string.chat_drawer_uploaded_files)
                                     AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                     AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
                                     AddToChatPage.OFFICIAL_TOOL ->
@@ -205,6 +211,8 @@ internal fun ChatAddToChatSheet(
                                     onChooseFiles = onChooseFiles,
                                     imagesEnabled = imagesEnabled,
                                     filesEnabled = filesEnabled,
+                                    onOpenUploadedFiles = { page = AddToChatPage.UPLOADED_FILES },
+                                    uploadedFilesEnabled = uploadedFilesEnabled,
                                     onOpenMcp = { page = AddToChatPage.MCP },
                                     onOpenOfficialTools = {
                                         state.officialTools.forEach { tool ->
@@ -212,6 +220,11 @@ internal fun ChatAddToChatSheet(
                                         }
                                         page = AddToChatPage.OFFICIAL_TOOL
                                     },
+                                )
+                                AddToChatPage.UPLOADED_FILES -> UploadedFilesPage(
+                                    files = uploadedFiles,
+                                    onAttach = onAttachUploadedFile,
+                                    listMaxHeight = toolListMaxHeight,
                                 )
                                 AddToChatPage.MCP -> McpServersPage(
                                     state = state,
@@ -239,74 +252,84 @@ private fun AddToChatHome(
     onChooseFiles: () -> Unit,
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
+    onOpenUploadedFiles: () -> Unit = {},
+    uploadedFilesEnabled: Boolean = false,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
+    Column(
         modifier = Modifier
             .wrapContentHeight()
-            .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState))
+            .padding(top = 8.dp, bottom = 24.dp)
             .testTag("add-to-chat-home"),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            ) {
-                AttachmentShortcut(
-                    icon = Icons.Default.CameraAlt,
-                    label = stringResource(R.string.stream_ai_compose_composer_take_photo),
-                    onClick = onTakePhoto,
-                    enabled = imagesEnabled,
-                    modifier = Modifier.weight(1f),
-                )
-                AttachmentShortcut(
-                    icon = Icons.Default.PhotoLibrary,
-                    label = stringResource(R.string.chat_add_to_chat_photos),
-                    onClick = onChoosePhotos,
-                    enabled = imagesEnabled,
-                    modifier = Modifier.weight(1f),
-                )
-                AttachmentShortcut(
-                    icon = Icons.Default.Description,
-                    label = stringResource(R.string.chat_add_to_chat_files),
-                    onClick = onChooseFiles,
-                    enabled = filesEnabled,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        ) {
+            AttachmentShortcut(
+                icon = Icons.Default.CameraAlt,
+                label = stringResource(R.string.stream_ai_compose_composer_take_photo),
+                onClick = onTakePhoto,
+                enabled = imagesEnabled,
+                modifier = Modifier.weight(1f),
+            )
+            AttachmentShortcut(
+                icon = Icons.Default.PhotoLibrary,
+                label = stringResource(R.string.chat_add_to_chat_photos),
+                onClick = onChoosePhotos,
+                enabled = imagesEnabled,
+                modifier = Modifier.weight(1f),
+            )
+            AttachmentShortcut(
+                icon = Icons.Default.Description,
+                label = stringResource(R.string.chat_add_to_chat_files),
+                onClick = onChooseFiles,
+                enabled = filesEnabled,
+                modifier = Modifier.weight(1f),
+            )
         }
-        if (state.officialTools.isNotEmpty()) {
-            item {
-                GroupedCard {
-                    OfficialToolsNavigationRow(
-                        enabledCount = state.enabledOfficialFunctionTotal(),
-                        onClick = onOpenOfficialTools,
-                    )
-                }
-            }
-        }
-        item {
-            GroupedCard(modifier = Modifier.testTag("session-configuration-group")) {
+        if (uploadedFilesEnabled) {
+            GroupedCard {
                 NavigationRow(
-                    icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
-                    title = stringResource(R.string.chat_session_mcp_title),
-                    subtitle = when {
-                        state.mcpServers.isEmpty() ->
-                            stringResource(R.string.chat_session_mcp_not_configured)
-                        else -> enabledCountText(state.enabledMcpServerCount, isMcp = true)
+                    leadingIcon = { rowModifier ->
+                        LLMModelServiceIcon(
+                            serviceId = state.vendorTemplateId.orEmpty(),
+                            modifier = rowModifier.size(28.dp),
+                            contentPadding = 3.dp,
+                        )
                     },
-                    onClick = onOpenMcp,
-                    testTag = "session-mcp-nav",
+                    title = stringResource(R.string.chat_drawer_uploaded_files),
+                    subtitle = stringResource(R.string.chat_uploaded_files_description),
+                    onClick = onOpenUploadedFiles,
+                    testTag = "uploaded-files-nav",
                 )
             }
+    }
+        if (state.officialTools.isNotEmpty()) {
+            GroupedCard {
+                OfficialToolsNavigationRow(
+                    enabledCount = state.enabledOfficialFunctionTotal(),
+                    onClick = onOpenOfficialTools,
+                )
+            }
+    }
+        GroupedCard(modifier = Modifier.testTag("session-configuration-group")) {
+            NavigationRow(
+                icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
+                title = stringResource(R.string.chat_session_mcp_title),
+                subtitle = when {
+                    state.mcpServers.isEmpty() ->
+                        stringResource(R.string.chat_session_mcp_not_configured)
+                    else -> enabledCountText(state.enabledMcpServerCount, isMcp = true)
+                },
+                onClick = onOpenMcp,
+                testTag = "session-mcp-nav",
+            )
         }
         state.errorMessage?.let { error ->
-            item { PreferenceBanner(text = error, tone = PreferenceBannerTone.Error) }
+            PreferenceBanner(text = error, tone = PreferenceBannerTone.Error)
         }
     }
 }
@@ -351,7 +374,7 @@ private fun GroupedCard(
 
 /** 分段绘制分组背景，保留 LazyColumn 每行独立组合与滚动的行为。 */
 @Composable
-private fun GroupedListItem(
+internal fun GroupedListItem(
     first: Boolean,
     last: Boolean,
     withIcon: Boolean = true,
@@ -756,7 +779,7 @@ private fun McpServerRow(
 }
 
 @Composable
-private fun rememberLowerBoundaryNestedScrollConnection(
+internal fun rememberLowerBoundaryNestedScrollConnection(
     listState: LazyListState,
 ): NestedScrollConnection =
     remember(listState) {

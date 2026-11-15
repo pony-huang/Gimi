@@ -4,6 +4,8 @@ import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
@@ -71,6 +73,24 @@ class ValidateChatAttachmentsUseCaseTest {
     }
 
     @Test
+    fun pathTextModeAcceptsDocumentsWithoutSizeLimits() {
+        val source = instanceWith(pathTextModel())
+        assertNull(validate(selection, listOf(source), listOf(draft("big.pdf", 100L * 1024 * 1024))))
+        assertNull(validate(
+            selection,
+            listOf(source),
+            listOf(draft("a.pdf", 60L * 1024 * 1024), draft("b.pdf", 60L * 1024 * 1024)),
+        ))
+    }
+
+    @Test
+    fun pathTextModeStillRejectsUnsupportedMime() {
+        val unsupported = draft("unsupported.bin", 100).copy(mimeType = "application/octet-stream")
+        assertEquals(ChatAttachmentValidationFailure.UnsupportedOrTooLarge(unsupported.displayName),
+            validate(selection, listOf(instanceWith(pathTextModel())), listOf(unsupported)))
+    }
+
+    @Test
     fun mixedCategoriesAreRejectedBeforeResolvingTheModel() {
         val document = draft("a.pdf", 100)
         val image = document.copy(category = AttachmentCategory.IMAGE)
@@ -88,5 +108,25 @@ class ValidateChatAttachmentsUseCaseTest {
     private fun draft(name: String, sizeBytes: Long) = DraftAttachment(
         reference = "/drafts/$name", displayName = name, mimeType = "application/pdf",
         sizeBytes = sizeBytes, category = AttachmentCategory.DOCUMENT,
+    )
+
+    /** 开关关闭时能力推导（withDerivedUploadCapabilities）产出的形态：PATH_TEXT 且无内联限额。 */
+    private fun pathTextModel() = model.copy(multimodal = MultimodalCapabilities(
+        documentInput = DocumentInputCapability(
+            ingestMode = FileIngestMode.PATH_TEXT,
+            maxInlineBytes = null,
+        ),
+    ))
+
+    private fun instanceWith(model: Model) = instance.copy(
+        connections = listOf(
+            ServiceConnection(
+                id = "connection",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://example.com",
+                models = listOf(model),
+            ),
+        ),
     )
 }

@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationStorageIds
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -51,16 +52,34 @@ class AndroidChatAttachmentRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             // 归档目的地是全局共享工作区，与会话无关；sessionId 仅为接口兼容保留。
             attachments.map { attachment ->
-                when (attachment.category) {
-                    AttachmentCategory.IMAGE -> persist(prepareImage(attachment))
-                    AttachmentCategory.AUDIO,
-                    AttachmentCategory.DOCUMENT,
-                    -> archiveDraftAttachment(
-                        workspaceRoot = workspaceRoot,
-                        legacyArchiveRoot = attachmentRoot,
-                        attachment = attachment,
-                        extension = extensionFor(attachment.displayName, attachment.mimeType),
+                // file_id-only 草稿（抽屉复用）：本地无副本，直接产出厂商引用附件，不触碰磁盘。
+                if (attachment.reference.startsWith(VendorFileReference.SCHEME)) {
+                    FileAttachment.fromVendorReference(
+                        vendor = requireNotNull(attachment.fileVendor) { "Vendor reference without vendor" },
+                        fileId = requireNotNull(attachment.fileId) { "Vendor reference without file id" },
+                        mimeType = attachment.mimeType,
+                        displayName = attachment.displayName,
+                        bytes = attachment.sizeBytes,
                     )
+                } else {
+                    when (attachment.category) {
+                        AttachmentCategory.IMAGE -> persist(prepareImage(attachment))
+                        AttachmentCategory.AUDIO,
+                        AttachmentCategory.DOCUMENT,
+                        -> archiveDraftAttachment(
+                            workspaceRoot = workspaceRoot,
+                            legacyArchiveRoot = attachmentRoot,
+                            attachment = attachment,
+                            extension = extensionFor(attachment.displayName, attachment.mimeType),
+                        )
+                    }.let { result ->
+                        // 本地归档 + 已上传的草稿：归档路径与厂商引用并存，发送侧以厂商引用优先。
+                        if (attachment.isVendorUploaded) {
+                            result.copy(fileId = attachment.fileId, fileVendor = attachment.fileVendor)
+                        } else {
+                            result
+                        }
+                    }
                 }
             }
         }
@@ -68,6 +87,8 @@ class AndroidChatAttachmentRepository @Inject constructor(
     override suspend fun deleteDrafts(attachments: List<DraftAttachment>) {
         withContext(Dispatchers.IO) {
             attachments.forEach { attachment ->
+                // 厂商引用草稿（抽屉复用）没有本地文件，跳过磁盘操作。
+                if (attachment.reference.startsWith(VendorFileReference.SCHEME)) return@forEach
                 val file = File(attachment.reference)
                 val candidate = runCatching { file.canonicalFile }.getOrNull() ?: return@forEach
                 if (draftRoots.any { candidate.parentFile == it.canonicalFile }) candidate.delete()

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,10 +27,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +81,8 @@ internal fun AttachmentList(
     attachments: List<DraftAttachment>,
     onRemoveAttachment: (DraftAttachment) -> Unit,
     modifier: Modifier = Modifier,
+    uploadStates: Map<String, DraftUploadState> = emptyMap(),
+    onRetryUpload: (DraftAttachment) -> Unit = {},
 ) {
     LazyRow(
         modifier = modifier,
@@ -90,6 +96,8 @@ internal fun AttachmentList(
             SelectedAttachment(
                 modifier = Modifier.animateItem(),
                 attachment = attachment,
+                uploadState = uploadStates[attachment.reference],
+                onRetryUpload = { onRetryUpload(attachment) },
                 onRemove = { onRemoveAttachment(attachment) },
             )
         }
@@ -102,6 +110,8 @@ internal fun MessageAttachments(
     attachments: List<FileAttachment>,
     onOpenDocument: (FileAttachment) -> Unit,
     modifier: Modifier = Modifier,
+    /** 首个文件行的顶部间距；附件排在气泡首行时传 0dp，避免与气泡内边距叠加。 */
+    firstRowTopPadding: Dp = 8.dp,
 ) {
     if (attachments.isEmpty()) return
     val images = attachments.filter { it.category == AttachmentCategory.IMAGE }
@@ -130,8 +140,12 @@ internal fun MessageAttachments(
             onDismiss = { previewImage = null },
         )
     }
-    files.forEach { attachment ->
-        PersistedFileAttachment(attachment, onOpenDocument)
+    files.forEachIndexed { index, attachment ->
+        PersistedFileAttachment(
+            attachment = attachment,
+            onOpenDocument = onOpenDocument,
+            topPadding = if (index == 0) firstRowTopPadding else 8.dp,
+        )
     }
 }
 
@@ -331,12 +345,19 @@ private fun MissingImageTile() {
 private fun SelectedAttachment(
     attachment: DraftAttachment,
     modifier: Modifier = Modifier,
+    uploadState: DraftUploadState? = null,
+    onRetryUpload: () -> Unit = {},
     onRemove: () -> Unit = {},
 ) {
+    val uploading = uploadState is DraftUploadState.Uploading
+    val failed = uploadState is DraftUploadState.Failed
     AttachmentTile(
-        modifier = modifier.testTag("chat_composer_attachment"),
+        modifier = modifier
+            .testTag("chat_composer_attachment")
+            // 上传失败的 chip 整体可点按重试；其他状态不消费点击。
+            .clickable(enabled = failed) { onRetryUpload() },
     ) {
-        if (attachment.category == AttachmentCategory.IMAGE) {
+        if (attachment.category == AttachmentCategory.IMAGE && !attachment.isVendorUploaded) {
             UriImage(
                 uri = Uri.fromFile(File(attachment.reference)),
                 modifier = Modifier.matchParentSize(),
@@ -359,22 +380,40 @@ private fun SelectedAttachment(
                     .padding(12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = if (attachment.category == AttachmentCategory.AUDIO) {
-                        Icons.Default.AudioFile
-                    } else {
-                        Icons.Default.Description
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp),
-                )
-                Text(
-                    text = attachment.displayName,
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 2,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
+                when {
+                    uploading -> CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    failed -> Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(30.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.chat_attachment_upload_failed),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                        )
+                    }
+                    else -> FileAttachmentIcon(attachment)
+                }
+                if (!failed) {
+                    Text(
+                        text = attachment.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
             }
         }
         RemoveButton(
@@ -386,16 +425,42 @@ private fun SelectedAttachment(
     }
 }
 
+/**
+ * 非图片（或抽屉复用的 file_id-only 图片）附件的类型图标。
+ *
+ * 文档与图片走彩色 vscode-icons 资产（不做主题着色，日夜主题共用），音频维持原有
+ * material 图标；未知类型回退彩色文本文件图标。
+ */
+@Composable
+private fun FileAttachmentIcon(attachment: DraftAttachment) {
+    when {
+        attachment.category == AttachmentCategory.AUDIO -> Icon(
+            imageVector = Icons.Default.AudioFile,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(36.dp),
+        )
+        else -> Icon(
+            painter = painterResource(fileTypeIconRes(attachment.mimeType)),
+            contentDescription = null,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(36.dp),
+        )
+    }
+}
+
 @Composable
 private fun PersistedFileAttachment(
     attachment: FileAttachment,
     onOpenDocument: (FileAttachment) -> Unit,
+    topPadding: Dp = 8.dp,
 ) {
     if (attachment.isMissing) {
-        MissingFileAttachmentRow(attachment)
+        MissingFileAttachmentRow(attachment, topPadding)
         return
     }
     val context = LocalContext.current
+    val openUnsupportedMessage = stringResource(R.string.chat_attachment_open_unsupported)
     var isPlaying by remember(attachment.id) { mutableStateOf(false) }
     val mediaPlayer = remember(attachment.id) {
         if (attachment.category == AttachmentCategory.AUDIO) MediaPlayer() else null
@@ -405,7 +470,7 @@ private fun PersistedFileAttachment(
     }
     Row(
         modifier = Modifier
-            .padding(top = 8.dp)
+            .padding(top = topPadding)
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable {
@@ -415,29 +480,44 @@ private fun PersistedFileAttachment(
                         player.pause()
                         isPlaying = false
                     } else {
-                        if (player.currentPosition == 0) {
-                            val source = attachment.playbackPath(context) ?: return@clickable
-                            player.reset()
-                            player.setDataSource(source)
-                            player.prepare()
-                            player.setOnCompletionListener { isPlaying = false }
-                        }
+                if (player.currentPosition == 0) {
+                    val source = attachment.playbackPath(context)
+                    if (source == null) {
+                        // 无本地载荷（厂商 file 引用）的音频无法播放，给出明确反馈。
+                        Toast.makeText(context, openUnsupportedMessage, Toast.LENGTH_SHORT).show()
+                        return@clickable
+                    }
+                    player.reset()
+                    player.setDataSource(source)
+                    player.prepare()
+                    player.setOnCompletionListener { isPlaying = false }
+                }
                         player.start()
                         isPlaying = true
                     }
-                } else onOpenDocument(attachment)
+                } else if (attachment.payloadReference != null) {
+                    onOpenDocument(attachment)
+                } else {
+                    // 厂商 file 引用附件没有本地副本，厂商侧也不提供下载，直接提示。
+                    Toast.makeText(context, openUnsupportedMessage, Toast.LENGTH_SHORT).show()
+                }
             }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = when {
-                attachment.category == AttachmentCategory.AUDIO && isPlaying -> Icons.Default.Pause
-                attachment.category == AttachmentCategory.AUDIO -> Icons.Default.PlayArrow
-                else -> Icons.Default.Description
-            },
-            contentDescription = null,
-        )
+        if (attachment.category == AttachmentCategory.AUDIO) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = null,
+            )
+        } else {
+            // 文档附件：彩色文件类型图标（不做主题着色，日夜主题共用）。
+            Icon(
+                painter = painterResource(fileTypeIconRes(attachment.mimeType)),
+                contentDescription = null,
+                tint = Color.Unspecified,
+            )
+        }
         Text(
             text = attachment.displayName,
             style = MaterialTheme.typography.bodySmall,
@@ -449,10 +529,13 @@ private fun PersistedFileAttachment(
 
 /** 缺失文档/音频附件的降级行：仅展示文件名与缺失标记，禁用预览、播放等依赖文件的操作。 */
 @Composable
-private fun MissingFileAttachmentRow(attachment: FileAttachment) {
+private fun MissingFileAttachmentRow(
+    attachment: FileAttachment,
+    topPadding: Dp = 8.dp,
+) {
     Row(
         modifier = Modifier
-            .padding(top = 8.dp)
+            .padding(top = topPadding)
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 12.dp, vertical = 10.dp),

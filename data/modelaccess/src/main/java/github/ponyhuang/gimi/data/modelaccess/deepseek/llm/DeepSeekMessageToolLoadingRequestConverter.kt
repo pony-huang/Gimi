@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.data.modelaccess.anthropic.llm
+package github.ponyhuang.gimi.data.modelaccess.deepseek.llm
 
 import com.anthropic.core.JsonValue.Companion.from
 import com.anthropic.core.jsonMapper
@@ -14,13 +14,18 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Tool as AdkTool
 
-/** 工具加载层将持久化的内部事件翻译成厂商请求，不让通用 Claude 转换器依赖搜索实现。 */
-internal class AnthropicToolLoadingRequestConverter(
+/**
+ * DeepSeek 的内联工具加载层：将持久化的内部事件翻译成 tool_addition/tool_reference
+ * 请求，不依赖通用转换器感知搜索实现。RESULT 模式退化为普通请求转换。
+ */
+internal class DeepSeekMessageToolLoadingRequestConverter(
     name: String,
     maxTokens: Int,
     private val loadingMode: ToolLoadingMode,
+    /** 每次请求取一次 latest_reminder 内容；null 或空白表示本轮不注入。 */
+    private val latestReminder: (() -> String?)? = null,
 ) {
-    private val standard = ClaudeRequestConverter(name, maxTokens)
+    private val standard = DeepSeekMessageRequestConverter(name, maxTokens, latestReminder)
     private val jsonMapper = jsonMapper()
 
     fun convert(request: LlmRequest): MessageCreateParams {
@@ -55,7 +60,7 @@ internal class AnthropicToolLoadingRequestConverter(
                 }
             }
         }
-        builder.messages(messages)
+        builder.messages(messages.withLatestReminder(latestReminder?.invoke()))
         val declared = standard.toAnthropicTools(request.config.tools)
         // 内联路径只添加当前仍可用的工具；撤销场景已转为普通声明。
         val snapshots = request.config.systemInstruction?.parts.orEmpty().flatMap {

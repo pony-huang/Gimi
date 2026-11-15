@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.data.modelaccess.shared
+package github.ponyhuang.gimi.domain.voice.repository
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.SpeechEndpoints
 import org.junit.Assert.assertEquals

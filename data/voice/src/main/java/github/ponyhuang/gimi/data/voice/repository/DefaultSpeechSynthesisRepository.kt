@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.data.voice.repository
 
 import github.ponyhuang.gimi.data.voice.remote.VoiceCapabilityRegistry
-import github.ponyhuang.gimi.data.modelaccess.shared.speechRequestBaseUrl
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -10,6 +9,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisRequest
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisSessionRequest
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
+import github.ponyhuang.gimi.domain.voice.repository.speechRequestBaseUrl
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow

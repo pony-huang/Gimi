@@ -8,7 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.data.agent.AgentContribution
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
 import github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository
 import javax.inject.Singleton
 
@@ -30,7 +30,7 @@ abstract class SubtaskModule {
             sessions: SessionService,
             store: SubtaskSessionStore,
             tools: SubtaskReadOnlyToolset,
-            models: AgentLLMModelFactory,
+            models: AgentModelRuntime,
         ): SubtaskBatchExecutor = SubtaskBatchExecutor(sessions, store, tools, models::createModel)
     }
 }

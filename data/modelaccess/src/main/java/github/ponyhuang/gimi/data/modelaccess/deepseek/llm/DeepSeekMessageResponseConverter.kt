@@ -10,6 +10,7 @@ import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.UsageMetadata
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 
 /** 完整响应转换；工具名原样透传，思考签名留给下一轮请求重放。 */
 internal fun Message.toDeepSeekMessageLlmResponse(conversationTitle: String? = null): LlmResponse = LlmResponse(

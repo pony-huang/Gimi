@@ -9,9 +9,7 @@ import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.serialization.adkJson
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Role
-
-/** DeepSeek 会话标题随首轮回答顺带返回时的透传键；写入 LlmResponse.customMetadata。 */
-const val CONVERSATION_TITLE_METADATA_KEY = "gimi.conversation_title"
+import github.ponyhuang.gimi.domain.modelaccess.DEFERRED_CATALOG
 
 /**
  * 首轮模型调用判定：请求历史里没有任何模型回复。

@@ -16,8 +16,8 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.core.network.VoiceWsKernel
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer

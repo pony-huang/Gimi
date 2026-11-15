@@ -18,10 +18,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.security.MessageDigest
-import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.ToolLoadingMode
-import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.toolLoadingMode
-import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DEFERRED_CATALOG
-import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.domain.modelaccess.ToolLoadingMode
+import github.ponyhuang.gimi.domain.modelaccess.toolLoadingMode
+import github.ponyhuang.gimi.domain.modelaccess.DEFERRED_CATALOG
+import github.ponyhuang.gimi.domain.modelaccess.TOOL_SEARCH_NAME
 
 
 /**

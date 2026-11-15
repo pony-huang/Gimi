@@ -71,6 +71,8 @@ dependencies {
     implementation(project(":domain:workfiles"))
     // 厂商模型接入层（Claude/实时/级联/语音适配与装配）拆分至独立模块。
     implementation(project(":data:modelaccess"))
+    // 模型接入契约（DTO/选择接口/协议常量）在 domain 层；编排层契约消费。
+    implementation(project(":domain:modelaccess"))
     // Realtime 语音模型与语音上传需要共享传输内核（VoiceWsKernel）与音频格式契约。
     implementation(project(":core:network"))
     implementation(project(":core:audio"))

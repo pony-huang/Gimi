@@ -4,7 +4,7 @@ import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 
 /**
  * Agent 构建期的一个能力贡献方。

@@ -13,8 +13,8 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.CONVERSATION_TITLE_METADATA_KEY
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.ConversationTitle
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
  * @author pony
  */
 class ConversationGenerateTitlePlugin(
-    private val agentLLMModelFactory: AgentLLMModelFactory,
+    private val agentLLMModelFactory: AgentModelRuntime,
     override val name: String = "conversation_plugin"
 ) : Plugin {
 

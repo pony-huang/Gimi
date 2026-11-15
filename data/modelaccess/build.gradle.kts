@@ -16,6 +16,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:modelaccess"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:voice"))
     // 会话域的厂商文件引用（gimi-file://）契约与附件模型由转换器消费。

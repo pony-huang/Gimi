@@ -13,6 +13,10 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Tool as AdkTool
+import github.ponyhuang.gimi.domain.modelaccess.DEFERRED_CATALOG
+import github.ponyhuang.gimi.domain.modelaccess.INLINE_DEFINITIONS
+import github.ponyhuang.gimi.domain.modelaccess.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.domain.modelaccess.ToolLoadingMode
 
 /**
  * DeepSeek 的内联工具加载层：将持久化的内部事件翻译成 tool_addition/tool_reference

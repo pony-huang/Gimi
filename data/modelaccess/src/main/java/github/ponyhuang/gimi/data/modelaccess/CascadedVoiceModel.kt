@@ -16,6 +16,8 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
+import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
@@ -39,8 +41,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
 
 /**
  * 将现有 ASR、文字模型和 TTS 实现为 ADK 官方 Model/LiveConnection。

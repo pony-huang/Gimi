@@ -32,7 +32,7 @@ import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeProt
  *   工厂不再按厂商硬编码差异。
  */
 class VoiceLiveModelFactory @Inject constructor(
-    private val models: AgentLLMModelFactory,
+    private val models: DefaultAgentLLMModelFactory,
     private val configuration: AgentModelConfigurationSource,
     private val modelCatalog: ModelCatalogRepository,
     private val recognition: SpeechRecognitionRepository,

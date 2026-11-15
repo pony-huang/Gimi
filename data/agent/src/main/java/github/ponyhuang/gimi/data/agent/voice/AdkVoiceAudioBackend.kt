@@ -15,13 +15,9 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.data.agent.AgentPrompts
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
-import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
-import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
-import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
+import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceDuplexSession
@@ -501,28 +497,4 @@ class AdkVoiceAudioBackend @Inject constructor(
 abstract class VoiceAudioModule {
     @Binds
     abstract fun bindVoiceAudioBackend(implementation: AdkVoiceAudioBackend): VoiceAudioBackend
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindOpenAiRealtimeConnectionProbe(
-        implementation: OpenAiRealtimeConnectionProbe,
-    ): SpeechConnectionProbe
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindQwenRealtimeConnectionProbe(
-        implementation: QwenRealtimeConnectionProbe,
-    ): SpeechConnectionProbe
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindOpenAiRealtimeVoiceSupport(
-        implementation: OpenAiRealtimeVoiceSupport,
-    ): RealtimeVoiceSupport
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindQwenRealtimeVoiceSupport(
-        implementation: QwenRealtimeVoiceSupport,
-    ): RealtimeVoiceSupport
 }

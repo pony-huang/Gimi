@@ -2,10 +2,10 @@ package github.ponyhuang.gimi.data.agent.recommendation
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogEntry
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.AgentLlmModelSource
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCapability
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -17,7 +17,7 @@ import javax.inject.Singleton
 class AgentRecommendationCapabilitySource @Inject constructor(
     private val contributionRegistry: AgentContributionRegistry,
     private val toolAuthorization: ToolAuthorizationRepository,
-    private val modelFactory: AgentLLMModelFactory,
+    private val modelFactory: AgentLlmModelSource,
 ) : RecommendationCapabilitySource {
     override suspend fun capabilities(): List<RecommendationCapability> {
         // 官方函数按当前模型服务门控；没有可用模型时跳过官方来源，不影响其它目录。

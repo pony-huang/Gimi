@@ -25,7 +25,7 @@ import kotlinx.coroutines.future.await
  * 轻聊场景按需开启。关闭或注入被跳过时，标题回落标题插件的独立快速模型请求。
  *
  * 仅官方 `https://api.deepseek.com/anthropic` 端点使用本适配器（见
- * [isOfficialDeepSeekAnthropicEndpoint]）；第三方代理回落通用 Claude 适配器。
+ * `github.ponyhuang.gimi.domain.modelaccess.isOfficialDeepSeekAnthropicEndpoint`）；第三方代理回落通用 Claude 适配器。
  *
  * @param client 由调用方配置和管理的 SDK 客户端，支持自定义端点。
  * @param maxTokens 请求未指定输出上限时的默认值，沿用原有 8196；思考预算另行校验。

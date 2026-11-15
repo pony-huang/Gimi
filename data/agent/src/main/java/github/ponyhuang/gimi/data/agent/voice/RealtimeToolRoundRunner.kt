@@ -8,7 +8,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /**
  * 一轮 Realtime 工具调用的执行器：串行执行模型发起的全部 function_call，

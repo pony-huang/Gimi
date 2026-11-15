@@ -68,6 +68,7 @@ domain/data/core -X-> feature or app
 - Suspending code should let cancellation propagate naturally: avoid broad catches, catch recoverable exception types, and use the shared cancellation-aware recovery helper only at boundaries that require a fallback.
 - Do not promote code to `core` merely because two files look alike.
 - Resolve graph conflicts through contracts/interfaces, not shortcut dependencies. Document any temporary exception with its owner and removal condition.
+- `:data:agent` (orchestration) depends on `:data:modelaccess` (vendor adapters) only through the narrow ADK-runtime seam that cannot cross `:domain:*` (domain forbids ADK imports): `AgentModelRuntime` (the sole `DefaultAgentLLMModelFactory` consumer, ADK `Model` creation), `VendorLocalToolBinder` (vendor SDK tool assembly, ADK `BaseTool`), `VoiceLiveModelFactory` (ADK `Model`), and `RealtimeManualInputSink` (ADK `Content`). Everything else — model config DTOs, selection contracts (`AgentLlmModelSource`), tool-search policy constants, realtime voice contracts — lives in `:domain:modelaccess` or `:domain:voice` and must be consumed from there. Owner: architecture-guard spec (`spec/en/ci/architecture-guard.md`); removal condition: ADK types gain a domain-side abstraction, or ADK leaves the orchestration path.
 
 ## Compose, UI, i18n, and Style
 
@@ -242,3 +243,4 @@ Load specs on demand:
 | [Plugins](spec/en/plugin/plugins.md) | adding or changing a plugin, or its integrated platform |
 | [Testing and verification](spec/en/testing.md) | writing or evaluating tests, diagnosing cross-platform failures, changing HTTP/paid integrations |
 | [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, prereleases, tag-based releases |
+| [Architecture guard & CI verification](spec/en/ci/architecture-guard.md) | changing architecture checks, CI triggers or baseline entries, or resolving module boundary violations |

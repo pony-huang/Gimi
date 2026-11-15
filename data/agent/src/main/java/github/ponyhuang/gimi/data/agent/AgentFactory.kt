@@ -15,9 +15,8 @@ import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import javax.inject.Inject
 import javax.inject.Singleton
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 
 /**
  * 一次 Agent 构建的产物。
@@ -50,7 +49,7 @@ data class AgentRuntime(
 @Singleton
 class AgentFactory @Inject constructor(
     private val contributions: AgentContributionRegistry,
-    private val agentLLMModelFactory: AgentLLMModelFactory,
+    private val agentLLMModelFactory: AgentModelRuntime,
     private val toolVectorSearch: ToolVectorSearch,
 ) {
     /** 按 [spec] 装配 [AgentRuntime]。 */

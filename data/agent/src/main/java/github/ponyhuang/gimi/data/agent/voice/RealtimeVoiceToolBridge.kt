@@ -20,7 +20,7 @@ import com.google.gson.Gson
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.contribution.GuardedAppFunctionToolset
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -38,8 +38,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /**
  * 实时助手模式的工具桥（已解析、可直接下发与执行）。

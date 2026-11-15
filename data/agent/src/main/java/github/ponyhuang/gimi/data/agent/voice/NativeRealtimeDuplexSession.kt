@@ -13,9 +13,9 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Tool
 import github.ponyhuang.gimi.core.audio.Pcm16Resampler
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection

@@ -4,15 +4,7 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.UrlContextTool
-import github.ponyhuang.gimi.data.modelaccess.deepseek.tool.DeepSeekWebTool
-import github.ponyhuang.gimi.data.modelaccess.deepseek.tool.DeepSeekWebToolApi
-import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmReaderTool
-import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebSearchTool
-import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebToolApi
-import github.ponyhuang.gimi.data.modelaccess.kimi.tool.KimiWebTool
-import github.ponyhuang.gimi.data.modelaccess.kimi.tool.KimiWebToolApi
-import github.ponyhuang.gimi.data.modelaccess.minimax.tool.MinimaxImageGenerationApi
-import github.ponyhuang.gimi.data.modelaccess.minimax.tool.MinimaxImageGenerationTool
+import github.ponyhuang.gimi.data.modelaccess.VendorLocalToolBinder
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
@@ -26,6 +18,7 @@ import okhttp3.OkHttpClient
 class OfficialToolFactory @Inject constructor(
     private val httpClient: OkHttpClient,
     private val modelServices: AgentModelConfigurationSource,
+    private val vendorTools: VendorLocalToolBinder,
 ) {
     /** 凭据仅在构造本地执行实例时读取，不进入 invocation metadata。 */
     suspend fun createTools(spec: OfficialToolSpec): List<BaseTool> = when (val binding = spec.binding) {
@@ -49,27 +42,9 @@ class OfficialToolFactory @Inject constructor(
             } else {
                 val conversation = checkNotNull(instance.conversationConnection)
                 val apiKey = instance.effectiveApiKey(conversation)
-                when (spec.toolId) {
-                    OfficialToolIds.DEEPSEEK_WEB_SEARCH,
-                    OfficialToolIds.DEEPSEEK_WEB_FETCH,
-                    -> listOf(DeepSeekWebTool(spec.toolId, DeepSeekWebToolApi(apiKey, httpClient)))
-                    OfficialToolIds.MINIMAX_IMAGE_GENERATION -> {
-                        val api = MinimaxImageGenerationApi(apiKey, httpClient)
-                        listOf(
-                            MinimaxImageGenerationTool.textToImage(api),
-                            MinimaxImageGenerationTool.imageToImage(api),
-                        )
-                    }
-                    OfficialToolIds.GLM_WEB_SEARCH -> {
-                        val api = GlmWebToolApi(apiKey, conversation.endpoint, httpClient)
-                        listOf(GlmWebSearchTool(api), GlmReaderTool(api))
-                    }
-                    OfficialToolIds.KIMI_WEB_TOOLS -> {
-                        val api = KimiWebToolApi(apiKey, httpClient)
-                        spec.staticFunctionIds.map { KimiWebTool(it, api) }
-                    }
-                    else -> error("No local tool factory for ${spec.toolId}")
-                }
+                // 厂商 SDK 工具的构造收敛在 :data:modelaccess；这里只提供目录与凭据。
+                vendorTools.createTools(spec, apiKey, conversation.endpoint)
+                    ?: error("No local tool factory for ${spec.toolId}")
             }
         }
     }

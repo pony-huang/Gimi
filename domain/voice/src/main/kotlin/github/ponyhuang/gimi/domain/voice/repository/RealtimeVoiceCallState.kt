@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.domain.voice.repository
 
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+
 /**
  * 进程级实时通话快照；语音页面、常驻通知与前台服务都以它作为唯一状态来源。
  * @property active 通话是否仍在占用麦克风；页面据此决定是否显示语音页。
@@ -12,6 +14,8 @@ package github.ponyhuang.gimi.domain.voice.repository
  * @property returnToCallRequested 状态栏通知请求返回语音页，界面消费后复位。
  */
 data class RealtimeVoiceCallState(
+    /** 单调递增的通话代次，隔离旧草稿准备与新通话。 */
+    val callId: Long = 0,
     val active: Boolean = false,
     val ending: Boolean = false,
     val voice: RealtimeVoiceState = RealtimeVoiceState(),
@@ -21,6 +25,8 @@ data class RealtimeVoiceCallState(
     val realtimeAvailable: Boolean = false,
     val realtimeModelName: String = "",
     val conversationTitle: String = "",
+    /** 通话开始时固定的模型选择，供附件校验与上传使用。 */
+    val modelSelection: ModelSelection? = null,
     val modelName: String = "",
     val ttsModelName: String = "",
     val sttModelName: String = "",

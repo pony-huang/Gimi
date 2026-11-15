@@ -13,6 +13,11 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Tool
 import github.ponyhuang.gimi.core.audio.Pcm16Resampler
+import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceDuplexSession
@@ -20,6 +25,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceEvent
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
@@ -28,9 +34,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
 
 /**
  * Realtime 模式的全双工会话门面（厂商无关）。
@@ -66,6 +69,7 @@ internal class NativeRealtimeDuplexSession(
     @Volatile private var resampler: Pcm16Resampler? = null
     private val lock = Any()
     private var connection: LiveConnection? = null
+    private val toolJobs = mutableSetOf<kotlinx.coroutines.Job>()
 
     /** 重连等待期与发送失败瞬间的上行缓冲；消费方不感知断线。 */
     private val pendingAudio = ArrayDeque<ByteArray>()
@@ -155,6 +159,42 @@ internal class NativeRealtimeDuplexSession(
         }
     }
 
+    override suspend fun prepareInput(input: VoiceManualInput): VoiceManualInput {
+        val active = synchronized(lock) { connection } ?: error("Realtime connection is not ready")
+        val sink = active as? RealtimeManualInputSink
+            ?: throw UnsupportedOperationException("This realtime provider does not support manual messages")
+        check(sink.manualInputReady)
+        if (input.attachments.any { it.category != AttachmentCategory.IMAGE }) {
+            throw UnsupportedOperationException("Realtime manual messages support text and images")
+        }
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            input.copy(attachments = input.attachments.map { attachment ->
+                val bytes = attachment.inlineData ?: java.io.File(requireNotNull(attachment.payloadReference)).let { file ->
+                    require(file.length() <= 20L * 1024 * 1024)
+                    file.readBytes()
+                }
+                attachment.copy(inlineData = bytes)
+            })
+        }
+    }
+
+    override suspend fun submit(input: VoiceManualInput) {
+        val active = synchronized(lock) { connection } ?: error("Realtime connection is not ready")
+        val sink = active as? RealtimeManualInputSink
+            ?: throw UnsupportedOperationException("Manual input unavailable")
+        val pendingTools = synchronized(lock) { toolJobs.toList() }
+        pendingTools.forEach { it.cancel() }
+        pendingTools.forEach { it.join() }
+        sink.submitUserContent(Content(role = Role.USER, parts = buildList {
+            input.text.takeIf(String::isNotBlank)?.let { add(com.google.adk.kt.types.Part(text = it)) }
+            input.attachments.forEach { attachment ->
+                add(com.google.adk.kt.types.Part(inlineData = Blob(
+                    mimeType = attachment.mimeType, data = requireNotNull(attachment.inlineData),
+                )))
+            }
+        }))
+    }
+
     override suspend fun close() {
         closed = true
         val current = synchronized(lock) {
@@ -211,7 +251,10 @@ internal class NativeRealtimeDuplexSession(
         if (calls.isNotEmpty()) {
             for (call in calls) emit(RealtimeVoiceEvent.ToolCallStarted(call.name))
             // 执行轮不阻塞事件接收；无桥时由执行轮回写失败结果并照样触发二轮推理。
-            scope.launch { rounds.run(calls) }
+            val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) { rounds.run(calls) }
+            synchronized(lock) { toolJobs.add(job) }
+            job.invokeOnCompletion { synchronized(lock) { toolJobs.remove(job) } }
+            job.start()
         }
         if (response.customMetadata?.get(VoiceAudioMarkers.TURN_COMMITTED) == true) {
             emit(RealtimeVoiceEvent.TurnCommitted)

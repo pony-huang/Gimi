@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -29,14 +30,16 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.feature.chat.MessageAttachments
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
 
@@ -48,16 +51,13 @@ internal fun VoiceCaptions(
     spokenText: String,
     speakingText: String,
     revision: Long,
-    reconnectNotice: Boolean = false,
-    toolNotice: String? = null,
     /** 场景适配：回答字幕主/次色与滚动渐隐底色；语音页传入当前主题场景色。 */
     responseColor: Color = MaterialTheme.colorScheme.onSurface,
     responseDimColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     fadeColor: Color = MaterialTheme.colorScheme.background,
-    /** 场景适配：提示胶囊（重连/工具执行）的容器与内容色；语音页传入当前主题场景色。 */
-    noticeContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    noticeContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier: Modifier = Modifier,
+    inputAttachments: List<FileAttachment> = emptyList(),
+    onOpenDocument: (FileAttachment) -> Unit = {},
 ) {
     val heard = spokenText + speakingText
     val text = responseText.ifBlank { heard }
@@ -78,33 +78,11 @@ internal fun VoiceCaptions(
         }
     }
     Column(modifier) {
-        if (reconnectNotice) {
-            // 断线重连提示(Realtime 模式):重连即新会话,旧字幕上下文已清空。
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = noticeContainerColor,
-                contentColor = noticeContentColor,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Text(stringResource(R.string.voice_reconnect_notice),
-                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelMedium)
+        if (inputAttachments.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 130.dp).verticalScroll(rememberScrollState())) {
+                MessageAttachments(inputAttachments, onOpenDocument)
             }
-            Spacer(Modifier.height(10.dp))
-        }
-        if (toolNotice != null) {
-            // 工具执行提示(实时助手模式):函数调用不进语音播报,执行期间的静默由该提示补位。
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = noticeContainerColor,
-                contentColor = noticeContentColor,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Text(stringResource(R.string.voice_tool_running, toolNotice),
-                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelMedium)
-            }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
         }
         if (inputText.isNotBlank()) {
             // 用户话语气泡：配色与聊天页用户气泡同源（浅色容器），靠右与回答字幕区分开。

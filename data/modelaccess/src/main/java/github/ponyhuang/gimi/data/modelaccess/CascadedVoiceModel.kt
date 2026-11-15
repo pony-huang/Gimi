@@ -80,6 +80,7 @@ class CascadedVoiceModel(
         private val turns = Channel<Turn>(1)
         private val history = mutableListOf<Content>()
         private val textInput = StringBuilder()
+        private val mediaInput = mutableListOf<Part>()
         private val audioInput = ByteArrayOutputStream()
         private var historySent = false
         private var inputSent = false
@@ -89,7 +90,8 @@ class CascadedVoiceModel(
 
         override suspend fun sendHistory(history: List<Content>) {
             val seeded = history.map { content ->
-                content.copy(parts = content.parts.filter { it.text != null && it.thought != true })
+                content.copy(parts = content.parts.filter { it.thought != true && (it.text != null ||
+                    (content.role == Role.USER && (it.fileData != null || it.inlineData != null))) })
             }.filter { it.parts.isNotEmpty() }
             synchronized(lock) {
                 check(!closed && !historySent && !inputSent) { "History must be sent once before input" }
@@ -103,8 +105,8 @@ class CascadedVoiceModel(
             // 构造结果被有意丢弃：ADK 的 ContentInput 构造自带 parts 非空校验，
             // 这里借它提前拒绝空 parts 的文本轮；删掉会让空轮静默变成一次空请求。
             ContentInput(content, partial)
-            require(content.role == Role.USER && content.parts.all { it.text != null }) {
-                "Cascaded voice accepts user text, not tools or other media"
+            require(content.role == Role.USER && content.parts.all { it.text != null || it.fileData != null || it.inlineData != null }) {
+                "Cascaded voice accepts user text and media"
             }
             val turn = synchronized(lock) {
                 check(!closed)
@@ -114,7 +116,11 @@ class CascadedVoiceModel(
                     "Partial text exceeds the voice input limit"
                 }
                 textInput.append(content.parts.joinToString("") { it.text.orEmpty() })
-                if (partial) null else Turn.Text(textInput.toString().also { textInput.clear() })
+                mediaInput.addAll(content.parts.filter { it.text == null })
+                if (partial) null else Turn.Text(Content(role = Role.USER, parts = buildList {
+                    textInput.toString().takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
+                    addAll(mediaInput)
+                }).also { textInput.clear(); mediaInput.clear() })
             }
             if (turn != null) {
                 interrupt()
@@ -128,7 +134,7 @@ class CascadedVoiceModel(
             }
             val turn = synchronized(lock) {
                 check(!closed)
-                check(textInput.isEmpty()) { "Finish the partial text turn before sending audio" }
+                check(textInput.isEmpty() && mediaInput.isEmpty()) { "Finish the partial text turn before sending audio" }
                 inputSent = true
                 when (input) {
                     RealtimeInput.ActivityStart -> {
@@ -211,17 +217,17 @@ class CascadedVoiceModel(
         }
 
         private suspend fun respond(turn: Turn, send: suspend (LlmResponse) -> Unit) {
-            val text = when (turn) {
-                is Turn.Text -> turn.text.trim()
-                is Turn.Audio -> transcribe(turn.pcm16, send)
+            val input = when (turn) {
+                is Turn.Text -> turn.content
+                is Turn.Audio -> transcribe(turn.pcm16, send).takeIf(String::isNotBlank)?.let { Content.fromText(Role.USER, it) }
             }
-            if (text.isEmpty()) {
+            if (input == null) {
                 send(LlmResponse(turnComplete = true))
                 return
             }
             val contents = synchronized(lock) {
                 if (closed) throw ConnectionClosed()
-                history.add(Content.fromText(Role.USER, text))
+                history.add(input)
                 history.toList()
             }
             val answer = StringBuilder()
@@ -413,7 +419,7 @@ class CascadedVoiceModel(
     /** 一轮输入，仅持有用户文字或有界的完整 PCM 活动。 */
     private sealed interface Turn {
         /** 合并 partial 内容后的完整文字轮。 */
-        data class Text(val text: String) : Turn
+        data class Text(val content: Content) : Turn
         /** 由手动活动边界封装的 16 kHz PCM16 语句。 */
         data class Audio(val pcm16: ByteArray) : Turn {
             override fun equals(other: Any?): Boolean {

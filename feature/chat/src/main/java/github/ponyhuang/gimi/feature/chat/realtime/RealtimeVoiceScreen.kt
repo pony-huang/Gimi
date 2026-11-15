@@ -4,14 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,8 +15,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -63,12 +58,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -85,7 +77,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -95,17 +86,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
-import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
 import github.ponyhuang.gimi.feature.chat.R
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.ui.components.GimiSheetBase
 import github.ponyhuang.gimi.ui.components.GimiSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiSheetTitleRow
@@ -278,13 +270,15 @@ fun RealtimeVoiceScreen(
     onSelectPromptPreset: (String?) -> Unit = {},
     /** 音色抽屉的「查看官方音色列表」外链。 */
     onOpenUrl: (String) -> Unit = {},
+    onEditInput: () -> Unit = {},
+    onOpenDocument: (FileAttachment) -> Unit = {},
+    composerContent: @Composable () -> Unit = {},
 ) {
     val state = uiState.voice
     val colors = MaterialTheme.colorScheme
     val failed = state.phase == RealtimeVoicePhase.Failed
     val savingFailed = state.failure == RealtimeVoiceFailure.Persistence
     val starting = state.phase == RealtimeVoicePhase.Idle || state.phase == RealtimeVoicePhase.Closed
-    val controlsEnabled = !starting && !failed && !uiState.switching
     // 新建会话仅待启动态可用：通话中重建会话会打断采集/播放，与模式切换同因需先结束通话；
     // 且只有助手模式有持久化会话可换，轻聊/实时模式的内存会话随每次起呼新建，直接置灰。
     val newSessionEnabled = !started && !uiState.switching && uiState.mode == RealtimeVoiceMode.Chat
@@ -305,17 +299,6 @@ fun RealtimeVoiceScreen(
         state.phase == RealtimeVoicePhase.Speaking -> R.string.voice_speaking
         else -> R.string.voice_listening
     }
-    val failureMessage = when (state.failure) {
-        RealtimeVoiceFailure.Configuration -> R.string.voice_configuration_error
-        RealtimeVoiceFailure.Microphone -> R.string.voice_microphone_error
-        RealtimeVoiceFailure.AudioProcessing -> R.string.voice_audio_error
-        RealtimeVoiceFailure.Recognition -> R.string.voice_recognition_error
-        RealtimeVoiceFailure.Generation -> R.string.voice_generation_error
-        RealtimeVoiceFailure.Synthesis, RealtimeVoiceFailure.Playback -> R.string.voice_synthesis_error
-        RealtimeVoiceFailure.Persistence -> R.string.voice_save_caption
-        RealtimeVoiceFailure.ConversationBusy -> R.string.voice_conversation_busy
-        null -> R.string.voice_error_hint
-    }
     val routing = state.audioRouting
     // 通话设备：优先取系统确认的实际输出；没有活跃通话时 currentDeviceId 可能为空，回落到手动首选。
     val currentDevice = routing.devices.firstOrNull { it.id == routing.currentDeviceId }
@@ -329,39 +312,24 @@ fun RealtimeVoiceScreen(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            Row(
-                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                    .heightIn(min = 132.dp).padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                Modifier.fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .imePadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = if (uiState.composer.editing) 12.dp else 30.dp),
             ) {
-                // 左槽：更多选项抽屉入口。通话中不开放抽屉——模式与语音配置在通话中本就不可写，
-                // 点击只提示原因，不静默吞掉这次点击。
-                VoiceControl(
-                    Icons.Default.Tune,
-                    stringResource(R.string.voice_more_options),
-                    main = false, end = false,
-                    enabled = !uiState.switching && !savingFailed,
-                    contentDescription = stringResource(R.string.voice_open_more_options),
-                    onClick = {
-                        if (started) {
-                            onMoreOptionsBlocked()
-                        } else {
+                VoiceInputDock(
+                    state = uiState,
+                    onSettings = {
+                        if (started) onMoreOptionsBlocked() else {
                             sheetPage = VoiceSheetPage.Entry
                             modeSheetOpen = true
                         }
                     },
+                    onChat = onEditInput,
+                    onCall = if (started) onEnd else onStartCall,
+                    onMute = onToggleMute,
+                    composerContent = composerContent,
                 )
-                // 主按钮与静音交换位置：挂断升级为中央主按钮，未启动时承载「开始通话」。
-                VoiceControl(
-                    if (started) Icons.Default.CallEnd else Icons.Default.Call,
-                    stringResource(if (started) R.string.voice_end else R.string.voice_start),
-                    main = true, end = started, enabled = started || !uiState.switching,
-                    onClick = if (started) onEnd else onStartCall,
-                )
-                VoiceControl(if (state.muted) Icons.Default.MicOff else Icons.Default.Mic,
-                    stringResource(if (state.muted) R.string.voice_unmute else R.string.voice_mute),
-                    main = false, end = false, enabled = controlsEnabled, onClick = onToggleMute)
             }
         },
     ) { padding ->
@@ -429,7 +397,7 @@ fun RealtimeVoiceScreen(
             Column(Modifier.weight(1.2f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center) {
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val orbSize = minOf(maxWidth, maxHeight, 340.dp)
+                    val orbSize = minOf(maxWidth, maxHeight, if (uiState.composer.editing) 180.dp else 340.dp)
                     VoiceOrb(state, uiState.switching, stringResource(status), Modifier.size(orbSize).offset(y = 16.dp), ink = scene.ink)
                 }
             }
@@ -439,29 +407,22 @@ fun RealtimeVoiceScreen(
                         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(stringResource(failureMessage), style = MaterialTheme.typography.titleMedium, color = scene.ink)
-                        Spacer(Modifier.height(12.dp))
                         Button(onClick = onRetry) {
                             Text(stringResource(if (savingFailed) R.string.voice_retry_save else R.string.voice_retry))
                         }
-                        if (savingFailed) Text(stringResource(R.string.voice_save_retry_hint), style = MaterialTheme.typography.bodySmall,
-                            color = scene.inkDim)
                     }
                     uiState.switching -> VoiceSwitchingIndicator(scene, Modifier.padding(top = 20.dp))
                     else -> VoiceCaptions(
                         inputText = state.inputText,
+                        inputAttachments = state.inputAttachments,
+                        onOpenDocument = onOpenDocument,
                         responseText = state.responseText,
                         spokenText = state.spokenText,
                         speakingText = state.speakingText,
                         revision = state.revision,
-                        reconnectNotice = state.reconnectNotice,
-                        toolNotice = state.toolNotice,
                         responseColor = scene.caption,
                         responseDimColor = scene.captionDim,
                         fadeColor = scene.fade,
-                        noticeContainerColor = colors.surfaceContainerHighest,
-                        // 提示胶囊是半透明容器，labelMedium 小字用 inkDim 对比度不足。
-                        noticeContentColor = scene.ink,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -875,109 +836,6 @@ private fun VoiceSwitchingIndicator(scene: VoiceSceneColors, modifier: Modifier 
     }
 }
 
-@Composable
-private fun VoiceControl(
-    icon: ImageVector,
-    label: String,
-    main: Boolean,
-    end: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    /** 图标的无障碍描述；默认复用可见标签。 */
-    contentDescription: String = label,
-) {
-    val colors = MaterialTheme.colorScheme
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) .94f else 1f,
-        animationSpec = spring(dampingRatio = .8f, stiffness = 600f),
-        label = "Voice control press",
-    )
-    // 主钮颜色在品牌蓝与错误色之间平滑过渡，避免「开始通话 → 结束通话」切换时的硬切。
-    val containerColor by animateColorAsState(
-        targetValue = if (end) colors.error else colors.primary,
-        animationSpec = tween(320),
-        label = "Voice control container",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (end) colors.onError else colors.onPrimary,
-        animationSpec = tween(320),
-        label = "Voice control content",
-    )
-    Column(Modifier.width(86.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        // 主钮是这一屏唯一的品牌蓝动作焦点；挂断属于破坏性操作，改用错误色并保留电话图标语义。
-        // 次要钮保持中性描边，不与主钮争夺注意力。
-        if (main) {
-            // 待启动态给主钮一圈呼吸光晕：蓝色只落在这一个动作上，同时把这一屏唯一的主操作点亮。
-            val pulse = !end && enabled
-            val pulseTransition = rememberInfiniteTransition(label = "voiceMainPulse")
-            val pulsePhase by pulseTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
-                label = "voiceMainPulsePhase",
-            )
-            Box(contentAlignment = Alignment.Center) {
-                if (pulse) {
-                    Canvas(Modifier.size(76.dp)) {
-                        // 光晕半径外扩、透明度同步归零，循环一轮；按钮本身不动。
-                        val base = size.minDimension / 2f
-                        drawCircle(
-                            color = colors.primary.copy(alpha = .26f * (1f - pulsePhase)),
-                            radius = base + base * .45f * pulsePhase,
-                        )
-                    }
-                }
-                FilledIconButton(
-                    onClick = onClick,
-                    enabled = enabled,
-                    interactionSource = interactionSource,
-                    modifier = Modifier.size(76.dp).graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = containerColor,
-                        contentColor = contentColor,
-                    ),
-                ) {
-                    Crossfade(targetState = icon, animationSpec = tween(180), label = "Voice control icon") { currentIcon ->
-                        Icon(currentIcon, contentDescription, Modifier.size(30.dp))
-                    }
-                }
-            }
-        } else {
-            OutlinedIconButton(
-                onClick = onClick,
-                enabled = enabled,
-                interactionSource = interactionSource,
-                modifier = Modifier.size(54.dp).graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                },
-                colors = IconButtonDefaults.outlinedIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = colors.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.5.dp, colors.outline),
-            ) {
-                Crossfade(targetState = icon, animationSpec = tween(180), label = "Voice control icon") { currentIcon ->
-                    Icon(currentIcon, contentDescription, Modifier.size(24.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Crossfade(targetState = label, animationSpec = tween(180), label = "Voice control label") { currentLabel ->
-            Text(currentLabel, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-// ── 抽屉页面预览 ─────────────────────────────────────────────────
-
-/** 抽屉页面预览共用的候选模型行假数据。 */
 private fun previewVoiceModelRow(
     instanceId: String,
     instanceName: String,

@@ -340,7 +340,7 @@ fun ChatRoute(
     }
 }
 
-private fun openDocumentAttachment(context: Context, attachment: FileAttachment) {
+internal fun openDocumentAttachment(context: Context, attachment: FileAttachment) {
     runCatching {
         val shareableRoot = AndroidAppDirectoryResolver(context).resolve(
             chatShareableDirectorySpec,

@@ -453,4 +453,20 @@
     <string name="voice_prompt_preset_view_close">关闭</string>
     <string name="chat_uploaded_files_description">选择已上传的文件</string>
     <string name="chat_uploaded_files_empty">暂无上传的文件</string>
+
+    <string name="voice_input_paused">输入中，收音已暂停</string>
+    <string name="voice_input_open">文字输入</string>
+    <string name="voice_input_placeholder">输入文字…</string>
+    <string name="voice_input_collapse">收起</string>
+    <string name="voice_input_send">发送</string>
+    <string name="voice_input_draft_saved">草稿已保留</string>
+    <string name="voice_input_start_first">请先开始通话</string>
+    <string name="voice_input_unavailable">连接暂不可用，草稿已保留，请稍后重试</string>
+    <string name="voice_input_unsupported">当前实时模型不支持此类手动输入，请使用支持的模型</string>
+    <string name="voice_input_attachment_error">附件尚未就绪或超出当前模型能力，请检查附件</string>
+    <string name="voice_input_submit_error">发送失败，草稿已保留，请重试</string>
+    <string name="voice_input_discard_title">丢弃未发送的内容？</string>
+    <string name="voice_input_discard_message">离开将丢弃当前文字和附件草稿。</string>
+    <string name="voice_input_discard">丢弃并离开</string>
+    <string name="voice_input_keep">继续编辑</string>
 </resources>

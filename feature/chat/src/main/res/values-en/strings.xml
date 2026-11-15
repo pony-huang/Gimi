@@ -443,4 +443,20 @@
     <string name="voice_prompt_preset_view_close">Close</string>
     <string name="chat_uploaded_files_description">Choose an uploaded file</string>
     <string name="chat_uploaded_files_empty">No uploaded files yet</string>
+
+    <string name="voice_input_paused">Microphone paused while editing</string>
+    <string name="voice_input_open">Text input</string>
+    <string name="voice_input_placeholder">Type a message…</string>
+    <string name="voice_input_collapse">Collapse</string>
+    <string name="voice_input_send">Send</string>
+    <string name="voice_input_draft_saved">Draft saved</string>
+    <string name="voice_input_start_first">Start a call first</string>
+    <string name="voice_input_unavailable">Connection unavailable. Your draft is retained. Try again.</string>
+    <string name="voice_input_unsupported">This realtime model does not support this manual input. Choose a supported model.</string>
+    <string name="voice_input_attachment_error">Check the attachment readiness, type and size supported by this model.</string>
+    <string name="voice_input_submit_error">Could not send. Your draft is retained. Try again.</string>
+    <string name="voice_input_discard_title">Discard unsent content?</string>
+    <string name="voice_input_discard_message">Leaving discards the current text and attachment draft.</string>
+    <string name="voice_input_discard">Discard and leave</string>
+    <string name="voice_input_keep">Keep editing</string>
 </resources>

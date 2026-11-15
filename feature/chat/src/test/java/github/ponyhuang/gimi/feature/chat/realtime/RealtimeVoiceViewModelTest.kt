@@ -9,14 +9,15 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionS
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
@@ -27,6 +28,10 @@ import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
 import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult
+import github.ponyhuang.gimi.feature.chat.ChatSubmissionResult
+import github.ponyhuang.gimi.feature.chat.MessageData
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -35,6 +40,7 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,7 +48,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 
 /**
  * 模式抽屉与会话的回归线：
@@ -288,6 +293,126 @@ class RealtimeVoiceViewModelTest {
         coVerify(exactly = 0) { sessionResolver.createAndActivate() }
     }
 
+    @Test
+    fun editingPausesInputWithoutChangingUserMuteAndClosingRetainsDraft() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            assertTrue(awaitItem().composer.editing)
+            vm.updateDraft(MessageData("保留的草稿"))
+            assertEquals("保留的草稿", awaitItem().composer.draft.text)
+            vm.closeInput()
+            val closed = awaitItem().composer
+            assertFalse(closed.editing)
+            assertEquals("保留的草稿", closed.draft.text)
+            verify { controller.setInputPaused(true); controller.setInputPaused(false) }
+            verify(exactly = 0) { controller.toggleMute() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun inputBeforeCallShowsStartHintAndDoesNotPauseMicrophone() = runTest {
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            val composer = awaitItem().composer
+            assertFalse(composer.editing)
+            assertEquals(VoiceComposerError.StartCall, composer.error)
+            verify(exactly = 0) { controller.setInputPaused(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun microphoneBeforeCallShowsToastNoticeAndDuringCallTogglesMute() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState())
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.toggleMute()
+            val notice = awaitItem().composer
+            assertEquals(VoiceComposerError.StartCall, notice.error)
+            verify(exactly = 0) { controller.toggleMute() }
+            vm.consumeInputNotice(notice.noticeRevision)
+            awaitItem()
+            call.value = RealtimeVoiceCallState(active = true)
+            awaitItem()
+            vm.toggleMute()
+            verify(exactly = 1) { controller.toggleMute() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun repeatedNoticeCanBeConsumedAndShownAgainWithoutStayingInPageState() = runTest {
+        val vm = viewModel()
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            val first = awaitItem().composer
+            assertEquals(VoiceComposerError.StartCall, first.error)
+            vm.consumeInputNotice(first.noticeRevision)
+            assertNull(awaitItem().composer.error)
+            vm.editInput()
+            val second = awaitItem().composer
+            assertEquals(VoiceComposerError.StartCall, second.error)
+            assertTrue(second.noticeRevision > first.noticeRevision)
+            vm.startCall()
+            assertNull(awaitItem().composer.error)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun failedSubmissionKeepsDraftAndSuccessfulRetryClosesEditor() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true, callId = 5))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns call
+            coEvery { submit(any()) } returnsMany listOf(
+                VoiceInputResult.Failed,
+                VoiceInputResult.Accepted,
+            )
+        }
+        val vm = viewModel(controller = controller)
+        vm.prepare("conversation", ModelSelection("instance-qwen", "chat", "model"), "")
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            awaitItem()
+            val draft = MessageData("手动输入")
+            vm.updateDraft(draft)
+            awaitItem()
+            var result: ChatSubmissionResult? = null
+            vm.submitInput(draft) { result = it }
+            runCurrent()
+            val failed = expectMostRecentItem().composer
+            assertEquals(ChatSubmissionResult.REJECTED, result)
+            assertEquals(draft, failed.draft)
+            assertTrue(failed.editing)
+            vm.submitInput(draft) { result = it }
+            runCurrent()
+            val accepted = expectMostRecentItem().composer
+            assertEquals(ChatSubmissionResult.ACCEPTED, result)
+            assertEquals("", accepted.draft.text)
+            assertFalse(accepted.editing)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private fun viewModel(
         settings: DefaultModelSettings = configuredRealtimeSettings(),
         controller: RealtimeVoiceCallController = mockk(relaxed = true) {
@@ -315,6 +440,10 @@ class RealtimeVoiceViewModelTest {
             voiceCapabilities = voiceCapabilities,
             voiceCatalog = mockk(relaxed = true),
             observeSettings = observeSettings,
+            attachmentRepository = mockk(relaxed = true),
+            fileGateway = mockk(relaxed = true),
+            uploadedFileRegistry = mockk(relaxed = true),
+            validateAttachments = ValidateChatAttachmentsUseCase(),
         )
     }
 

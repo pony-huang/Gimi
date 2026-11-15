@@ -8,20 +8,30 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.feature.chat.ChatComposer
 import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.feature.chat.openDocumentAttachment
 
 /**
  * 权限和 Android 副作用只在入口处理；无状态页面不接触模型副作用。
@@ -39,6 +49,15 @@ fun RealtimeVoiceRoute(
     val viewModel: RealtimeVoiceViewModel = hiltViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var leaving by remember { mutableStateOf(false) }
+    var confirmDiscard by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
+    LaunchedEffect(state.composer.editing) {
+        if (state.composer.editing) keyboard?.show() else {
+            keyboard?.hide()
+            focus.clearFocus()
+        }
+    }
     var presentedState by remember { mutableStateOf(state) }
     // 退场期间保留最后一帧，防止挂断清理产生的 Closed/空字幕闪成“连接中”。
     // 只冻结展示快照，麦克风和后台通话仍立即由控制器释放。
@@ -48,6 +67,44 @@ fun RealtimeVoiceRoute(
         if (active) viewModel.prepare(conversationId, selection, conversationTitle)
     }
     val context = LocalContext.current
+    val routeActive by rememberUpdatedState(active)
+    LaunchedEffect(viewModel) {
+        viewModel.inputNotices.collect { (revision, error) ->
+            if (error != null && routeActive) {
+                val message = when (error) {
+                    VoiceComposerError.StartCall -> R.string.voice_input_start_first
+                    VoiceComposerError.Unavailable -> R.string.voice_input_unavailable
+                    VoiceComposerError.Unsupported -> R.string.voice_input_unsupported
+                    VoiceComposerError.Attachment -> R.string.voice_input_attachment_error
+                    VoiceComposerError.Submit -> R.string.voice_input_submit_error
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                viewModel.consumeInputNotice(revision)
+            }
+        }
+    }
+    LaunchedEffect(state.voice.failure) {
+        val message = when (state.voice.failure) {
+            RealtimeVoiceFailure.Configuration -> R.string.voice_configuration_error
+            RealtimeVoiceFailure.Microphone -> R.string.voice_microphone_error
+            RealtimeVoiceFailure.AudioProcessing -> R.string.voice_audio_error
+            RealtimeVoiceFailure.Recognition -> R.string.voice_recognition_error
+            RealtimeVoiceFailure.Generation -> R.string.voice_generation_error
+            RealtimeVoiceFailure.Synthesis, RealtimeVoiceFailure.Playback -> R.string.voice_synthesis_error
+            RealtimeVoiceFailure.Persistence -> R.string.voice_save_caption
+            RealtimeVoiceFailure.ConversationBusy -> R.string.voice_conversation_busy
+            null -> null
+        }
+        if (message != null && active) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    }
+    LaunchedEffect(state.voice.reconnectNotice) {
+        if (state.voice.reconnectNotice && active) Toast.makeText(context, R.string.voice_reconnect_notice, Toast.LENGTH_SHORT).show()
+    }
+    LaunchedEffect(state.voice.toolNotice) {
+        state.voice.toolNotice?.takeIf { active }?.let { name ->
+            Toast.makeText(context, context.getString(R.string.voice_tool_running, name), Toast.LENGTH_SHORT).show()
+        }
+    }
     val permissionMessage = stringResource(R.string.voice_permission)
     val newSessionFailedMessage = stringResource(R.string.voice_new_session_failed)
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -99,7 +156,7 @@ fun RealtimeVoiceRoute(
         if (routing.noticeRevision != shownNoticeRevision) Toast.makeText(context, routingMessage, Toast.LENGTH_SHORT).show()
     }
     // 系统返回与左胶囊「回聊天」同义：结束通话并返回文字聊天。
-    val backToChat = {
+    val leavePage = {
         if (!leaving) {
             presentedState = state
             leaving = true
@@ -107,8 +164,32 @@ fun RealtimeVoiceRoute(
             viewModel.end()
         }
     }
+    val backToChat = {
+        when {
+            state.composer.submitting -> Unit
+            state.composer.editing -> viewModel.closeInput()
+            state.composer.draft.text.isNotBlank() || state.composer.draft.attachments.isNotEmpty() -> confirmDiscard = true
+            else -> leavePage()
+        }
+    }
+    if (confirmDiscard) AlertDialog(
+        onDismissRequest = { confirmDiscard = false },
+        title = { Text(stringResource(R.string.voice_input_discard_title)) },
+        text = { Text(stringResource(R.string.voice_input_discard_message)) },
+        confirmButton = { TextButton(onClick = { confirmDiscard = false; leavePage() }) {
+            Text(stringResource(R.string.voice_input_discard))
+        } },
+        dismissButton = { TextButton(onClick = { confirmDiscard = false; viewModel.editInput() }) {
+            Text(stringResource(R.string.voice_input_keep))
+        } },
+    )
     // 主按钮挂断只是关闭会话：留在语音页回到待启动状态，不返回聊天列表。
-    val hangUp = { viewModel.end() }
+    val hangUp = {
+        if (state.composer.draft.text.isNotBlank() || state.composer.draft.attachments.isNotEmpty()) {
+            Toast.makeText(context, R.string.voice_input_draft_saved, Toast.LENGTH_SHORT).show()
+        }
+        viewModel.end()
+    }
     BackHandler { backToChat() }
     // 展示快照（含退场冻结帧）同时决定主按钮状态，避免离场动画期间闪回「开始通话」。
     val presented = if (active && !leaving) state else presentedState
@@ -142,5 +223,29 @@ fun RealtimeVoiceRoute(
         onNewSession = viewModel::newSession,
         onEnd = hangUp,
         onBack = backToChat,
+        onEditInput = viewModel::editInput,
+        onOpenDocument = { attachment -> openDocumentAttachment(context, attachment) },
+        composerContent = {
+            val composer = presented.composer
+            val uploadPending = composer.fileUploadEnabled && composer.draft.attachments.any {
+                it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+            }
+            val sendEnabled = presented.active && !presented.switching && !uploadPending &&
+                (composer.draft.text.isNotBlank() || composer.draft.attachments.isNotEmpty())
+            ChatComposer(
+                onSendClick = viewModel::submitInput,
+                onStopClick = {}, isGenerating = composer.submitting,
+                messageData = composer.draft, onMessageDataChange = viewModel::updateDraft,
+                attachmentCapabilities = composer.capabilities,
+                attachmentUploadStates = composer.uploads,
+                isFileUploadEnabled = composer.fileUploadEnabled,
+                onRetryAttachmentUpload = viewModel::uploadDocument,
+                onDocumentDraftImported = viewModel::uploadDocument,
+                uploadedFiles = composer.uploadedFiles,
+                onAttachUploadedFile = viewModel::attachUploadedFile,
+                retainExpanded = true, embedded = true,
+                inputContent = { params -> VoiceComposerInput(params, sendEnabled, viewModel::closeInput) },
+            )
+        },
     )
 }

@@ -2,16 +2,18 @@ package github.ponyhuang.gimi.data.voice.runtime
 
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
-import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
+import github.ponyhuang.gimi.domain.voice.model.TtsVoice
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallForeground
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
@@ -24,6 +26,8 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityNotSupported
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult
+import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -190,6 +194,37 @@ class InMemoryRealtimeVoiceCallControllerTest {
         assertEquals(RealtimeVoicePhase.Closed, session.state.value.phase)
     }
 
+    @Test
+    fun manualSubmissionIsRejectedOutsideAnActiveCall() = runTest {
+        val session = FakeSession()
+        val controller = controller(ArrayDeque(listOf(session)))
+        val input = github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput("手动消息")
+        assertEquals(github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult.Unavailable, controller.submit(input))
+        controller.start(null, null, "", RealtimeVoiceMode.Simple)
+        advanceUntilIdle()
+        assertEquals(github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult.Accepted, controller.submit(input))
+        controller.end()
+        assertEquals(github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult.Unavailable, controller.submit(input))
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun editingPauseDoesNotOverwriteUserMute() = runTest {
+        val session = FakeSession()
+        val controller = controller(ArrayDeque(listOf(session)))
+        controller.start(null, null, "", RealtimeVoiceMode.Simple)
+        advanceUntilIdle()
+        controller.toggleMute()
+        controller.setInputPaused(true)
+        assertTrue(session.state.value.muted)
+        assertTrue(session.state.value.inputPaused)
+        controller.setInputPaused(false)
+        assertTrue(session.state.value.muted)
+        assertFalse(session.state.value.inputPaused)
+        controller.end()
+        advanceUntilIdle()
+    }
+
     private fun controller(
         sessions: ArrayDeque<RealtimeVoiceSession>,
         catalog: ModelCatalogRepository = mockk(relaxed = true),
@@ -218,9 +253,9 @@ class InMemoryRealtimeVoiceCallControllerTest {
         override fun realtimeSupport(serviceId: String): RealtimeVoiceSupport? =
             if (serviceId == this.serviceId) object : RealtimeVoiceSupport {
                 override val serviceId: String = this@RealtimeCapable.serviceId
-                override val builtInVoices = emptyList<github.ponyhuang.gimi.domain.voice.model.TtsVoice>()
+                override val builtInVoices = emptyList<TtsVoice>()
                 override val customVoiceAllowed: Boolean = true
-                override val uplink = github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink(16_000, false)
+                override val uplink = RealtimeUplink(16_000, false)
                 override fun defaultVoiceFor(modelId: String): String = "longanqian_v3.1"
             } else null
     }
@@ -254,6 +289,7 @@ class InMemoryRealtimeVoiceCallControllerTest {
         every { catalog.currentRealtimeSelection() } returns selection
         every { catalog.currentRealtimeVoice() } returns override
         every { catalog.currentInstances() } returns listOf(instance)
+        every { catalog.currentAssistantSelection() } returns null
         every { catalog.currentTtsSelection() } returns null
         every { catalog.currentSpeechSelection() } returns null
         every { catalog.resolveConnection(any()) } answers {
@@ -368,6 +404,8 @@ class InMemoryRealtimeVoiceCallControllerTest {
         override val state = MutableStateFlow(RealtimeVoiceState())
         override suspend fun start() { state.value = state.value.copy(phase = RealtimeVoicePhase.Listening) }
         override fun selectAudioDevice(deviceId: Int?) {}
+        override fun setInputPaused(paused: Boolean) { state.value = state.value.copy(inputPaused = paused) }
+        override suspend fun submit(input: VoiceManualInput) = VoiceInputResult.Accepted
         override fun setMuted(muted: Boolean) { state.value = state.value.copy(muted = muted) }
         override suspend fun finishPendingTurn(): Boolean {
             if (!canFinish) state.value = state.value.copy(

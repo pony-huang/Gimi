@@ -3,22 +3,33 @@ package github.ponyhuang.gimi.feature.chat.realtime
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
+import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
+import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
-import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
+import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
-import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
+import github.ponyhuang.gimi.domain.modelcatalog.model.VisionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
-import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
@@ -29,16 +40,26 @@ import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
 import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult
+import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
+import github.ponyhuang.gimi.domain.voice.repository.isRealtimeEngine
+import github.ponyhuang.gimi.feature.chat.AttachmentSelectionResult
+import github.ponyhuang.gimi.feature.chat.ChatFileUploadCoordinator
+import github.ponyhuang.gimi.feature.chat.ChatSubmissionResult
+import github.ponyhuang.gimi.feature.chat.DraftUploadState
+import github.ponyhuang.gimi.feature.chat.MessageData
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** 语音页懒启动所需的会话绑定参数；进入页面时由宿主一次性提供。 */
@@ -137,6 +158,7 @@ data class RealtimeVoiceUiState(
     val devicePickerOpen: Boolean = false,
     /** 模式抽屉里的语音设置条目状态（默认模型与音色）。 */
     val settings: VoiceSettingsUiState = VoiceSettingsUiState(),
+    val composer: VoiceComposerUiState = VoiceComposerUiState(),
 )
 
 /**
@@ -160,6 +182,11 @@ class RealtimeVoiceViewModel @Inject constructor(
     private val voiceCapabilities: VoiceCapabilityResolver,
     private val voiceCatalog: VoiceCatalogResolver,
     observeSettings: ObserveDefaultModelSettingsUseCase,
+    private val attachmentRepository: ChatAttachmentRepository,
+    private val fileGateway: VendorFileGateway,
+    private val uploadedFileRegistry: UploadedFileRegistry,
+    private val validateAttachments: ValidateChatAttachmentsUseCase,
+
 ) : ViewModel() {
     private val devicePickerOpen = MutableStateFlow(false)
     private val startArguments = MutableStateFlow(VoiceCallArguments())
@@ -180,6 +207,16 @@ class RealtimeVoiceViewModel @Inject constructor(
     val newSessionFailedRevision: StateFlow<Long> = newSessionFailed
 
     private val settingsFlow = observeSettings()
+    private val composer = MutableStateFlow(VoiceComposerUiState())
+    private var latestSettings: DefaultModelSettings? = null
+    private val preparedAttachments = mutableMapOf<DraftAttachment, FileAttachment>()
+    private val fileUploads = ChatFileUploadCoordinator(
+        scope = viewModelScope,
+        gateway = fileGateway,
+        registry = uploadedFileRegistry,
+        resolveConnection = { selection -> latestSettings?.instances?.resolveConnection(selection) },
+        isFileUploadEnabled = { composer.value.fileUploadEnabled },
+    )
 
     /** 轻聊预设的自建列表与选中项合流；官方预设是静态目录，直接读仓库属性。 */
     private val promptPresetsFlow = combine(
@@ -190,10 +227,44 @@ class RealtimeVoiceViewModel @Inject constructor(
     val callState: StateFlow<RealtimeVoiceCallState> = controller.state
 
     init {
+        viewModelScope.launch {
+            combine(settingsFlow, controller.state, startArguments, pendingMode) { settings, call, arguments, pending ->
+                val selection = call.modelSelection ?: if (pending.isRealtimeEngine) settings.realtimeSelection
+                    else arguments.selection ?: settings.assistantSelection
+                val resolved = settings.instances.resolveConnection(selection)
+                val realtime = (if (call.active) call.mode else pending).isRealtimeEngine
+                val capabilities = if (realtime) {
+                    MultimodalCapabilities(
+                        vision = if (resolved?.templateId == "openai") VisionCapability() else null,
+                        audioInput = null, documentInput = null,
+                    )
+                } else resolved?.model?.multimodal ?: MultimodalCapabilities(null, null, null)
+                composer.update { it.copy(capabilities = capabilities,
+                    fileUploadEnabled = capabilities.documentInput?.ingestMode == FileIngestMode.FILE_REFERENCE) }
+                resolved?.templateId
+            }.distinctUntilChanged().collectLatest { vendor ->
+                if (vendor == null) composer.update { it.copy(uploadedFiles = emptyList()) }
+                else uploadedFileRegistry.entriesFor(vendor).collect { entries ->
+                    composer.update { it.copy(uploadedFiles = entries) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            fileUploads.states.collect { uploads ->
+                composer.update { state -> state.copy(uploads = uploads, draft = state.draft.copy(
+                    attachments = state.draft.attachments.map { draft ->
+                        val ready = uploads[draft.reference] as? DraftUploadState.Ready
+                        if (ready == null) draft else draft.copy(fileId = ready.fileId, fileVendor = ready.vendor)
+                    },
+                )) }
+            }
+        }
+
         // 无论从页面还是状态栏结束，通话代次变化都要关掉上次遗留的设备选择器。
         viewModelScope.launch {
             controller.state.map { it.active }.distinctUntilChanged().collect { active ->
                 if (!active) {
+                    composer.update { it.copy(editing = false) }
                     devicePickerOpen.value = false
                 }
             }
@@ -203,6 +274,7 @@ class RealtimeVoiceViewModel @Inject constructor(
         // 会误伤合法配置，用户填的值也会被静默覆盖。
         viewModelScope.launch {
             settingsFlow.collectLatest { settings ->
+                latestSettings = settings
                 realtimeSelection.value = settings.realtimeSelection
                 val selection = settings.ttsSelection
                 if (selection == null) {
@@ -224,6 +296,127 @@ class RealtimeVoiceViewModel @Inject constructor(
         }
     }
 
+    /** Route 逐条消费通知，消息文案与 Toast 生命周期由 UI 入口负责。 */
+    val inputNotices = composer.map { it.noticeRevision to it.error }.distinctUntilChanged()
+
+    private fun notifyInput(error: VoiceComposerError) {
+        composer.update { it.copy(error = error, noticeRevision = it.noticeRevision + 1) }
+    }
+
+    fun consumeInputNotice(revision: Long) {
+        composer.update { if (it.noticeRevision == revision) it.copy(error = null) else it }
+    }
+
+    private fun inputSelection(): ModelSelection? = controller.state.value.modelSelection
+        ?: if (pendingMode.value.isRealtimeEngine) latestSettings?.realtimeSelection
+        else startArguments.value.selection ?: latestSettings?.assistantSelection
+
+    /** 编辑状态只控制临时输入门，不改变用户静音选择。 */
+    fun editInput() {
+        val call = controller.state.value
+        if (!call.active || call.ending || call.switching) {
+            notifyInput(VoiceComposerError.StartCall)
+            return
+        }
+        controller.setInputPaused(true)
+        composer.update { it.copy(editing = true, error = null) }
+    }
+
+    fun closeInput() {
+        if (composer.value.submitting) return
+        composer.update { it.copy(editing = false) }
+        controller.setInputPaused(false)
+    }
+
+    fun updateDraft(draft: MessageData) {
+        if (composer.value.submitting) return
+        val removed = composer.value.draft.attachments.filterNot { it in draft.attachments }
+        fileUploads.clear(removed.map { it.reference })
+        composer.update { it.copy(draft = draft, error = null) }
+        preparedAttachments.keys.retainAll(draft.attachments.toSet())
+    }
+
+    fun uploadDocument(draft: DraftAttachment) {
+        inputSelection()?.let { fileUploads.upload(draft, it) }
+    }
+
+    fun attachUploadedFile(entry: UploadedFileEntry) {
+        val draft = DraftAttachment(
+            reference = VendorFileReference.uri(entry.vendor, entry.fileId),
+            displayName = entry.displayName, mimeType = entry.mimeType, sizeBytes = entry.bytes,
+            category = AttachmentCategory.DOCUMENT,
+            fileId = entry.fileId, fileVendor = entry.vendor,
+        )
+        val result = github.ponyhuang.gimi.feature.chat.mergeAttachmentSelection(composer.value.draft.attachments, listOf(draft))
+        if (result is AttachmentSelectionResult.Accepted) {
+            updateDraft(composer.value.draft.copy(attachments = result.attachments))
+        }
+    }
+
+    fun submitInput(message: MessageData, complete: (ChatSubmissionResult) -> Unit) {
+        val call = controller.state.value
+        val selection = inputSelection()
+        if (composer.value.submitting || !call.active || call.ending || selection == null ||
+            (message.text.isBlank() && message.attachments.isEmpty())) {
+            complete(ChatSubmissionResult.REJECTED)
+            return
+        }
+        val instances = latestSettings?.instances.orEmpty()
+        val vendor = instances.firstOrNull { it.id == selection.instanceId }?.templateId
+        val invalid = validateAttachments(selection, instances, message.attachments) != null ||
+            message.attachments.any { it.fileVendor != null && it.fileVendor != vendor } ||
+            (composer.value.fileUploadEnabled && message.attachments.any {
+                it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+            })
+        if (invalid) {
+            notifyInput(VoiceComposerError.Attachment)
+            complete(ChatSubmissionResult.REJECTED)
+            return
+        }
+        composer.update { it.copy(submitting = true, error = null) }
+        viewModelScope.launch {
+            var accepted = false
+            try {
+                val attachments = message.attachments.map { draft ->
+                    // 逐个缓存已归档结果：后续文件失败也不能丢失已移动文档的引用。
+                    preparedAttachments[draft] ?: attachmentRepository.read("voice", listOf(draft)).single().also {
+                        preparedAttachments[draft] = it
+                    }
+                }
+                if (!controller.state.value.active || controller.state.value.callId != call.callId) return@launch
+                val result = controller.submit(VoiceManualInput(message.text, attachments))
+                accepted = result == VoiceInputResult.Accepted
+                if (accepted) {
+                    fileUploads.clear(message.attachments.map { it.reference })
+                    composer.update { it.copy(draft = MessageData(), editing = false, error = null) }
+                    controller.setInputPaused(false)
+                    preparedAttachments.clear()
+                    try {
+                        attachmentRepository.deleteDrafts(message.attachments)
+                    } catch (_: java.io.IOException) {
+                        // 已接管消息不能因草稿文件清理失败回滚。
+                    }
+                } else notifyInput(when (result) {
+                    VoiceInputResult.Unsupported -> VoiceComposerError.Unsupported
+                    VoiceInputResult.Unavailable -> VoiceComposerError.Unavailable
+                    else -> VoiceComposerError.Submit
+                })
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                notifyInput(VoiceComposerError.Submit)
+            } finally {
+                composer.update { it.copy(submitting = false) }
+                complete(if (accepted) ChatSubmissionResult.ACCEPTED else ChatSubmissionResult.REJECTED)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        controller.setInputPaused(false)
+        super.onCleared()
+    }
+
     val uiState: StateFlow<RealtimeVoiceUiState> =
         combine(
             combine(controller.state, devicePickerOpen, startArguments, pendingMode) { call, picker, arguments, pending ->
@@ -232,13 +425,15 @@ class RealtimeVoiceViewModel @Inject constructor(
             combine(settingsFlow, runWhenAgentIdle.state, ttsVoiceOptions, isTtsVoiceLoading, promptPresetsFlow) { settings, runtime, voices, loading, presets ->
                 VoiceSettingsSnapshot(settings, runtime.isBusy, voices, loading, presets)
             },
-        ) { callSnapshot, settingsSnapshot ->
+            composer,
+        ) { callSnapshot, settingsSnapshot, composerState ->
             val call = callSnapshot.call
             // Realtime 可用性只由默认模型配置决定：通话状态快照在待启动时是默认值、挂断后还会整包复位，
             // 拿它判断会把「已配置」误显示成「请先在默认模型中配置 Realtime 模型」。
             val realtime = realtimeAvailability(settingsSnapshot.settings)
             RealtimeVoiceUiState(
                 voice = call.voice,
+                composer = composerState,
                 active = callSnapshot.active,
                 mode = if (callSnapshot.active) call.mode else callSnapshot.pendingMode,
                 switching = call.switching || call.ending,
@@ -276,6 +471,7 @@ class RealtimeVoiceViewModel @Inject constructor(
     fun startCall() {
         if (uiState.value.switching) return
         val arguments = startArguments.value
+        composer.update { it.copy(error = null) }
         controller.start(arguments.conversationId, arguments.selection, arguments.title, pendingMode.value)
     }
 
@@ -341,7 +537,13 @@ class RealtimeVoiceViewModel @Inject constructor(
      */
     fun selectPromptPreset(presetId: String?) = mutate { promptPresets.selectPreset(presetId) }
 
-    fun toggleMute() = controller.toggleMute()
+    fun toggleMute() {
+        if (!controller.state.value.active) {
+            notifyInput(VoiceComposerError.StartCall)
+            return
+        }
+        controller.toggleMute()
+    }
     fun openDevicePicker() { if (!uiState.value.switching) devicePickerOpen.value = true }
     fun dismissDevicePicker() { devicePickerOpen.value = false }
     fun selectAudioDevice(deviceId: Int?) { controller.selectAudioDevice(deviceId); dismissDevicePicker() }

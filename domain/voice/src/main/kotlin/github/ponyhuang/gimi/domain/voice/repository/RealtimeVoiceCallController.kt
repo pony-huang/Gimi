@@ -23,6 +23,8 @@ interface RealtimeVoiceCallController {
     fun selectMode(mode: RealtimeVoiceMode)
 
     fun toggleMute()
+    fun setInputPaused(paused: Boolean)
+    suspend fun submit(input: VoiceManualInput): VoiceInputResult
     fun selectAudioDevice(deviceId: Int?)
     fun retry()
 

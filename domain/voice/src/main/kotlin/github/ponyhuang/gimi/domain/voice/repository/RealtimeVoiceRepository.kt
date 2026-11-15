@@ -1,7 +1,8 @@
 package github.ponyhuang.gimi.domain.voice.repository
 
-import kotlinx.coroutines.flow.StateFlow
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 语音模式。
@@ -59,6 +60,9 @@ interface RealtimeVoiceSession {
 
     suspend fun start()
     fun setMuted(muted: Boolean)
+    /** 编辑暂停与用户静音独立，恢复编辑不会覆盖用户静音选择。 */
+    fun setInputPaused(paused: Boolean)
+    suspend fun submit(input: VoiceManualInput): VoiceInputResult
     /** null 恢复自动路由，非空 id 仅对当前会话有效。 */
     fun selectAudioDevice(deviceId: Int?)
     suspend fun retry()
@@ -110,6 +114,10 @@ data class RealtimeVoiceState(
     val phase: RealtimeVoicePhase = RealtimeVoicePhase.Idle,
     val listening: Boolean = false,
     val muted: Boolean = false,
+    /** 编辑或选择附件期间临时阻止上行，保持当前播报。 */
+    val inputPaused: Boolean = false,
+    /** 最近一轮用户输入携带的已归档附件。 */
+    val inputAttachments: List<FileAttachment> = emptyList(),
     val inputText: String = "",
     val responseText: String = "",
     val spokenText: String = "",

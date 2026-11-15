@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.voice.repository
 
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -68,6 +69,10 @@ interface RealtimeVoiceDuplexSession {
     /** 上行一帧 16 kHz 单声道 PCM16 采集音频；实现内部重采样为 24 kHz。 */
     suspend fun sendAudio(pcm16: ByteArray)
 
+    /** 提交前准备在此完成，不得打断正在播报的回答。 */
+    suspend fun prepareInput(input: VoiceManualInput): VoiceManualInput
+    suspend fun submit(input: VoiceManualInput)
+
     suspend fun close()
 }
 
@@ -90,7 +95,7 @@ interface VoiceAudioBackendSession {
     fun transcribe(pcm16: ByteArray): Flow<RecognitionEvent>
 
     /** previousSpokenText 只包含上一轮实际完整播完的文本；取消收集必须停止生成。 */
-    fun respond(text: String, previousSpokenText: String): Flow<VoiceAudioEvent>
+    fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment> = emptyList()): Flow<VoiceAudioEvent>
     /** 只在硬件队列完整播完后确认，稳定片段 ID 使重复确认无副作用。 */
     fun confirmPlayback(segmentId: String, text: String)
     /** 生成与播放均结束或取消后提交本轮文字；失败保留原事件 ID，供显式重试。 */

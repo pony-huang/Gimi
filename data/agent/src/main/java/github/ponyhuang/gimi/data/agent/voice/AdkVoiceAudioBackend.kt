@@ -10,17 +10,27 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.LiveConnectConfig
 import com.google.adk.kt.types.Modality
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.agent.AgentPrompts
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.data.agent.AgentPrompts
+import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
+import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeConnectionProbe
+import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeConnectionProbe
+import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
+import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceDuplexSession
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
@@ -53,13 +63,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
-import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
-import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
 
 /**
  * 应用会话与语音后端的唯一转换层；设备、AEC 和播放仍由 data:speech 拥有。
@@ -131,8 +134,8 @@ class AdkVoiceAudioBackend @Inject constructor(
     /** 简单聊天：级联模型 + 内存上下文，无工具、无持久化。 */
     private inner class SimpleSession(private val configuration: RealtimeVoiceConfiguration) : VoiceAudioBackendSession {
         private val mutex = Mutex()
-        private val heardHistory = ArrayDeque<Pair<String, String>>()
-        private var pendingInput: String? = null
+        private val heardHistory = ArrayDeque<Pair<Content, String>>()
+        private var pendingInput: Content? = null
         @Volatile private var closed = false
 
         /** 每轮读取当前选中的简单聊天预设；指令按轮重建，中途切换预设下一轮即生效。 */
@@ -148,13 +151,13 @@ class AdkVoiceAudioBackend @Inject constructor(
             emitAll(recognition.transcribeStreaming(pcm16))
         }
 
-        override fun respond(text: String, previousSpokenText: String): Flow<VoiceAudioEvent> = flow {
-            require(text.isNotBlank())
+        override fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment>): Flow<VoiceAudioEvent> = flow {
+            require(text.isNotBlank() || attachments.isNotEmpty())
             mutex.withLock {
                 check(!closed)
                 pendingInput?.let { heardHistory.addLast(it to previousSpokenText) }
                 while (heardHistory.size > 32) heardHistory.removeFirst()
-                pendingInput = text
+                pendingInput = voiceManualContent(text, attachments)
                 val model = models.create(configuration.modelSelection)
                 // 简单聊天可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
                 // 「无工具」声明始终叠加（级联链路确实无任何工具）。
@@ -176,11 +179,11 @@ class AdkVoiceAudioBackend @Inject constructor(
                 try {
                     connection.sendHistory(buildList {
                         for ((input, spoken) in heardHistory) {
-                            add(Content.fromText(Role.USER, input))
+                            add(input)
                             if (spoken.isNotBlank()) add(Content.fromText(Role.MODEL, spoken))
                         }
                         // 官方 sendHistory 会回答末尾 USER；把当前问题一起初始化，避免旧的未听轮先触发回答。
-                        add(Content.fromText(Role.USER, text))
+                        add(voiceManualContent(text, attachments))
                     })
                     var completed = false
                     var interrupted = false
@@ -293,18 +296,18 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         // channelFlow 而非 flow：文本增量与音频片段分别来自生成/播放两个并发端，
         // flow 构建器的单协程发射不变量会在第一句正文处直接失败。
-        override fun respond(text: String, previousSpokenText: String): Flow<VoiceAudioEvent> = channelFlow {
-            require(text.isNotBlank())
+        override fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment>): Flow<VoiceAudioEvent> = channelFlow {
+            require(text.isNotBlank() || attachments.isNotEmpty())
             mutex.withLock {
                 check(!closed)
                 val tts = synthesis.openSession()
                 var completed = false
                 try {
                     if (tts != null) {
-                        respondWithSessionTts(tts, text) { send(it) }
+                        respondWithSessionTts(tts, text, attachments) { send(it) }
                         completed = true
                     } else {
-                        respondWithOneShotTts(text) { send(it) }
+                        respondWithOneShotTts(text, attachments) { send(it) }
                         completed = true
                     }
                 } finally {
@@ -340,6 +343,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         private suspend fun respondWithSessionTts(
             tts: SpeechSynthesisSession,
             text: String,
+            attachments: List<FileAttachment>,
             emit: suspend (VoiceAudioEvent) -> Unit,
         ) = coroutineScope {
             val emitLock = Mutex()
@@ -347,7 +351,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             val clientSentences = ArrayDeque<String>()
             val buffer = VoiceSentenceBuffer()
             val generation = async {
-                agent.runTurn(text) { delta ->
+                agent.runTurn(text, attachments) { delta ->
                     deliver(VoiceAudioEvent.Text(delta))
                     buffer.append(delta).forEach { sentence ->
                         synchronized(clientSentences) { clientSentences.addLast(sentence) }
@@ -374,7 +378,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         }
 
         /** 一次性合成回退：整句合成，句间没有流式衔接。 */
-        private suspend fun respondWithOneShotTts(text: String, emit: suspend (VoiceAudioEvent) -> Unit) = coroutineScope {
+        private suspend fun respondWithOneShotTts(text: String, attachments: List<FileAttachment>, emit: suspend (VoiceAudioEvent) -> Unit) = coroutineScope {
             val emitLock = Mutex()
             val deliver: suspend (VoiceAudioEvent) -> Unit = { event -> emitLock.withLock { emit(event) } }
             val sentences = Channel<String>(1)
@@ -392,7 +396,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             }
             try {
                 val buffer = VoiceSentenceBuffer()
-                agent.runTurn(text) { delta ->
+                agent.runTurn(text, attachments) { delta ->
                     deliver(VoiceAudioEvent.Text(delta))
                     buffer.append(delta).forEach { sentences.send(it) }
                 }
@@ -502,23 +506,23 @@ abstract class VoiceAudioModule {
     @dagger.multibindings.IntoSet
     abstract fun bindOpenAiRealtimeConnectionProbe(
         implementation: OpenAiRealtimeConnectionProbe,
-    ): github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
+    ): SpeechConnectionProbe
 
     @Binds
     @dagger.multibindings.IntoSet
     abstract fun bindQwenRealtimeConnectionProbe(
         implementation: QwenRealtimeConnectionProbe,
-    ): github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
+    ): SpeechConnectionProbe
 
     @Binds
     @dagger.multibindings.IntoSet
     abstract fun bindOpenAiRealtimeVoiceSupport(
         implementation: OpenAiRealtimeVoiceSupport,
-    ): github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
+    ): RealtimeVoiceSupport
 
     @Binds
     @dagger.multibindings.IntoSet
     abstract fun bindQwenRealtimeVoiceSupport(
         implementation: QwenRealtimeVoiceSupport,
-    ): github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
+    ): RealtimeVoiceSupport
 }

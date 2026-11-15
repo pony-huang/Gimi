@@ -8,13 +8,14 @@ import android.media.AudioManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.audio.PlaybackEchoGuard
 import github.ponyhuang.gimi.core.audio.SileroVoiceActivityDetector
+import github.ponyhuang.gimi.core.audio.SoftwareEchoCanceller
 import github.ponyhuang.gimi.core.audio.VoiceActivitySegmenter
 import github.ponyhuang.gimi.core.audio.VoiceAudioFormat
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
-import github.ponyhuang.gimi.core.audio.SoftwareEchoCanceller
 import github.ponyhuang.gimi.core.audio.calculatePcm16Level
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.voice.playback.RealtimePcmPlayer
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.*
 import javax.inject.Inject
 import kotlinx.coroutines.*
@@ -165,7 +166,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 )) { "Microphone unavailable" }
                 // 通话刚建立：AEC 滤波器从零开始收敛，同样给一段保护窗口。
                 echoGuard.onAecReset()
-                mutableState.update { it.copy(phase = RealtimeVoicePhase.Listening, listening = !it.muted, failure = null) }
+                mutableState.update { it.copy(phase = RealtimeVoicePhase.Listening, listening = !it.muted && !it.inputPaused, failure = null) }
                 if (duplexMode) startDuplex()
             }.onFailure { error ->
                 android.util.Log.w(TAG, "Voice start failed", error)
@@ -192,7 +193,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         private fun acceptCleanAudio(bytes: ByteArray) {
             if (!started) return
             // 静音只阻止识别，不停止 AEC 学习；始终允许用户在播报期间讲话并打断。
-            val muted = state.value.muted
+            val muted = state.value.muted || state.value.inputPaused
             val now = System.nanoTime()
             if (now - lastInputLevelNanos >= 50_000_000L) {
                 lastInputLevelNanos = now
@@ -302,7 +303,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         }
 
         private fun speechStarted() {
-            if (closed || !started || state.value.muted) return
+            if (closed || !started || state.value.muted || state.value.inputPaused) return
             inputRevision++
             recognitionJob?.cancel()
             replyActive = false
@@ -352,7 +353,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     // 重连即新会话:清空字幕上下文,提示位由界面渲染「已重新连接」。
                     mutableState.update { it.copy(reconnectNotice = true, responseText = "", speakingText = "", toolNotice = null) }
                 }
-                is RealtimeVoiceEvent.UserTranscript -> mutableState.update { it.copy(inputText = event.text) }
+                is RealtimeVoiceEvent.UserTranscript -> mutableState.update { it.copy(inputText = event.text, inputAttachments = emptyList()) }
                 RealtimeVoiceEvent.TurnCommitted -> {
                     val turn = state.value.revision + 1
                     mutableState.update { it.copy(
@@ -451,7 +452,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         }
 
         private fun recognize(bytes: ByteArray) {
-            if (closed || !started || state.value.muted) return
+            if (closed || !started || state.value.muted || state.value.inputPaused) return
             val revision = inputRevision
             recognitionJob?.cancel()
             recognitionJob = scope.launch {
@@ -463,7 +464,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                             when (event) {
                                 // 中间结果只用于更新显示：用户能实时看到识别进度，但只有最终结果才是输入。
                                 is RecognitionEvent.Partial -> if (revision == inputRevision && !closed && started) {
-                                    mutableState.update { it.copy(inputText = event.text) }
+                                    mutableState.update { it.copy(inputText = event.text, inputAttachments = emptyList()) }
                                 }
                                 is RecognitionEvent.Final -> last = event.text
                             }
@@ -480,7 +481,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     if (revision != inputRevision || closed || !started) return@cancellationAwareRunCatching
                     val previousSpokenText = state.value.spokenText
                     val turn = state.value.revision + 1
-                    mutableState.update { it.copy(inputText = text, responseText = "", spokenText = "", speakingText = "",
+                    mutableState.update { it.copy(inputText = text, inputAttachments = emptyList(), responseText = "", spokenText = "", speakingText = "",
                         phase = RealtimeVoicePhase.Thinking, revision = turn, failure = null) }
                     replyJob = scope.launch { reply(text, turn, previousSpokenText) }
                 }.onFailure { if (revision == inputRevision) {
@@ -490,7 +491,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             }
         }
 
-        private suspend fun reply(text: String, revision: Long, previousSpokenText: String) {
+        private suspend fun reply(text: String, revision: Long, previousSpokenText: String, attachments: List<FileAttachment> = emptyList()) {
             val playbackToken = player.checkpoint()
             replyActive = true
             try {
@@ -501,7 +502,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                             for (segment in segments) playSegment(segment, revision, playbackToken)
                         }
                         try {
-                            session.respond(text, previousSpokenText).collect { event ->
+                            session.respond(text, previousSpokenText, attachments).collect { event ->
                                 when (event) {
                                     is VoiceAudioEvent.Text -> mutableState.update {
                                         if (it.revision == revision) it.copy(responseText = it.responseText + event.text) else it
@@ -581,13 +582,75 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 if (closed) return@launch
                 inputRevision++
                 recognitionJob?.cancel()
-                mutableState.update { it.copy(muted = muted, listening = started && !muted, inputLevel = 0f) }
+                mutableState.update { it.copy(muted = muted, listening = started && !muted && !it.inputPaused, inputLevel = 0f) }
                 withContext(Dispatchers.IO) {
                     synchronized(inputLock) {
                         detector?.reset()
                         segmenter.reset()
                     }
                 }
+            }
+        }
+
+        override fun setInputPaused(paused: Boolean) {
+            if (closed) return
+            inputRevision++
+            recognitionJob?.cancel()
+            mutableState.update { it.copy(inputPaused = paused, listening = started && !paused && !it.muted, inputLevel = 0f) }
+            uplinkDrainJob?.cancel()
+            uplinkDrainJob = null
+            scope.launch(Dispatchers.IO) {
+                synchronized(inputLock) {
+                    detector?.reset()
+                    segmenter.reset()
+                    uplinkPreRoll.clear()
+                    uplinkQueue.clear()
+                    uplinkGateOpen = false
+                }
+            }
+        }
+
+        override suspend fun submit(input: VoiceManualInput): VoiceInputResult = withContext(Dispatchers.Main.immediate) {
+            if (closed || !started || state.value.failure != null || (input.text.isBlank() && input.attachments.isEmpty())) {
+                return@withContext VoiceInputResult.Unavailable
+            }
+            try {
+                // 读取媒体和协议准入在停播前完成；重连中不缓存手动消息，等待用户重试。
+                val prepared = if (duplexMode) {
+                    duplex?.prepareInput(input) ?: return@withContext VoiceInputResult.Unavailable
+                } else input
+                if (closed || !started) return@withContext VoiceInputResult.Unavailable
+                inputRevision++
+                recognitionJob?.cancelAndJoin()
+                val spoken = state.value.spokenText
+                replyActive = false
+                player.stop()
+                replyJob?.cancelAndJoin()
+                if (closed || !started) return@withContext VoiceInputResult.Unavailable
+                if (duplexMode) {
+                    duplexPlayback?.cancel()
+                    duplexPlayback = null
+                    duplexPlaybackJob?.cancelAndJoin()
+                    duplexPlaybackJob = null
+                    duplex?.submit(prepared) ?: return@withContext VoiceInputResult.Unavailable
+                }
+                val turn = state.value.revision + 1
+                mutableState.update { it.copy(
+                    inputText = input.text, inputAttachments = input.attachments,
+                    responseText = "", spokenText = "", speakingText = "", outputLevel = 0f,
+                    phase = RealtimeVoicePhase.Thinking, revision = turn, toolNotice = null,
+                ) }
+                if (duplexMode) armResponseWatchdog()
+                else replyJob = scope.launch { reply(input.text, turn, spoken, input.attachments) }
+                VoiceInputResult.Accepted
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: UnsupportedOperationException) {
+                VoiceInputResult.Unsupported
+            } catch (_: IllegalStateException) {
+                VoiceInputResult.Unavailable
+            } catch (_: Exception) {
+                VoiceInputResult.Failed
             }
         }
 

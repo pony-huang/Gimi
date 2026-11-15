@@ -327,6 +327,14 @@ Below `RealtimeVoiceFailure` sits a **non-mapped** lower-level taxonomy,
 used only by the settings screens and connectivity tests. Do not mix the two: the
 call UI cannot see `VoiceFailureKind`.
 
+## Manual input during calls
+
+The wider, raised bottom capsule groups settings, chat, call and mute actions with transparent buttons and theme foreground icons. Warnings and operation notices are delivered as Toasts by the Route. Opening chat expands the capsule above the IME and temporarily pauses capture input through `inputPaused`. User mute remains independent. Closing the editor or accepting a submission restores the prior mute behavior. Hanging up preserves the page draft, and leaving with a draft requires a discard decision.
+
+Attachments reuse chat selection, validation, previews, vendor upload and archive storage. Preparation finishes before interrupting playback. Failed submissions retain drafts and archived references for retry. A call generation guards preparation results against a subsequent call. Submitted attachments appear with the latest user caption. Persistence follows the existing mode.
+
+Simple and Chat submit text and attachments through their existing model/agent paths. OpenAI native Realtime accepts text and images through one user conversation item and an explicit response trigger. Qwen native Realtime currently has no manual-message sink because the documented protocol exposes audio/image buffers and tool outputs. Its unsupported manual input is reported before stopping playback. Native realtime documents and audio files are rejected explicitly. Manual messages are never buffered across reconnects.
+
 ## Known gaps
 
 The following reflects the actual state of the code, not a to-do list. Confirm
@@ -368,7 +376,7 @@ each item is still true before relying on it — or before assuming it was fixed
    still does not automatically gain realtime voice capability.
 5. **MiniMax has no dedicated connectivity probe registered**, so its settings
    "test connection" behaviour is unverified.
-6. **No control to stop playback manually**; barge-in requires speaking.
+6. **No dedicated stop-playback control**. Speaking or submitting an accepted manual message interrupts the current answer.
 7. **Simple mode rebuilds the connection and resends 32 turns of context every
    turn**, so latency and cost for long calls have never been optimized.
 8. **The Realtime model and voice are chosen in one place, and that place is

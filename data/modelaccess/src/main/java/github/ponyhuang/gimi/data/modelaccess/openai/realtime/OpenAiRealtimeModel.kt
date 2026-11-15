@@ -16,17 +16,18 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.core.network.VoiceWsKernel
+import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
+import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer
+import github.ponyhuang.gimi.data.modelaccess.shared.parseFunctionArguments
+import github.ponyhuang.gimi.data.modelaccess.shared.realtimeResponseDisposition
 import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import okhttp3.OkHttpClient
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
-import github.ponyhuang.gimi.data.modelaccess.shared.realtimeResponseDisposition
-import github.ponyhuang.gimi.data.modelaccess.shared.parseFunctionArguments
 
 /**
  * OpenAI Realtime 原生语音模型（GA 协议）。
@@ -80,8 +81,24 @@ internal class OpenAiRealtimeModel(
         private val kernel: VoiceWsKernel,
         private val instructions: String,
         private val toolDeclarations: List<FunctionDeclaration>,
-    ) : LiveConnection, RealtimeFunctionCallSink {
+    ) : LiveConnection, RealtimeFunctionCallSink, RealtimeManualInputSink {
         private val collecting = Mutex()
+        @Volatile private var suppressManualResponse = false
+        @Volatile private var responseActive = false
+        override val manualInputReady: Boolean get() = sessionConfigured
+
+        override suspend fun submitUserContent(content: Content) {
+            check(sessionConfigured)
+            val message = OpenAiRealtimeProtocol.userMessage(content, "manual_" + java.util.UUID.randomUUID().toString().replace("-", "").take(24))
+            suppressManualResponse = true
+            if (responseActive) kernel.sendControl(OpenAiRealtimeProtocol.cancelResponse())
+            assistantItemId?.let { itemId ->
+                kernel.sendControl(OpenAiRealtimeProtocol.truncate(itemId, assistantAudioBytes / 48L))
+            }
+            kernel.sendControl(com.google.gson.JsonObject().apply { addProperty("type", "input_audio_buffer.clear") })
+            kernel.sendControl(message)
+            kernel.sendControl(OpenAiRealtimeProtocol.createResponse())
+        }
 
         /** `session.updated` 确认前的上行缓冲；满则丢最旧，确认后一次冲出。 */
         private val pendingAudio = ArrayDeque<ByteArray>()
@@ -137,11 +154,16 @@ internal class OpenAiRealtimeModel(
                             )
                         is VoiceWsKernel.WsFrame.Control ->
                             when (val event = OpenAiRealtimeProtocol.parse(frame.payload)) {
+                                OpenAiRealtimeEvent.ResponseStarted -> {
+                                    responseActive = true
+                                    suppressManualResponse = false
+                                }
                                 is OpenAiRealtimeEvent.SessionUpdated -> {
                                     sessionConfigured = true
                                     flushPendingAudio()
                                 }
                                 is OpenAiRealtimeEvent.AudioDelta -> {
+                                    if (suppressManualResponse) continue
                                     assistantAudioBytes += event.pcm24k.size
                                     emit(
                                         LlmResponse(
@@ -160,7 +182,7 @@ internal class OpenAiRealtimeModel(
                                         ),
                                     )
                                 }
-                                is OpenAiRealtimeEvent.AssistantTranscriptDelta ->
+                                is OpenAiRealtimeEvent.AssistantTranscriptDelta -> if (!suppressManualResponse)
                                     emit(
                                         LlmResponse(
                                             outputTranscription = Transcription(text = event.text, finished = false),
@@ -187,6 +209,8 @@ internal class OpenAiRealtimeModel(
                                 is OpenAiRealtimeEvent.ToolCallArgumentsDone ->
                                     toolCalls.onDone(event.callId, event.arguments)?.let { emit(functionCallResponse(it)) }
                                 is OpenAiRealtimeEvent.ResponseDone -> {
+                                    responseActive = false
+                                    if (suppressManualResponse) continue
                                     // 仅明确取消/失败/截断的响应丢弃未定稿调用；status 缺失
                                     // 与未知终态按完成兜底冲出（后者记日志），避免静默漏执行。
                                     when (realtimeResponseDisposition(event.status)) {

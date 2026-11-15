@@ -14,6 +14,8 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSession
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult
+import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import github.ponyhuang.gimi.domain.voice.repository.isRealtimeEngine
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -53,6 +55,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
     private var realtimeModelSelection: ModelSelection? = null
     private var realtimeVoiceId: String? = null
     private var generation = 0L
+    private var submitting = false
 
     /**
      * Realtime 可用性随默认选择与目录变化实时刷新：用户在设置页改完默认后回到通话页，
@@ -123,7 +126,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
 
     private fun create(mode: RealtimeVoiceMode) {
         val token = ++generation
-        val selection = selectionFor(mode)
+        val selection = selectionFor(mode) ?: catalog.currentAssistantSelection()
         val active = repository.createSession(
             RealtimeVoiceConfiguration(
                 mode = mode,
@@ -134,7 +137,7 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
             ),
         )
         session = active
-        mutableState.update { it.copy(voice = active.state.value, mode = mode, switching = false) }
+        mutableState.update { it.copy(callId = token, voice = active.state.value, mode = mode, modelSelection = selection, switching = false) }
         observation = scope.launch {
             active.state.collect { voice ->
                 if (session === active) mutableState.update { it.copy(voice = voice) }
@@ -219,6 +222,22 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
         if (!current.active || current.switching) return
         session?.setMuted(!current.voice.muted)
     }
+
+    override fun setInputPaused(paused: Boolean) { session?.setInputPaused(paused) }
+
+    override suspend fun submit(input: VoiceManualInput): VoiceInputResult =
+        withContext(Dispatchers.Main.immediate) {
+            val active = session
+            if (active == null || submitting || !mutableState.value.active || mutableState.value.ending || mutableState.value.switching) {
+                return@withContext VoiceInputResult.Unavailable
+            }
+            submitting = true
+            try {
+                active.submit(input)
+            } finally {
+                submitting = false
+            }
+        }
 
     override fun selectAudioDevice(deviceId: Int?) { session?.selectAudioDevice(deviceId) }
 

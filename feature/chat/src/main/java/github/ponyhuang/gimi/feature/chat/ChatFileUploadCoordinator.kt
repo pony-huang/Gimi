@@ -117,12 +117,13 @@ class ChatFileUploadCoordinator(
 
     /** 清理引用对应的上传状态（附件移除或发送完成后）。 */
     fun clear(references: Collection<String>) {
-        references.forEach { jobs.remove(it) }
+        references.forEach { jobs.remove(it)?.cancel() }
         _states.update { current -> current - references.toSet() }
     }
 
     /** 清空全部状态（会话切换/草稿清空）。 */
     fun clearAll() {
+        jobs.values.forEach { it.cancel() }
         jobs.clear()
         _states.value = emptyMap()
     }

@@ -14,6 +14,38 @@ import org.junit.Test
 class OpenAiRealtimeProtocolTest {
 
     @Test
+    fun manualMessageCarriesTextAndImageInOneUserItem() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.USER,
+            parts = listOf(
+                com.google.adk.kt.types.Part(text = "看看这张图"),
+                com.google.adk.kt.types.Part(inlineData = com.google.adk.kt.types.Blob(
+                    mimeType = "image/jpeg", data = byteArrayOf(1, 2, 3),
+                )),
+            ),
+        )
+        val payload = OpenAiRealtimeProtocol.userMessage(content, "manual-1")
+        assertEquals("conversation.item.create", payload.get("type").asString)
+        val item = payload.getAsJsonObject("item")
+        assertEquals("manual-1", item.get("id").asString)
+        assertEquals("user", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals("input_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("看看这张图", parts[0].asJsonObject.get("text").asString)
+        assertEquals("data:image/jpeg;base64,AQID", parts[1].asJsonObject.get("image_url").asString)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun manualMessageRejectsUnsupportedDocumentBeforeSending() {
+        OpenAiRealtimeProtocol.userMessage(com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.USER,
+            parts = listOf(com.google.adk.kt.types.Part(inlineData = com.google.adk.kt.types.Blob(
+                mimeType = "application/pdf", data = byteArrayOf(1),
+            ))),
+        ), "manual-2")
+    }
+
+    @Test
     fun `sessionUpdate carries realtime session config`() {
         val payload = OpenAiRealtimeProtocol.sessionUpdate(instructions = "voice persona", voice = "cedar")
         assertEquals("session.update", payload.get("type").asString)

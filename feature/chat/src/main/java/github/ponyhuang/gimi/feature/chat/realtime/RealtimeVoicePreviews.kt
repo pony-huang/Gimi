@@ -14,10 +14,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
+import github.ponyhuang.gimi.feature.chat.ComposerInputContentParams
+import github.ponyhuang.gimi.feature.chat.MessageData
+import github.ponyhuang.gimi.feature.chat.VoiceInputUiState
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 对比无输入、轻声内收、强声内收、回答和静音，保持球形并使用固定相位与真实电平范围。 */
@@ -180,4 +185,47 @@ private fun VoiceGeneratingPreview() {
 private fun VoiceMutedPreview() {
     GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening,
         muted = true), modelName = "DeepSeek V4"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
+}
+
+/** 胶囊编辑与附件状态；小屏和深浅色使用生产布局及纯展示参数。 */
+@Preview(name = "Capsule editing light", widthDp = 360, heightDp = 640, locale = "zh-rCN")
+@Preview(name = "Capsule editing dark", widthDp = 360, heightDp = 640, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceCapsuleEditingPreview() = VoiceCapsulePreview(attachments = false)
+
+@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 720, locale = "zh-rCN")
+@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 720, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceCapsuleAttachmentsPreview() = VoiceCapsulePreview(attachments = true)
+
+@Composable
+private fun VoiceCapsulePreview(attachments: Boolean) {
+    GimiTheme {
+        val draft = MessageData(
+            text = "帮我看看这份方案",
+            attachments = if (attachments) listOf(DraftAttachment(
+                reference = "preview-file", displayName = "项目方案.pdf", mimeType = "application/pdf",
+                sizeBytes = 2048, category = AttachmentCategory.DOCUMENT,
+            )) else emptyList(),
+        )
+        RealtimeVoiceScreen(
+            uiState = RealtimeVoiceUiState(
+                active = true,
+                voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, inputPaused = true),
+                composer = VoiceComposerUiState(editing = true, draft = draft),
+            ),
+            started = true, onStartCall = {}, onToggleMute = {}, onEnd = {},
+            composerContent = {
+                VoiceComposerInput(
+                    params = ComposerInputContentParams(
+                        messageData = draft, isGenerating = false,
+                        voiceInputState = VoiceInputUiState.Idle,
+                        isVoiceInputAvailable = false, voiceErrorMessage = null,
+                        onVoiceErrorShown = {}, onTextChange = {}, onRemoveAttachment = {},
+                        onSendClick = {}, onStopClick = {}, onVoiceInputStart = {},
+                    ), sendEnabled = true, onClose = {},
+                )
+            },
+        )
+    }
 }

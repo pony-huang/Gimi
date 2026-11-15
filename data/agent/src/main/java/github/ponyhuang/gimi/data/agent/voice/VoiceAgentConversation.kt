@@ -8,6 +8,7 @@ import github.ponyhuang.gimi.data.agent.AgentChatExecution
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.data.agent.conversation.UserInputToolProtocol
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
@@ -23,9 +24,9 @@ import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * 聊天模式语音通话的完整 Agent 执行层：每轮把识别文字直接交给 chat agent
@@ -78,21 +79,21 @@ class VoiceAgentConversation @Inject constructor(
          * 模型正文增量交给 [onDelta]。需要确认的工具逐个自动批准后继续收集；
          * 遇到用户输入请求则结束本轮，等下一轮再恢复。
          */
-        suspend fun runTurn(text: String, onDelta: suspend (String) -> Unit) {
+        suspend fun runTurn(text: String, attachments: List<FileAttachment> = emptyList(), onDelta: suspend (String) -> Unit) {
             val paused = pendingInput
             pendingInput = null
             ranTurn = true
             lease?.updatePhase(AgentTaskPhase.GENERATING)
             try {
                 var execution = createExecution()
-                var events = if (paused != null) {
+                var events = if (paused != null && attachments.isEmpty()) {
                     execution.respondToInputRequest(
                         callId = paused.callId,
                         toolName = paused.toolName,
                         payload = UserInputToolProtocol.responsePayload(paused.toolName, text),
                     )
                 } else {
-                    execution.send(text)
+                    execution.send(text, attachments)
                 }
                 while (true) {
                     val confirmations = collectTurn(events, onDelta)

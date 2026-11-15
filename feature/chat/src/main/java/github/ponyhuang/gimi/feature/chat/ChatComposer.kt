@@ -8,8 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
-import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
-import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -18,19 +16,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -41,17 +40,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -61,12 +59,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
+import github.ponyhuang.gimi.feature.chat.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.delay
@@ -133,8 +134,8 @@ public fun ChatComposer(
     onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
     /** 文档草稿的厂商上传状态（键为草稿 reference）；chip 三态与发送门控的数据源。 */
-    uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
-    onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    uploadedFiles: List<UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (UploadedFileEntry) -> Unit = {},
     attachmentUploadStates: Map<String, DraftUploadState> = emptyMap(),
     /** 当前选择是否启用厂商文件上传；决定文档草稿是否需要预热上传与发送门控。 */
     isFileUploadEnabled: Boolean = false,
@@ -146,6 +147,10 @@ public fun ChatComposer(
     onSharedMediaConsumed: () -> Unit = {},
     attachmentsEnabled: Boolean = true,
     headerContent: @Composable () -> Unit = {},
+    /** 实时通话嵌入同一胶囊时由外层处理 IME、安全区与容器。 */
+    embedded: Boolean = false,
+    inputContent: (@Composable (ComposerInputContentParams) -> Unit)? = null,
+
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
     val onDraftChange by rememberUpdatedState(onMessageDataChange)
@@ -296,7 +301,7 @@ public fun ChatComposer(
         ) {
             return
         }
-        keyboardController?.hide()
+        if (!embedded) keyboardController?.hide()
         isSubmitting = true
         onSubmit(submitted) { isSubmitting = false }
     }
@@ -445,10 +450,10 @@ public fun ChatComposer(
     }
 
     Column(
-        modifier = modifier
+        modifier = modifier.then(if (embedded) Modifier else Modifier
             .imePadding()
             .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp))
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -457,11 +462,11 @@ public fun ChatComposer(
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
-            color = chatCapsuleColor(),
-            border = chatCapsuleBorder(),
+            color = if (embedded) Color.Transparent else chatCapsuleColor(),
+            border = if (embedded) null else chatCapsuleBorder(),
             tonalElevation = 0.dp,
             // 仅保留轻微悬浮感，避免底边形成厚重阴影。
-            shadowElevation = 0.5.dp,
+            shadowElevation = if (embedded) 0.dp else 0.5.dp,
         ) {
             Column {
                 headerContent()
@@ -479,8 +484,9 @@ public fun ChatComposer(
                     }
                 } else {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        with(componentFactory) {
-                            ComposerInputContent(
+                        val renderInput: @Composable (ComposerInputContentParams) -> Unit = inputContent
+                            ?: { params -> with(componentFactory) { ComposerInputContent(params) } }
+                        renderInput(
                                 ComposerInputContentParams(
                                     messageData = messageData,
                                     isGenerating = isGenerating || isSubmitting,
@@ -516,8 +522,7 @@ public fun ChatComposer(
                                     attachmentUploadStates = attachmentUploadStates,
                                     onRetryAttachmentUpload = { currentOnRetryUpload(it) },
                                 ),
-                            )
-                        }
+                        )
                     }
                 }
             }
@@ -587,7 +592,6 @@ internal fun appendTranscript(draft: String, transcript: String): String {
     if (draft.isBlank()) return recognized
     return "${draft.trimEnd()} $recognized"
 }
-
 
 /** 胶囊横向内缩。大胶囊样式下无横向内缩（0.dp），保留常量保证调用兼容。 */
 internal val ComposerCollapsedHorizontalInset = 0.dp

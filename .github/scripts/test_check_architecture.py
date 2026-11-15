@@ -1,7 +1,15 @@
 """Behavior coverage for the repository's module boundary guard."""
 import unittest
 
-from check_architecture import allowed_dependency, cycles, dependencies, forbidden_import, imported_module
+from check_architecture import (
+    allowed_dependency,
+    cycles,
+    dependencies,
+    forbidden_import,
+    imported_module,
+    signature,
+    split_new,
+)
 
 
 class ArchitectureGuardTest(unittest.TestCase):
@@ -47,6 +55,33 @@ class ArchitectureGuardTest(unittest.TestCase):
 
     def test_shared_dependencies_do_not_form_cycles(self):
         self.assertEqual([], cycles({':a': {':c'}, ':b': {':c'}, ':c': set()}))
+
+    def test_runtime_role_composes_core_and_domain_only(self):
+        self.assertTrue(allowed_dependency(':environment-runtime', ':core:security'))
+        self.assertTrue(allowed_dependency(':environment-runtime', ':domain:environment'))
+        self.assertFalse(allowed_dependency(':environment-runtime', ':feature:chat'))
+        self.assertFalse(allowed_dependency(':environment-runtime', ':data:agent'))
+
+    def test_approved_designsystem_voice_exception_stays_narrow(self):
+        self.assertTrue(allowed_dependency(':core:designsystem', ':domain:voice'))
+        self.assertFalse(
+            forbidden_import(':core:designsystem', 'github.ponyhuang.gimi.domain.voice.model.TtsVoice'))
+        self.assertTrue(
+            forbidden_import(':core:designsystem', 'github.ponyhuang.gimi.domain.conversation.model.Conversation'))
+        self.assertFalse(allowed_dependency(':core:designsystem', ':data:agent'))
+
+    def test_baseline_signatures_drop_line_numbers_and_split_reports_only_new(self):
+        self.assertEqual('data/agent/src/File.kt: forbidden import x.Y',
+                         signature('data\\agent\\src\\File.kt:12: forbidden import x.Y'))
+        known, new = split_new(
+            ['data/agent/src/File.kt:1: forbidden import x.Y', 'data/agent/src/File.kt:2: forbidden import x.Z'],
+            frozenset({'data/agent/src/File.kt: forbidden import x.Y'}))
+        self.assertEqual(1, known)
+        self.assertEqual(['data/agent/src/File.kt:2: forbidden import x.Z'], new)
+
+    def test_unknown_module_layer_defaults_to_rejected(self):
+        self.assertFalse(allowed_dependency(':tooling:some', ':core:common'))
+        self.assertFalse(allowed_dependency(':tooling:some', ':domain:voice'))
 
 
 if __name__ == '__main__':

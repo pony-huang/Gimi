@@ -1,0 +1,10 @@
+# Known architecture violations; regenerated only by:
+#   python .github/scripts/check_architecture.py --update-baseline
+# Signatures carry no line numbers, so unrelated edits keep entries valid.
+# Shrink this file by fixing the violation, never by editing it by hand.
+:data:agent: forbidden production dependency :data:modelaccess
+data/agent/src/main/java/github/ponyhuang/gimi/data/agent/AgentModelRuntime.kt: forbidden import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
+data/agent/src/main/java/github/ponyhuang/gimi/data/agent/tools/official/OfficialToolFactory.kt: forbidden import github.ponyhuang.gimi.data.modelaccess.VendorLocalToolBinder
+data/agent/src/main/java/github/ponyhuang/gimi/data/agent/voice/AdkVoiceAudioBackend.kt: forbidden import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+data/agent/src/main/java/github/ponyhuang/gimi/data/agent/voice/NativeRealtimeDuplexSession.kt: forbidden import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+data/agent/src/main/java/github/ponyhuang/gimi/data/agent/voice/NativeRealtimeDuplexSession.kt: forbidden import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink

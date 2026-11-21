@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '已存在的版本 tag，例如 v0.6.4、v0.7.0-rc.1 或 v1.0.0-beta.1'
+        description: '已存在的版本 tag，例如 v0.6.4、v0.7.0-rc.1、v1.0.0-beta.1 或热修 v1.0.0-beta.4.0.1'
         required: true
         type: string
   workflow_call:
@@ -45,7 +45,8 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.[1-9][0-9]*|-rc\.[1-9][0-9]*)?$ ]]
+          # 与 release_tools.py 的 VERSION 同规则：预发布号允许多段热修（beta.4.0.1）。
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.[1-9][0-9]*(\.(0|[1-9][0-9]*))*|-rc\.[1-9][0-9]*(\.(0|[1-9][0-9]*))*)?$ ]]
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
       - name: Check required signing configuration
         env:

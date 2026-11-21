@@ -127,10 +127,10 @@ behavioral differences that matter:
 - **Native realtime** writes without reading — it never injects history into
   model context; each call and reconnect starts fresh and history lives only
   in the persisted conversation.
-- **An interrupted turn drops the half answer.** Interruption, cancellation,
-  disconnect or close persists only the user's finalized utterance; the
-  truncated reply is discarded. Persistence failures are logged and swallowed:
-  the call continues, the turn just isn't saved.
+- **Hanging up a cascaded Chatbot call saves the active reply's generated text.**
+  If playback is still in progress, chat history includes the text generated
+  before hang-up. When the user interrupts a reply and stays in the call, only
+  fully played sentences are saved.
 
 ### Synthesis and playback
 Synthesis prefers a session path (currently one bidirectional vendor), else

@@ -45,6 +45,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         private var echoCanceller: SoftwareEchoCanceller? = null
         private var recognitionJob: Job? = null
         private var replyJob: Job? = null
+        private var replyToFinalizeOnClose: Job? = null
         private var inputRevision = 0L
         private var lastInputLevelNanos = 0L
         private val inputLock = Any()
@@ -584,10 +585,12 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 }
             } finally {
                 replyActive = false
-                // 取消只停止生成；已生成文字及硬件播完回执必须在下一轮/释放租约前提交。
-                withContext(NonCancellable + Dispatchers.IO) {
-                    cancellationAwareRunCatching { session.finishTurn() }.onFailure {
-                        withContext(Dispatchers.Main.immediate) { fail(RealtimeVoiceFailure.Persistence) }
+                // 用户挂断的当前轮交给 session.close()，由它提交生成文字并释放租约。
+                if (currentCoroutineContext()[Job] !== replyToFinalizeOnClose) {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        cancellationAwareRunCatching { session.finishTurn() }.onFailure {
+                            withContext(Dispatchers.Main.immediate) { fail(RealtimeVoiceFailure.Persistence) }
+                        }
                     }
                 }
             }
@@ -790,6 +793,8 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         override suspend fun close() = withContext(NonCancellable + Dispatchers.Main.immediate) {
             // 页面挂断与状态栏结束可能并发到达；后来的调用也必须等到旧资源真正释放。
             lifecycle.close {
+                // 已被打断并进入收尾的轮次仍按通话内规则提交。
+                replyToFinalizeOnClose = replyJob?.takeIf { it.isActive }
                 replyActive = false
                 inputRevision++
                 player.stop()

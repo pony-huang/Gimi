@@ -144,6 +144,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         private val conversation = simpleVoice.get().bind(configuration.conversationId)
         private var restoredHistory = emptyList<Content>()
         private val playedSegments = linkedMapOf<String, String>()
+        private val generatedReply = StringBuilder()
         private var pendingInput: Content? = null
         @Volatile private var closed = false
 
@@ -230,6 +231,7 @@ class AdkVoiceAudioBackend @Inject constructor(
                         }
                         if (response.interrupted) {
                             interrupted = true
+                            generatedReply.clear()
                             segment?.chunks?.cancel()
                             segment = null
                             emit(VoiceAudioEvent.Interrupted)
@@ -240,6 +242,7 @@ class AdkVoiceAudioBackend @Inject constructor(
                         if (body.isNotEmpty() && (response.partial || !hasPartialText)) {
                             hasModelText = true
                             if (response.partial) hasPartialText = true
+                            generatedReply.append(body)
                             emit(VoiceAudioEvent.Text(body))
                         }
                         val startsSegment = response.customMetadata?.get(VoiceAudioMarkers.SEGMENT_START) == true
@@ -293,11 +296,14 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         override suspend fun finishTurn() = mutex.withLock { finishTurnLocked() }
 
-        private suspend fun finishTurnLocked() {
+        private suspend fun finishTurnLocked(saveGeneratedReply: Boolean = false) {
             val spoken = synchronized(playedSegments) {
                 playedSegments.values.joinToString("").also { playedSegments.clear() }
             }
-            if (spoken.isNotBlank()) conversation.enqueue(Content.fromText(Role.MODEL, spoken))
+            // 挂断时把已生成的文字留在聊天历史中；通话内收尾仍按完整播完的句子记账。
+            val reply = if (saveGeneratedReply) generatedReply.toString().ifBlank { spoken } else spoken
+            generatedReply.clear()
+            if (reply.isNotBlank()) conversation.enqueue(Content.fromText(Role.MODEL, reply))
             conversation.flush()
         }
 
@@ -307,7 +313,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             mutex.withLock {
                 if (closed) return@withLock
                 try {
-                    finishTurnLocked()
+                    finishTurnLocked(saveGeneratedReply = true)
                 } finally {
                     closed = true
                     conversation.release()

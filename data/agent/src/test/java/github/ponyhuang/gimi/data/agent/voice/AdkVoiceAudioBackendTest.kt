@@ -168,6 +168,42 @@ class AdkVoiceAudioBackendTest {
     }
 
     @Test
+    fun hangingUpDuringPlaybackSavesTheGeneratedReplyExactlyOnce(): Unit = runBlocking {
+        withTimeout(5_000) {
+            val answer = "第一句。还没播出的第二句。"
+            every { textModel.name } returns "fake"
+            every { textModel.generateContent(any(), true) } returns flowOf(text(answer, true))
+            every { synthesis.synthesize(any()) } returns flow {
+                emit(pcm)
+                awaitCancellation()
+            }
+            coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
+            val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
+
+            val playbackStarted = CompletableDeferred<Unit>()
+            val reply = launch {
+                coroutineScope {
+                    session.respond("请继续", "").collect { event ->
+                        if (event is VoiceAudioEvent.Audio) launch {
+                            event.audio.collect { playbackStarted.complete(Unit) }
+                        }
+                    }
+                }
+            }
+            playbackStarted.await()
+            reply.cancelAndJoin()
+            session.close()
+            session.close()
+
+            verify(exactly = 1) { persistence.enqueue(match { it.role == Role.MODEL }) }
+            verify(exactly = 1) {
+                persistence.enqueue(match { it.role == Role.MODEL && it.parts.single().text == answer })
+            }
+        }
+    }
+
+    @Test
     fun interruptedReplySeedsOnlyTheActuallyHeardSentencesIntoTheNextConnection() = runBlocking {
         withTimeout(5_000) {
             val requests = mutableListOf<LlmRequest>()
@@ -220,7 +256,8 @@ class AdkVoiceAudioBackendTest {
                 awaitCancellation()
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
+            val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
             val first = launch {
                 coroutineScope {
                     session.respond("旧问题", "").collect { event ->
@@ -230,6 +267,7 @@ class AdkVoiceAudioBackendTest {
             }
             started.await()
             first.cancelAndJoin()
+            session.finishTurn()
             every { textModel.generateContent(any(), true) } answers {
                 requests += firstArg<LlmRequest>()
                 emptyFlow()
@@ -239,6 +277,7 @@ class AdkVoiceAudioBackendTest {
             assertEquals(listOf("旧问题", "新问题"), requests.last().contents.map { it.parts.single().text })
             assertTrue(requests.last().contents.all { it.role == Role.USER })
             session.close()
+            verify(exactly = 0) { persistence.enqueue(match { it.role == Role.MODEL }) }
         }
     }
 

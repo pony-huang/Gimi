@@ -18,6 +18,14 @@ object VoiceAudioMarkers {
 }
 
 /** 将模型正文增量切成适合顺序合成的句子，并限制无标点长回答的等待长度。 */
+/**
+ * 把流式文本增量切成可朗读的合成单元。
+ *
+ * 输出保证：每个单元 trim 后必须含至少一个字母或数字（含汉字）。纯 emoji/标点尾块
+ * （LLM 回复概率性以 😊、…… 结尾）无可朗读内容，送进厂商合成会被拒绝
+ * （百炼返回 InvalidParameter "Please ensure input text is valid"）并让整轮回复
+ * 在音频播完后标失败；因此在缓冲层直接丢弃，不再依赖各调用方各自过滤。
+ */
 class VoiceSentenceBuffer {
     private val pending = StringBuilder()
 
@@ -40,13 +48,15 @@ class VoiceSentenceBuffer {
                 while (length < pending.length && pending[length] in "。！？!?；,.，\n") length++
             }
             if (length < pending.length && pending[length - 1].isHighSurrogate() && pending[length].isLowSurrogate()) length--
-            pending.substring(0, length).trim().takeIf { it.isNotEmpty() }?.let(sentences::add)
+            pending.substring(0, length).trim().takeIf { it.any(Char::isLetterOrDigit) }?.let(sentences::add)
             pending.delete(0, length)
         }
         return sentences
     }
 
+    /** 剩余可朗读文本；尾块只有 emoji/标点时返回空串，调用方的非空判断据此跳过合成。 */
     fun finish(): String = pending.toString().trim().also { pending.clear() }
+        .takeIf { it.any(Char::isLetterOrDigit) }.orEmpty()
 
     private companion object {
         const val MAX_LENGTH = 100

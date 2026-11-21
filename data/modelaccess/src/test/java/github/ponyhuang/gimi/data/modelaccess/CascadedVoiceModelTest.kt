@@ -182,6 +182,27 @@ class CascadedVoiceModelTest : LiveConnectionContractTest() {
     }
 
     @Test
+    fun unpronounceableTrailingUnitsNeverReachSynthesis() = runTest {
+        val requested = mutableListOf<String>()
+        every { synthesis.synthesize(any()) } answers {
+            requested.add(firstArg())
+            flowOf(byteArrayOf(1, 0))
+        }
+        // 真机故障形态：回复以仅含 emoji 的尾块结尾，DashScope 对其返回
+        // InvalidParameter "Please ensure input text is valid"，整轮在音频播完后被标失败。
+        every { textModel.generateContent(any(), true) } answers {
+            flowOf(LlmResponse(content = Content.fromText(Role.MODEL, "好的！😊"), partial = true))
+        }
+        val connection = model.connect(manual)
+        connection.sendContent(Content.fromText(Role.USER, "打个招呼"))
+        val responses = connection.receive().toList()
+        connection.closeSession()
+        assertTrue(responses.last().turnComplete == true)
+        // 合成器只应收到可朗读单元；纯 emoji/标点尾块应被丢弃而不是送给厂商。
+        assertTrue("Synthesized: $requested", requested.none { unit -> unit.none(Char::isLetterOrDigit) })
+    }
+
+    @Test
     fun closingAnActiveConnectionCancelsItsNetworkProducer() = runTest {
         val started = CompletableDeferred<Unit>()
         val stopped = CompletableDeferred<Unit>()

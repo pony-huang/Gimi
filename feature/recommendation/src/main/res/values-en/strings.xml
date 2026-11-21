@@ -33,7 +33,7 @@
     <string name="recommendation_tool_loading_on_demand">On demand</string>
     <string name="recommendation_theme_section">Theme</string>
     <string name="recommendation_theme_mode_title">Theme mode</string>
-    <string name="recommendation_theme_system">Follow system</string>
+    <string name="recommendation_theme_system">System</string>
     <string name="recommendation_theme_light">Light</string>
     <string name="recommendation_theme_dark">Dark</string>
 </resources>

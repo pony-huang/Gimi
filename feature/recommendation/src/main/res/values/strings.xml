@@ -33,7 +33,7 @@
     <string name="recommendation_tool_loading_on_demand">按需加载</string>
     <string name="recommendation_theme_section">主题</string>
     <string name="recommendation_theme_mode_title">主题模式</string>
-    <string name="recommendation_theme_system">跟随系统</string>
+    <string name="recommendation_theme_system">系统</string>
     <string name="recommendation_theme_light">白天</string>
     <string name="recommendation_theme_dark">夜间</string>
 </resources>

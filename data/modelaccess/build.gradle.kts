@@ -23,6 +23,8 @@ dependencies {
     // 会话域的厂商文件引用（gimi-file://）契约与附件模型由转换器消费。
     implementation(project(":domain:conversation"))
     implementation(project(":core:common"))
+    // 厂商文件上传暂存目录走受管目录声明（ManagedDirectorySpec + AppDirectoryResolver）。
+    implementation(project(":core:storage"))
     // 实时模型/连接探针与 WS 语音适配器共享传输内核（VoiceWsKernel）与音频格式契约。
     implementation(project(":core:network"))
     implementation(project(":core:audio"))

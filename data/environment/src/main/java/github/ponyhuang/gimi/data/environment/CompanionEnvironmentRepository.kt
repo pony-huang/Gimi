@@ -12,6 +12,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.core.storage.AppDirectoryResolver
 import github.ponyhuang.gimi.domain.environment.*
 import java.io.IOException
 import javax.inject.Inject
@@ -26,10 +27,13 @@ const val RUNTIME_PACKAGE = "github.ponyhuang.gimi.environment.runtime"
 
 /** 只通过签名保护的 Provider 与独立 UID 通信，文件字节和凭据不进入 Agent 元数据。 */
 @Singleton
-class CompanionEnvironmentRepository @Inject constructor(@ApplicationContext private val context: Context) : EnvironmentRepository {
+class CompanionEnvironmentRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val directoryResolver: AppDirectoryResolver,
+) : EnvironmentRepository {
     private fun extractBundledApk(): java.io.File {
         // 必须落在 FileProvider 已声明的 shareable/ 缓存目录，否则 getUriForFile 解析失败。
-        val dir = java.io.File(context.cacheDir, "shareable").apply { mkdirs() }
+        val dir = directoryResolver.resolve(EnvironmentStorage.CompanionApk, create = true)
         val file = java.io.File(dir, "environment-runtime.apk")
         context.assets.open("environment-runtime.apk").use { input -> file.outputStream().use { input.copyTo(it) } }
         return file

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.environment
 
+import github.ponyhuang.gimi.core.storage.AppDirectoryResolver
+
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -49,7 +51,9 @@ class RuntimeVersionDetectionTest {
         every { resolver.call(any<Uri>(), "status", null, any()) } returns Bundle().apply {
             putBoolean("installed", true); putBoolean("enabled", true)
         }
-        repository = CompanionEnvironmentRepository(context)
+        val directories = mockk<AppDirectoryResolver>()
+        every { directories.resolve(any(), any()) } returns temporary.root
+        repository = CompanionEnvironmentRepository(context, directories)
     }
     @Test fun versionsAreDetectedAndBundledApkIsExtractedOnce() = runTest {
         val state = repository.status()

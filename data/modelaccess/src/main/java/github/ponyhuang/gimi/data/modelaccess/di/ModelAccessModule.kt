@@ -7,9 +7,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
+import github.ponyhuang.gimi.core.storage.AppDirectoryResolver
+import github.ponyhuang.gimi.data.modelaccess.ModelAccessStorage
 import github.ponyhuang.gimi.core.network.SpeechWebSocketClient
 import github.ponyhuang.gimi.data.modelaccess.deepseek.speech.DeepSeekSpeechRecognizer
 import github.ponyhuang.gimi.data.modelaccess.deepseek.speech.DeepSeekSpeechSynthesizer
@@ -209,20 +208,20 @@ abstract class ModelAccessModule {
         @Singleton
         @IntoSet
         fun provideOpenAiProtocolFileClient(
-            @ApplicationContext context: Context,
+            directoryResolver: AppDirectoryResolver,
         ): github.ponyhuang.gimi.data.modelaccess.file.FileProtocolClient =
             github.ponyhuang.gimi.data.modelaccess.file.OpenAiProtocolFileClient(
-                File(context.cacheDir, "vendor-files"),
+                directoryResolver.resolve(ModelAccessStorage.VendorFiles, create = true),
             )
 
         @Provides
         @Singleton
         @IntoSet
         fun provideClaudeProtocolFileClient(
-            @ApplicationContext context: Context,
+            directoryResolver: AppDirectoryResolver,
         ): github.ponyhuang.gimi.data.modelaccess.file.FileProtocolClient =
             github.ponyhuang.gimi.data.modelaccess.file.ClaudeProtocolFileClient(
-                File(context.cacheDir, "vendor-files"),
+                directoryResolver.resolve(ModelAccessStorage.VendorFiles, create = true),
             )
 
         @Provides

@@ -175,6 +175,8 @@ dependencies {
     implementation(project(":domain:recommendation"))
     implementation(project(":domain:memory"))
     implementation(project(":core:common"))
+    // 环境配套 APK 安装在导航边界生成共享 URI，走 ShareableFileUriFactory 静态入口。
+    implementation(project(":core:storage"))
     implementation(project(":data:modelcatalog"))
     implementation(project(":data:voice"))
     implementation(project(":data:conversation"))

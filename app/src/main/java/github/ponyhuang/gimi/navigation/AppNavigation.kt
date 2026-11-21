@@ -2,7 +2,8 @@ package github.ponyhuang.gimi.navigation
 
 import android.Manifest
 import android.content.Intent
-import androidx.core.content.FileProvider
+import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
+import github.ponyhuang.gimi.data.environment.EnvironmentStorage
 import github.ponyhuang.gimi.feature.environment.EnvironmentDestination
 import github.ponyhuang.gimi.feature.environment.EnvironmentEntryProvider
 import android.content.pm.PackageManager
@@ -298,7 +299,8 @@ internal fun AppEntryContent(
                 if (!context.packageManager.canRequestPackageInstalls()) {
                     context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
                 } else {
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", java.io.File(path))
+                    // UI 边界无法注入工厂，走受管目录静态入口，路径由环境存储 spec 校验。
+                    val uri = ShareableFileUriFactory.uriFor(context, java.io.File(path), EnvironmentStorage.CompanionApk)
                     context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
                 }

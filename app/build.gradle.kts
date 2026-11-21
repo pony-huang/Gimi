@@ -32,8 +32,11 @@ listOf("debug", "release").forEach { buildType ->
             "merge${capitalized}Assets",
             "lintVitalAnalyze$capitalized",
             "lintAnalyze$capitalized",
+            "lintAnalyze${capitalized}AndroidTest",
+            "lintAnalyze${capitalized}UnitTest",
             "generate${capitalized}LintVitalReportModel",
             "generate${capitalized}LintModel",
+            "generate${capitalized}LintReportModel",
         )
     }.configureEach { dependsOn(packageRuntime) }
 

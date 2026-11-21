@@ -33,16 +33,16 @@
 <div align="center">
 <table>
 <tr>
-<td><img src="doc/screenshots/chat.png" width="220" alt="对话界面" /><br /><sub>对话界面</sub></td>
+<td><img src="doc/screenshots/assistant-chat.png" width="220" alt="助手对话" /><br /><sub>助手对话</sub></td>
 <td><img src="doc/screenshots/add-service.png" width="220" alt="添加模型服务" /><br /><sub>添加模型服务</sub></td>
-<td><img src="doc/screenshots/settings.png" width="220" alt="设置" /><br /><sub>设置</sub></td>
-<td><img src="doc/screenshots/local-environment.png" width="220" alt="本地环境" /><br /><sub>本地环境</sub></td>
+<td><img src="doc/screenshots/voice-settings.png" width="220" alt="语音设置" /><br /><sub>语音设置</sub></td>
+<td><img src="doc/screenshots/conversation-drawer.png" width="220" alt="会话抽屉" /><br /><sub>会话抽屉</sub></td>
 </tr>
 <tr>
-<td><img src="doc/screenshots/voice-ready.png" width="220" alt="语音通话" /><br /><sub>语音通话</sub></td>
-<td><img src="doc/screenshots/voice-listening.png" width="220" alt="语音通话字幕" /><br /><sub>语音通话字幕</sub></td>
-<td><img src="doc/screenshots/voice-ready-dark.png" width="220" alt="语音通话深色模式" /><br /><sub>语音通话深色模式</sub></td>
-<td><img src="doc/screenshots/voice-thinking-dark.png" width="220" alt="实时助手深色模式" /><br /><sub>实时助手深色模式</sub></td>
+<td><img src="doc/screenshots/voice-cascaded.png" width="220" alt="语音通话（级联）" /><br /><sub>语音通话（级联）</sub></td>
+<td><img src="doc/screenshots/chatbot-persona.png" width="220" alt="Chatbot 角色对话" /><br /><sub>Chatbot 角色对话</sub></td>
+<td><img src="doc/screenshots/voice-cascaded-dark.png" width="220" alt="语音通话深色模式" /><br /><sub>语音通话深色模式</sub></td>
+<td><img src="doc/screenshots/chatbot-mode-dark.png" width="220" alt="Chatbot 模式深色" /><br /><sub>Chatbot 模式深色</sub></td>
 </tr>
 </table>
 </div>

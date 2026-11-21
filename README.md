@@ -33,16 +33,16 @@ Built as a fully native Android app with Material 3 and Jetpack Compose.
 <div align="center">
 <table>
 <tr>
-<td><img src="doc/screenshots/chat.png" width="220" alt="Chat" /><br /><sub>Chat</sub></td>
+<td><img src="doc/screenshots/assistant-chat.png" width="220" alt="Assistant chat" /><br /><sub>Assistant chat</sub></td>
 <td><img src="doc/screenshots/add-service.png" width="220" alt="Add service" /><br /><sub>Add service</sub></td>
-<td><img src="doc/screenshots/settings.png" width="220" alt="Settings" /><br /><sub>Settings</sub></td>
-<td><img src="doc/screenshots/local-environment.png" width="220" alt="Local environment" /><br /><sub>Local environment</sub></td>
+<td><img src="doc/screenshots/voice-settings.png" width="220" alt="Voice settings" /><br /><sub>Voice settings</sub></td>
+<td><img src="doc/screenshots/conversation-drawer.png" width="220" alt="Conversation drawer" /><br /><sub>Conversation drawer</sub></td>
 </tr>
 <tr>
-<td><img src="doc/screenshots/voice-ready.png" width="220" alt="Voice call" /><br /><sub>Voice call</sub></td>
-<td><img src="doc/screenshots/voice-listening.png" width="220" alt="Voice call with captions" /><br /><sub>Voice call with captions</sub></td>
-<td><img src="doc/screenshots/voice-ready-dark.png" width="220" alt="Voice call, dark mode" /><br /><sub>Voice call, dark mode</sub></td>
-<td><img src="doc/screenshots/voice-thinking-dark.png" width="220" alt="Realtime assistant, dark mode" /><br /><sub>Realtime assistant, dark mode</sub></td>
+<td><img src="doc/screenshots/voice-cascaded.png" width="220" alt="Voice call, cascaded" /><br /><sub>Voice call, cascaded</sub></td>
+<td><img src="doc/screenshots/chatbot-persona.png" width="220" alt="Chatbot persona" /><br /><sub>Chatbot persona</sub></td>
+<td><img src="doc/screenshots/voice-cascaded-dark.png" width="220" alt="Voice call, dark mode" /><br /><sub>Voice call, dark mode</sub></td>
+<td><img src="doc/screenshots/chatbot-mode-dark.png" width="220" alt="Chatbot mode, dark mode" /><br /><sub>Chatbot mode, dark mode</sub></td>
 </tr>
 </table>
 </div>

@@ -13,7 +13,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 @Composable
 fun RecommendationSettingsRoute(
     onBack: () -> Unit,
-    onOpenSimpleChatPromptSettings: () -> Unit = {},
+    onOpenChatbotPromptSettings: () -> Unit = {},
     onOpenRecommendationUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: RecommendationSettingsViewModel = hiltViewModel(),
@@ -27,7 +27,7 @@ fun RecommendationSettingsRoute(
         RecommendationSettingsScreen(
             state = state,
             onAction = viewModel::onAction,
-            onOpenSimpleChatPromptSettings = onOpenSimpleChatPromptSettings,
+            onOpenChatbotPromptSettings = onOpenChatbotPromptSettings,
             onOpenRecommendationUpdate = onOpenRecommendationUpdate,
             modifier = scaffoldModifier,
         )

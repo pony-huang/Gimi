@@ -51,7 +51,7 @@ class AgentSessionPipelineTest {
         modelSelection = selection,
     )
 
-    private fun emptySimpleChatPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
+    private fun emptyChatbotPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
         override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
         override val builtInPresets = emptyList<ChatbotRolePreset>()
         override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -118,7 +118,7 @@ class AgentSessionPipelineTest {
         val agentVoice = VoiceAgentConversation(
             scriptedRunner(execution), mockk(), mockk(relaxed = true), mockk(),
         )
-        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
+        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptyChatbotPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
     }
 
     @Test
@@ -160,7 +160,7 @@ class AgentSessionPipelineTest {
                 modelText("今天天气不错。", partial = true),
             ))), mockk(), mockk(relaxed = true), mockk(),
         )
-        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
+        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptyChatbotPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
         val session = backend.open(configuration)
         val events = withTimeout(10_000) { session.respond("你好", "").toList() }
         assertEquals(listOf("你好。", "今天天气不错。"),

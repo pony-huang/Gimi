@@ -40,10 +40,13 @@ sealed interface DraftUploadState {
 }
 
 /**
- * 聊天输入框文档草稿的厂商上传编排。
+ * 聊天输入框文档草稿的厂商上传编排；助手 / Chatbot / 实时语音三个 surface 共用。
  *
- * 只编排"chip 阶段预热上传"这一条路径：成功后写注册表（上传即记录，与是否发送无关）
- * 并置 Ready；历史重放不经过这里（会话引用直通 file_id，不上传不哈希）。
+ * 两个入口共用同一套任务去重、状态机与注册表记录（上传成功即记录，与是否发送无关）：
+ * - [upload]：chip 阶段预热上传（选完即传）；已带厂商引用的草稿直接忽略。
+ *   历史重放不经过这里（会话引用直通 file_id，不上传不哈希）。
+ * - [awaitUpload]：发送时补传，挂起至终态。供发送前准备路径兜底：同厂商已就绪的草稿
+ *   短路复用不重传；厂商切换后归属旧厂商的本地副本草稿换厂商重传。
  * 上传端点与凭据来自当前选择实例的对话连接解析视图。
  */
 class ChatFileUploadCoordinator(
@@ -59,13 +62,54 @@ class ChatFileUploadCoordinator(
 
     private val jobs = mutableMapOf<String, Job>()
 
-    /** 启动 [draft] 的上传；同引用去重，未启用上传或已是厂商引用的草稿直接忽略。 */
+    /** 启动 [draft] 的 chip 阶段上传；未启用上传或已是厂商引用的草稿直接忽略。 */
     fun upload(draft: DraftAttachment, selection: ModelSelection) {
         if (draft.category != AttachmentCategory.DOCUMENT || draft.isVendorUploaded) return
         if (!isFileUploadEnabled(selection)) return
+        startUpload(draft, selection)
+    }
+
+    /**
+     * 发送时补传：挂起至该草稿的上传终态并返回。
+     *
+     * 与 chip 阶段共用任务去重（进行中的同引用任务直接等待，不同入口重复触发不重传）；
+     * 同厂商已就绪的草稿短路返回，不做网络往返。与 [upload] 不同，这里不设
+     * "已带厂商引用即跳过"门——厂商切换后的本地副本草稿必须换厂商重传。
+     * 调用方（发送准备路径）据终态决定放行或落失败。
+     */
+    suspend fun awaitUpload(draft: DraftAttachment, selection: ModelSelection): DraftUploadState {
+        jobs[draft.reference]?.let { job ->
+            job.join()
+            return _states.value[draft.reference] ?: DraftUploadState.Failed(VendorFileFailureReason.VENDOR_ERROR)
+        }
+        if (draft.category != AttachmentCategory.DOCUMENT) {
+            return DraftUploadState.Failed(VendorFileFailureReason.VENDOR_ERROR, "non-document draft")
+        }
+        if (!isFileUploadEnabled(selection)) {
+            return DraftUploadState.Failed(VendorFileFailureReason.VENDOR_ERROR, "file upload disabled")
+        }
+        val vendor = resolveConnection(selection)?.templateId.orEmpty()
+        // 已带同厂商 file 引用：发送门控已保证 chip 阶段落袋，直接复用无需网络往返。
+        if (draft.isVendorUploaded && draft.fileVendor == vendor) {
+            return DraftUploadState.Ready(requireNotNull(draft.fileId), vendor)
+        }
+        // chip 阶段已完成同厂商上传但草稿副本尚未回填 fileId：复用终态，不重复上传。
+        (_states.value[draft.reference] as? DraftUploadState.Ready)
+            ?.takeIf { it.vendor == vendor }
+            ?.let { return it }
+        startUpload(draft, selection)
+        jobs[draft.reference]?.join()
+        return _states.value[draft.reference] ?: DraftUploadState.Failed(VendorFileFailureReason.VENDOR_ERROR)
+    }
+
+    /** 统一的上传任务体：状态置 Uploading → 网关上传 → 成功写注册表并置 Ready / 失败置 Failed。 */
+    private fun startUpload(draft: DraftAttachment, selection: ModelSelection) {
+        // 同引用去重：进行中的任务直接复用（chip 阶段与发送时补传可能先后触发同草稿）。
         if (jobs.containsKey(draft.reference)) return
         val resolved = resolveConnection(selection)
         if (resolved == null) {
+            // 与网关失败同记一条：静默置 Failed 会让真机上"无网络请求、无日志"的失败无法定位。
+            Log.w(TAG, "Vendor file upload aborted: connection unresolved for selection=$selection")
             _states.update {
                 it + (draft.reference to DraftUploadState.Failed(VendorFileFailureReason.VENDOR_ERROR))
             }

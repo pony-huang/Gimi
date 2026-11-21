@@ -2,8 +2,10 @@ package github.ponyhuang.gimi.feature.chat.realtime
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
@@ -12,10 +14,13 @@ import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
+import github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
@@ -108,6 +113,49 @@ class RealtimeVoiceViewModelTest {
             assertFalse(state.realtimeAvailable)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun documentUploadResolvesConnectionFromCachedSettings() = runTest {
+        // 回归：latestSettings 未缓存时 coordinator 的连接解析恒为 null，上传瞬间静默失败
+        // （无网络请求、无日志）。设置流发射后命令式路径必须能解析到连接并走到网关。
+        val settings = configuredSettings().let { base ->
+            val instance = base.instances.single()
+            base.copy(
+                instances = listOf(instance.copy(connections = instance.connections.map { connection ->
+                    if (connection.id == "chat") {
+                        connection.copy(models = listOf(Model(
+                            id = "chat-model",
+                            name = "Chat",
+                            multimodal = MultimodalCapabilities(
+                                documentInput = DocumentInputCapability(ingestMode = FileIngestMode.FILE_REFERENCE),
+                            ),
+                        )))
+                    } else {
+                        connection
+                    }
+                })),
+                assistantSelection = ModelSelection(instance.id, "chat", "chat-model"),
+            )
+        }
+        val fileGateway = mockk<github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway>(relaxed = true)
+        coEvery { fileGateway.upload(any(), any(), any(), any(), any()) } returns
+            github.ponyhuang.gimi.domain.conversation.repository.VendorFileUploadResult.Uploaded("file-1", 10, 1)
+        val uploadedFileRegistry = mockk<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry>(relaxed = true)
+        val viewModel = viewModel(settings = settings, fileGateway = fileGateway, uploadedFileRegistry = uploadedFileRegistry)
+        advanceUntilIdle()
+
+        viewModel.uploadDocument(DraftAttachment(
+            reference = "/tmp/report.pdf",
+            displayName = "report.pdf",
+            mimeType = "application/pdf",
+            sizeBytes = 10,
+            category = AttachmentCategory.DOCUMENT,
+        ))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { fileGateway.upload("qwen", any(), any(), any(), any()) }
+        coVerify(exactly = 1) { uploadedFileRegistry.record(any()) }
     }
 
     @Test
@@ -550,6 +598,8 @@ class RealtimeVoiceViewModelTest {
             validModels += defaultsFixture().cascadedSynthesisModel!!
             validModels += defaultsFixture().realtimeModel!!
         },
+        fileGateway: github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway = mockk(relaxed = true),
+        uploadedFileRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry = mockk(relaxed = true),
     ): RealtimeVoiceViewModel {
         val voiceCapabilities = mockk<VoiceCapabilityResolver>(relaxed = true) {
             every { isSupported(any(), ModelCapability.Realtime) } returns true
@@ -568,8 +618,8 @@ class RealtimeVoiceViewModelTest {
             lookup = lookup,
             observeSettings = observeSettings,
             attachmentRepository = mockk(relaxed = true),
-            fileGateway = mockk(relaxed = true),
-            uploadedFileRegistry = mockk(relaxed = true),
+            fileGateway = fileGateway,
+            uploadedFileRegistry = uploadedFileRegistry,
             validateAttachments = ValidateChatAttachmentsUseCase(),
         )
     }

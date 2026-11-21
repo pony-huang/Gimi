@@ -20,17 +20,17 @@ import org.junit.Test
 
 /** 预设管理页的行为：新建落库必须带稳定 id，官方预设只读、查看不进入编辑流程。 */
 @OptIn(ExperimentalCoroutinesApi::class)
-class SimpleChatPromptViewModelTest {
+class ChatbotPromptViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
 
     @Test
     fun creatingAPresetStoresItWithAGeneratedId() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
 
-        viewModel.onAction(SimpleChatPromptAction.StartCreate)
-        viewModel.onAction(SimpleChatPromptAction.Save("简洁速答", "直接给结论。"))
+        viewModel.onAction(ChatbotPromptAction.StartCreate)
+        viewModel.onAction(ChatbotPromptAction.Save("简洁速答", "直接给结论。"))
 
         val stored = repository.presets.value.single()
         assertTrue("新建预设必须带非空 id", stored.id.isNotBlank())
@@ -41,10 +41,10 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun blankInputIsNotPersisted() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
 
-        viewModel.onAction(SimpleChatPromptAction.StartCreate)
-        viewModel.onAction(SimpleChatPromptAction.Save("  ", "内容"))
+        viewModel.onAction(ChatbotPromptAction.StartCreate)
+        viewModel.onAction(ChatbotPromptAction.Save("  ", "内容"))
 
         assertTrue(repository.presets.value.isEmpty())
     }
@@ -53,10 +53,10 @@ class SimpleChatPromptViewModelTest {
     fun editingAPresetKeepsItsId() = runTest {
         val repository = FakePromptRepository()
         repository.upsertPreset(ChatbotRolePreset("p1", "旧名", "旧内容。"))
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
 
-        viewModel.onAction(SimpleChatPromptAction.StartEdit("p1"))
-        viewModel.onAction(SimpleChatPromptAction.Save("新名", "新内容。"))
+        viewModel.onAction(ChatbotPromptAction.StartEdit("p1"))
+        viewModel.onAction(ChatbotPromptAction.Save("新名", "新内容。"))
 
         val stored = repository.presets.value.single()
         assertEquals("p1", stored.id)
@@ -66,12 +66,12 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun builtInPresetsAreListedAndViewedWithoutEnteringTheEditor() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
 
         viewModel.uiState.test {
             assertEquals(listOf("builtin.demo"), awaitItem().builtInPresets.map { it.id })
 
-            viewModel.onAction(SimpleChatPromptAction.ViewPrompt("builtin.demo"))
+            viewModel.onAction(ChatbotPromptAction.ViewPrompt("builtin.demo"))
 
             val state = awaitItem()
             assertEquals("builtin.demo", state.viewing?.id)
@@ -83,11 +83,11 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun selectingRoleKeepsConversationSelectionsIndependent() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
         viewModel.bind("first")
-        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        viewModel.onAction(ChatbotPromptAction.Select("builtin.demo"))
         viewModel.bind("second")
-        viewModel.onAction(SimpleChatPromptAction.Select(null))
+        viewModel.onAction(ChatbotPromptAction.Select(null))
         assertEquals("builtin.demo", repository.selectedPresetIds.value["first"])
         assertNull(repository.selectedPresetIds.value["second"])
     }
@@ -95,18 +95,18 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun unboundManagementDoesNotChangeConversationRoles() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
-        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
+        viewModel.onAction(ChatbotPromptAction.Select("builtin.demo"))
         assertTrue(repository.selectedPresetIds.value.isEmpty())
     }
 
     @Test
     fun copyingBuiltInRoleCreatesEditableIndependentPreset() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
-        viewModel.onAction(SimpleChatPromptAction.ViewPrompt("builtin.demo"))
-        viewModel.onAction(SimpleChatPromptAction.CopyViewedPreset)
-        viewModel.onAction(SimpleChatPromptAction.Save("我的角色", "自定义正文"))
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
+        viewModel.onAction(ChatbotPromptAction.ViewPrompt("builtin.demo"))
+        viewModel.onAction(ChatbotPromptAction.CopyViewedPreset)
+        viewModel.onAction(ChatbotPromptAction.Save("我的角色", "自定义正文"))
         assertEquals("我的角色", repository.presets.value.single().name)
         assertTrue(repository.presets.value.single().id != "builtin.demo")
         assertEquals("官方人设", repository.builtInPresets.single().name)
@@ -116,16 +116,16 @@ class SimpleChatPromptViewModelTest {
     fun roleRemainsLockedFromConnectionThroughCallCleanup() = runTest {
         val repository = FakePromptRepository()
         val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
-        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController(call))
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController(call))
         viewModel.bind("conversation")
 
-        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        viewModel.onAction(ChatbotPromptAction.Select("builtin.demo"))
         assertNull(repository.selectedPresetIds.value["conversation"])
         call.value = RealtimeVoiceCallState(ending = true)
-        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        viewModel.onAction(ChatbotPromptAction.Select("builtin.demo"))
         assertNull(repository.selectedPresetIds.value["conversation"])
         call.value = RealtimeVoiceCallState()
-        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        viewModel.onAction(ChatbotPromptAction.Select("builtin.demo"))
         assertEquals("builtin.demo", repository.selectedPresetIds.value["conversation"])
     }
 

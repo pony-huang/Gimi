@@ -44,7 +44,7 @@ class AppNavigationSmokeTest {
 
     /** 需要必填参数的目的地使用占位值；对应页面应展示空态/错误态而非崩溃。 */
     private val destinations: List<NavKey> = listOf(
-        ChatDestination.SimpleChatPromptSettings,
+        ChatDestination.ChatbotPromptSettings,
         SettingsDestination.Settings,
         SettingsDestination.About,
         SettingsDestination.PrivacyPolicy,

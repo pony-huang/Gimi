@@ -390,7 +390,7 @@ class CascadedVoiceModel(
                 responseModalities = null,
             ))
             llmModel.generateContent(textRequest, stream = true).collect { response ->
-                // 带上厂商错误码与原文：简单聊天路径外层不留完整异常，真机只能靠这条消息定位。
+                // 带上厂商错误码与原文：Chatbot 路径外层不留完整异常，真机只能靠这条消息定位。
                 check(response.errorCode == null && response.errorMessage.isNullOrBlank()) {
                     "Voice model request failed: ${response.errorCode} ${response.errorMessage}"
                 }

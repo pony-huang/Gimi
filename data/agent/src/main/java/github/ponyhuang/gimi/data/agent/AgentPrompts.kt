@@ -71,6 +71,15 @@ object AgentPrompts {
         ASSISTANT_INSTRUCTION + "\n\n" +
             if (voiceResponse) VOICE_RESPONSE_INSTRUCTION else TEXT_RESPONSE_INSTRUCTION
 
+    /**
+     * Chatbot 形态的指令：只做联网检索与回答，不涉及设备侧工具。
+     *
+     * 工具名与 Chatbot 形态挂载的官方工具一致（见 ChatbotOfficialToolset），
+     * 让模型按名字选工具而不是自行猜测检索入口。
+     */
+    fun chatbotInstruction(roleContent: String? = null): String =
+        roleContent?.takeIf(String::isNotBlank)?.let { CHATBOT_INSTRUCTION + "\n\n" + it } ?: CHATBOT_INSTRUCTION
+
     /** 两种助手语音共用的表达契约；完整交付必须以实际工具结果为依据。 */
     internal val VOICE_RESPONSE_INSTRUCTION = """
         <voice_response>
@@ -108,5 +117,23 @@ object AgentPrompts {
         - Use at most 10 words.
         - Output only the title, without quotation marks, a prefix, Markdown formatting, or an explanation.
         </output_requirements>
+    """.trimIndent()
+
+    /** Chatbot 形态指令；联网工具按厂商动态挂载，这里只约定用法，不点名具体工具。 */
+    private val CHATBOT_INSTRUCTION = """
+        <role>
+        你是一位专业、清晰的聊天助手。根据本会话内容回答问题。
+        </role>
+
+        <tool_use>
+        - 需要最新信息或事实核查时，优先使用当前会话提供的联网搜索工具检索。
+        - 已知链接的正文、原文或细节，使用链接阅读类工具获取。
+        - 引用检索到的信息时给出对应链接；工具失败或当前会话没有可用工具时直接说明，不要编造结果。
+        </tool_use>
+
+        <response>
+        - 用用户的语言回答，结论先行，必要时再补充细节。
+        - 回答保持简洁、有条理；内容较长时用 Markdown 分段。
+        </response>
     """.trimIndent()
 }

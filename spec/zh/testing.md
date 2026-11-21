@@ -30,6 +30,12 @@ AGENTS.md 维护默认验证决策表和必需检查。本文说明测试质量�
 适用时，为启用和选择规则增加领域测试。重复请求影响成本或正确性时，检查 HTTP 客户端的隐式重试。
 每项行为明确主要测试归属层；仅为尚未覆盖的接线风险增加跨层测试。
 
+## 设备级检查与基线配置
+
+`app` 的导航冒烟测试（`AppNavigationSmokeTest`）在生产分发体 `AppEntryContent` 中逐个驱动全部类型安全 NavKey，宿主为 `DebugTestHostActivity`（debug 源集）。声明在 androidTest 清单里的宿主 Activity 会落在测试 APK 自己的进程，被 `ActivityScenario` 拒绝，因此宿主放在 debug 源集。运行：`ANDROID_SERIAL=<serial> ./gradlew :app:connectedDebugAndroidTest`；设备策略禁止安装新 instrumentation 包时（部分 Meizu 报 `INSTALL_FAILED_USER_RESTRICTED`），回退模拟器并记录。未注册的目的地会快速失败；带参目的地使用占位 id，应渲染空态/错误态而非崩溃。
+
+基线配置在连接设备上生成并提交于 `app/src/release/generated/baselineProfiles/baseline-prof.txt`。修改 `MainApplication`/`MainActivity` 启动路径或首屏组合后重新生成：`ANDROID_SERIAL=<serial> ./gradlew :app:generateReleaseBaselineProfile`。`:baselineprofile` 的 `StartupBenchmark` 按设计拒绝模拟器，且需要允许安装 instrumentation 包的设备；基准变体带 `profileable` 并使用 debug 签名。
+
 ## 诊断与结果报告
 
 先检查现有逻辑和运行证据。原因仍不明确时，使用聚焦测试复现行为并验证假设，非核心代码也适用。

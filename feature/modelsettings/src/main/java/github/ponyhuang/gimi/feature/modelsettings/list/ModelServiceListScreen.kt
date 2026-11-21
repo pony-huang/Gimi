@@ -1,11 +1,9 @@
 package github.ponyhuang.gimi.feature.modelsettings.list
 
 import android.content.res.Configuration
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CloudQueue
-import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -33,7 +30,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.feature.modelsettings.detail.HorizontalRowDivider
 import github.ponyhuang.gimi.feature.modelsettings.detail.ServiceListPreviewFixtures
 import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -44,7 +40,6 @@ import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.ChevronRight
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
@@ -55,13 +50,11 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
-/** 列表行的展示投影：图标、来源行与用途摘要都在这里推导，页面保持无状态。 */
+/** 列表行的展示投影：图标与说明行都在这里推导，页面保持无状态。 */
 internal data class ServiceListRow(
     val instance: ModelServiceInstance,
-    /** 来源行；内置厂商由图标表达，仅自定义服务显示协议说明。 */
-    val sourceLabel: String?,
-    val summary: String,
-    val isPaused: Boolean,
+    /** 说明行；内置厂商由图标表达来源，仅自定义服务再写一段协议说明。 */
+    val subtitle: String,
 )
 
 @Composable
@@ -147,55 +140,17 @@ private fun ServiceListContent(
 
 @Composable
 private fun ServiceListRowItem(row: ServiceListRow, showDivider: Boolean, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                // 图标 40dp + 行内边距与间距，分隔线与品牌图标右侧对齐，同「默认模型」等偏好行风格。
-                LLMModelServiceIcon(row.instance.templateId.orEmpty(), Modifier.size(40.dp), contentPadding = 7.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(row.instance.name, style = MaterialTheme.typography.bodyLarge)
-                // 内置厂商的来源由品牌图标表达；只有自定义服务才显示协议说明行。
-                if (row.sourceLabel != null) {
-                    Text(
-                        row.sourceLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (row.isPaused) {
-                        Icon(
-                            Icons.Outlined.PauseCircleOutline,
-                            contentDescription = null,
-                            Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Text(
-                        row.summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Icon(
-                Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (showDivider) {
-            HorizontalRowDivider(start = 70)
-        }
-    }
+    // 与「添加服务 · 内置服务商」共用同一行骨架：24dp 品牌图标 + 标题/说明两行，
+    // 行高、内边距、分隔线内缩与尾部箭头都由 PreferenceListItem 统一给出。
+    PreferenceListItem(
+        title = row.instance.name,
+        subtitle = row.subtitle,
+        leadingIcon = { iconModifier ->
+            LLMModelServiceIcon(row.instance.templateId.orEmpty(), iconModifier, contentPadding = 2.dp)
+        },
+        showDivider = showDivider,
+        onClick = onClick,
+    )
 }
 
 @Composable
@@ -234,14 +189,20 @@ internal fun sourceLabel(instance: ModelServiceInstance): String = when (val tem
     else -> templateId
 }
 
-/** 用途摘要：非空能力连接的已选模型数，停用实例加前缀。 */
+/** 说明行：来源（仅自定义服务）+ 能力摘要；停用服务整行加停用前缀。 */
 @Composable
 internal fun ModelServiceInstance.toListRow(): ServiceListRow = ServiceListRow(
     instance = this,
-    sourceLabel = localizedSourceLabel(),
-    summary = localizedSummary(),
-    isPaused = !isEnabled,
+    subtitle = localizedSubtitle(),
 )
+
+@Composable
+private fun ModelServiceInstance.localizedSubtitle(): String {
+    val summary = localizedSummary()
+    val source = localizedSourceLabel()
+    val line = if (source == null) summary else "$source · $summary"
+    return if (isEnabled) line else stringResource(R.string.modelsettings_summary_paused_prefix, line)
+}
 
 @Composable
 private fun ModelServiceInstance.localizedSourceLabel(): String? = when (templateId) {
@@ -255,6 +216,7 @@ private fun ModelServiceInstance.localizedSourceLabel(): String? = when (templat
     else -> null
 }
 
+/** 用途摘要：非空能力连接的已选模型数。 */
 @Composable
 private fun ModelServiceInstance.localizedSummary(): String {
     val counts = buildList {
@@ -267,8 +229,7 @@ private fun ModelServiceInstance.localizedSummary(): String {
         connection(ServiceCapability.Realtime)?.models?.size?.takeIf { it > 0 }
             ?.let { add(stringResource(R.string.modelsettings_capability_count_realtime, it)) }
     }
-    val summary = counts.joinToString(" · ").ifEmpty { stringResource(R.string.modelsettings_summary_unconfigured) }
-    return if (isEnabled) summary else stringResource(R.string.modelsettings_summary_paused_prefix, summary)
+    return counts.joinToString(" · ").ifEmpty { stringResource(R.string.modelsettings_summary_unconfigured) }
 }
 
 private const val PROTOCOL_LABEL_ANTHROPIC = "Messages"

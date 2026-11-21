@@ -32,6 +32,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +62,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.isOmniLlm
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiPickerItemRow
 import github.ponyhuang.gimi.ui.components.GimiSheetBase
@@ -90,10 +93,12 @@ internal fun ChatModelPickerSheet(
     reasoningEnabled: Boolean = true,
     onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onThinkingEnabledChange: (Boolean) -> Unit = { },
+    /** 会话因包含厂商 file 引用附件而锁定的厂商模板 ID；null 表示未锁定。 */
+    lockedVendor: String? = null,
+    modelSwitchCreatesNewSession: Boolean = false,
 ) {
-    // 页级状态放在抽屉层：一级页标题是"选择模型"，二级页是厂商名，标题行要跟着页级切；
-    // 标题与主体共用同一份状态与同一份切页动效，切页时两者才会同步位移。
     var selectedServiceId by rememberSaveable { mutableStateOf<String?>(null) }
+    val page = selectedServiceId?.let { ModelPickerPage.Service(it) } ?: ModelPickerPage.Providers
 
     PreferenceStyleScope(PreferenceStyle.Compact) {
         GimiSheetBase(
@@ -103,11 +108,12 @@ internal fun ChatModelPickerSheet(
             modifier = Modifier.testTag("chat_model_picker_sheet"),
             header = {
                 AnimatedContent(
-                    targetState = selectedServiceId,
+                    targetState = page,
                     transitionSpec = { modelPickerPageTransition() },
                     label = "model-picker-title",
                     modifier = Modifier.fillMaxWidth(),
-                ) { serviceId ->
+                ) { current ->
+                    val serviceId = (current as? ModelPickerPage.Service)?.id
                     ChatModelPickerTitle(
                         serviceId = serviceId,
                         serviceName = serviceId?.let { id ->
@@ -115,25 +121,42 @@ internal fun ChatModelPickerSheet(
                         },
                         // 备注跟着当前模型协议走：一级页标题下说明为何没有思考强度控件。
                         showReasoningNotice = !reasoningSupported,
+                        modelSwitchCreatesNewSession = modelSwitchCreatesNewSession,
                         onBack = { selectedServiceId = null },
                         onDismiss = onDismiss,
                     )
                 }
             },
         ) {
-            ChatModelPickerBody(
-                options = options,
-                selection = selection,
-                onPick = onPick,
-                toolConfiguration = toolConfiguration,
-                reasoningSupported = reasoningSupported,
-                reasoningEnabled = reasoningEnabled,
-                onReasoningEffortChange = onReasoningEffortChange,
-                onThinkingEnabledChange = onThinkingEnabledChange,
-                selectedServiceId = selectedServiceId,
-                onSelectService = { selectedServiceId = it },
+            BackHandler(enabled = page !is ModelPickerPage.Providers) {
+                selectedServiceId = null
+            }
+            // 高度上限来自抽屉自身拿到的窗口约束；若改用 LocalConfiguration.screenHeightDp，
+            // 键盘显隐或窗口配置变化会让上限被重算，抽屉高度随之在滚动过程中反复变化而抽动。
+            // 主体用 heightIn(max) 给出上限，页面内容用可滚动的 Column 贴着内容长，
+            // 超过上限时列表自己滚动。短距离位移保留层级方向，尺寸使用同一缓动，
+            // 避免列表长度变化时抽屉突然跳高。
+            AnimatedContent(
+                targetState = page,
+                transitionSpec = { modelPickerPageTransition() },
+                label = "model-picker-page",
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) { current ->
+                ChatModelPickerBody(
+                    page = current,
+                    options = options,
+                    selection = selection,
+                    onPick = onPick,
+                    toolConfiguration = toolConfiguration,
+                    reasoningSupported = reasoningSupported,
+                    reasoningEnabled = reasoningEnabled,
+                    onReasoningEffortChange = onReasoningEffortChange,
+                    onThinkingEnabledChange = onThinkingEnabledChange,
+                    onSelectService = { selectedServiceId = it },
+                    lockedVendor = lockedVendor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -149,6 +172,7 @@ private fun ChatModelPickerTitle(
     serviceId: String?,
     serviceName: String?,
     showReasoningNotice: Boolean,
+    modelSwitchCreatesNewSession: Boolean = false,
     onBack: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -184,6 +208,14 @@ private fun ChatModelPickerTitle(
                 modifier = Modifier.padding(horizontal = GimiListDefaults.HorizontalPadding),
             )
         }
+        if (modelSwitchCreatesNewSession) {
+            Text(
+                text = stringResource(R.string.chatbot_model_switch_new_conversation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = GimiListDefaults.HorizontalPadding, vertical = 4.dp),
+            )
+        }
     }
 }
 
@@ -193,8 +225,22 @@ private data class ProviderOption(
     val modelCount: Int,
 )
 
+/** 抽屉页级：一级厂商列表、二级厂商模型列表、角色预设选择页；depth 决定切页滑动方向。 */
+private sealed interface ModelPickerPage {
+    val depth: Int
+
+    object Providers : ModelPickerPage {
+        override val depth = 0
+    }
+
+    data class Service(val id: String) : ModelPickerPage {
+        override val depth = 1
+    }
+}
+
 @Composable
 private fun ChatModelPickerBody(
+    page: ModelPickerPage,
     options: List<EnabledModelRow>,
     selection: ModelSelection?,
     onPick: (EnabledModelRow) -> Unit,
@@ -203,49 +249,36 @@ private fun ChatModelPickerBody(
     reasoningEnabled: Boolean,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onThinkingEnabledChange: (Boolean) -> Unit,
-    selectedServiceId: String?,
     onSelectService: (String?) -> Unit,
+    lockedVendor: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val providers = options
         .groupBy { it.instance.id }
         .map { (_, rows) -> ProviderOption(rows.first().instance, rows.size) }
-    BackHandler(enabled = selectedServiceId != null) { onSelectService(null) }
+    when (page) {
+        is ModelPickerPage.Service -> ProviderModelListContent(
+            serviceId = page.id,
+            options = options,
+            selection = selection,
+            showReasoning = reasoningSupported && toolConfiguration != null &&
+                page.id == selection?.instanceId,
+            reasoningSupported = reasoningSupported,
+            toolConfiguration = toolConfiguration,
+            reasoningEnabled = reasoningEnabled,
+            onReasoningEffortChange = onReasoningEffortChange,
+            onThinkingEnabledChange = onThinkingEnabledChange,
+            onPick = onPick,
+            modifier = modifier.fillMaxWidth(),
+        )
 
-    // 高度上限来自抽屉自身拿到的窗口约束；若改用 LocalConfiguration.screenHeightDp，
-    // 键盘显隐或窗口配置变化会让上限被重算，抽屉高度随之在滚动过程中反复变化而抽动。
-    // 主体用 heightIn(max) 给出上限，页面内容用可滚动的 Column 贴着内容长，
-    // 超过上限时列表自己滚动。短距离位移保留层级方向，尺寸使用同一缓动，
-    // 避免列表长度变化时抽屉突然跳高。
-    AnimatedContent(
-        targetState = selectedServiceId,
-        transitionSpec = { modelPickerPageTransition() },
-        label = "model-picker-page",
-        modifier = modifier.fillMaxWidth(),
-    ) { serviceId ->
-        when (serviceId) {
-            null -> ProviderListContent(
-                providers = providers,
-                selection = selection,
-                onOpenProvider = onSelectService,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            else -> ProviderModelListContent(
-                serviceId = serviceId,
-                options = options,
-                selection = selection,
-                showReasoning = reasoningSupported && toolConfiguration != null &&
-                    serviceId == selection?.instanceId,
-                reasoningSupported = reasoningSupported,
-                toolConfiguration = toolConfiguration,
-                reasoningEnabled = reasoningEnabled,
-                onReasoningEffortChange = onReasoningEffortChange,
-                onThinkingEnabledChange = onThinkingEnabledChange,
-                onPick = onPick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        else -> ProviderListContent(
+            providers = providers,
+            selection = selection,
+            onOpenProvider = onSelectService,
+            lockedVendor = lockedVendor,
+            modifier = modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -253,8 +286,8 @@ private fun ChatModelPickerBody(
  * 抽屉切页动效：标题行与主体共用同一份，保证切页时两者同向同步位移。
  * 一级页往二级页走时内容自右滑入，二级页回一级页时自左滑入。
  */
-private fun AnimatedContentTransitionScope<String?>.modelPickerPageTransition(): ContentTransform {
-    val direction = if (targetState == null) -1 else 1
+private fun AnimatedContentTransitionScope<ModelPickerPage>.modelPickerPageTransition(): ContentTransform {
+    val direction = if (targetState.depth > initialState.depth) 1 else -1
     return (slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
         direction * it / 16
     } + fadeIn(tween(280))) togetherWith
@@ -270,6 +303,7 @@ private fun ProviderListContent(
     providers: List<ProviderOption>,
     selection: ModelSelection?,
     onOpenProvider: (String) -> Unit,
+    lockedVendor: String? = null,
     modifier: Modifier = Modifier,
 ) {
     // 主体用 heightIn(max) 给了有界高度，LazyColumn 在这种约束下会直接把主体撑满，
@@ -291,8 +325,33 @@ private fun ProviderListContent(
                 ),
             )
         }
+        if (lockedVendor != null) {
+            // 厂商锁定说明：file_id 是账号级资源，同厂商内换模型允许；跨厂商切换被禁用。
+            // 文案展示服务实例名而非内部模板 ID；找不到匹配行时回落原始 ID。
+            val lockedProviderName = providers
+                .firstOrNull { it.instance.templateId == lockedVendor }?.instance?.name ?: lockedVendor
+            Row(
+                Modifier.padding(horizontal = GimiListDefaults.HorizontalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.chat_model_picker_file_lock_notice, lockedProviderName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         providers.forEach { provider ->
             val containsCurrent = selection?.instanceId == provider.instance.id
+            // 锁定语义：仅当前厂商（file_id 归属厂商）可进二级页，其他厂商行置灰 + 锁图标。
+            val locked = lockedVendor != null && provider.instance.templateId != lockedVendor
             GimiPickerItemRow(
                 title = provider.instance.name,
                 subtitle = stringResource(
@@ -300,6 +359,7 @@ private fun ProviderListContent(
                     provider.modelCount,
                 ),
                 selected = false,
+                enabled = !locked,
                 onClick = { onOpenProvider(provider.instance.id) },
                 modifier = Modifier.padding(
                     horizontal = GimiListDefaults.HorizontalPadding,
@@ -322,12 +382,21 @@ private fun ProviderListContent(
                             )
                             Spacer(Modifier.width(8.dp))
                         }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (locked) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = stringResource(R.string.chat_model_picker_locked_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 role = Role.Button,
@@ -372,10 +441,15 @@ private fun ProviderModelListContent(
             val selected = selection?.let {
                 it.instanceId == row.instance.id && it.connectionId == row.connection.id && it.modelId == row.model.id
             } ?: false
+            val secondaryTitle = if (row.model.isOmniLlm) {
+                stringResource(R.string.chat_model_omni_badge)
+            } else {
+                null
+            }
             GimiPickerItemRow(
                 title = row.model.name,
-                // 同一实例的对话模型是单一列表；副标题不再按分组展示。
                 subtitle = "",
+                secondaryTitle = secondaryTitle,
                 selected = selected,
                 onClick = { onPick(row) },
                 modifier = Modifier.padding(
@@ -542,7 +616,7 @@ private fun ChatModelPickerLevel1LightPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = null,
+                        page = ModelPickerPage.Providers,
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -575,7 +649,7 @@ private fun ChatModelPickerLevel2LightPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = "openai",
+                        page = ModelPickerPage.Service("openai"),
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -608,7 +682,7 @@ private fun ChatModelPickerLevel2DarkPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = "openai",
+                        page = ModelPickerPage.Service("openai"),
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -641,7 +715,7 @@ private fun ChatModelPickerReasoningUnsupportedPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = "openai",
+                        page = ModelPickerPage.Service("openai"),
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -674,7 +748,7 @@ private fun ChatModelPickerLevel1ReasoningUnsupportedPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = null,
+                        page = ModelPickerPage.Providers,
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -707,7 +781,7 @@ private fun ChatModelPickerEmptyPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = null,
+                        page = ModelPickerPage.Providers,
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -741,7 +815,7 @@ private fun ChatModelPickerManyModelsLightPreview() {
                         reasoningEnabled = true,
                         onReasoningEffortChange = {},
                         onThinkingEnabledChange = {},
-                        selectedServiceId = "openai",
+                        page = ModelPickerPage.Service("openai"),
                         onSelectService = {},
                         modifier = Modifier.fillMaxWidth(),
                     )

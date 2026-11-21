@@ -1,5 +1,11 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+/**
+ * AI 生成会话标题在 ADK 会话状态中的键：标题插件在轮次结束后写入，
+ * 会话列表读侧与 Chatbot 执行句柄（轮次收尾补发标题事件）共用。
+ */
+public const val CONVERSATION_TITLE_STATE_KEY: String = "conversation.title"
+
 /** 一次 SDK 无关的聊天运行事件；可携带文本、工具调用或独立的子任务进度快照。 */
 data class ChatRunEvent(
     val id: String,
@@ -15,6 +21,10 @@ data class ChatRunEvent(
     val timestamp: Long,
     /** SDK 无关的子任务进度，不改变主助手的运行阶段或完成标记。 */
     val subtaskBatch: SubtaskBatch? = null,
+    /** 模型停止生成的原因；只有最终响应带该值，增量片段为 null。 */
+    val finishReason: ChatFinishReason? = null,
+    /** 会话标题：厂商随回答顺带返回时由事件带出，宿主决定是否落库。 */
+    val conversationTitle: String? = null,
 )
 
 data class ChatRunPart(

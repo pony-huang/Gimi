@@ -1,6 +1,6 @@
 # A2UI business execution
 
-Reviewed: 2026-11-07. Audience: agents and developers touching the A2UI generation chain, protocol validation, chat catalog components, or upgrading the androidx a2ui artifacts. Chinese companion: [中文说明](../../zh/a2ui/a2ui-execution.md).
+Audience: agents and developers touching the A2UI generation chain, protocol validation, chat catalog components, or upgrading the androidx a2ui artifacts. Chinese companion: [中文说明](../../zh/a2ui/a2ui-execution.md).
 
 Read this before adding or changing a catalog component, altering the `generate_a2ui` tool contract, changing surface lifecycle/retry semantics, or upgrading protocol artifacts. This document absorbs the former "Compose A2UI (agentic UI) reference" section of the root `AGENTS.md`.
 

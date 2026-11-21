@@ -17,4 +17,4 @@
 
 ## 修改插件对接行为前
 
-在为插件新增或修改 Web API 端点、OAuth、工具 schema、播放行为或平台内容处理逻辑前，先重新获取该平台的官方 schema 与相关端点/政策页面——上表链接及带核查日期的配套文档（如 [spotify.md](spotify.md)）都不是冻结的 API 契约。
+在为插件新增或修改 Web API 端点、OAuth、工具 schema、播放行为或平台内容处理逻辑前，先重新获取该平台的官方 schema 与相关端点/政策页面——上表链接及配套文档（如 [spotify.md](spotify.md)）都不是冻结的 API 契约。

@@ -92,6 +92,21 @@ class CascadedVoiceModelTest : LiveConnectionContractTest() {
     }
 
     @Test
+    fun userAttachmentOnlyHistoryReachesTextModelWithoutBeingDropped() = runTest {
+        every { synthesis.synthesize(any()) } returns flowOf(byteArrayOf(1, 0))
+        val connection = model.connect(manual)
+        val image = Part(fileData = com.google.adk.kt.types.FileData(
+            mimeType = "image/jpeg", displayName = "photo.jpg", fileUri = "/workspace/photo.jpg",
+        ))
+        connection.sendHistory(listOf(Content(role = Role.USER, parts = listOf(image))))
+        assertTrue(connection.receive().toList().last().turnComplete == true)
+        verify { textModel.generateContent(match { request ->
+            request.contents.last().role == Role.USER && request.contents.last().parts == listOf(image)
+        }, true) }
+        connection.closeSession()
+    }
+
+    @Test
     fun manualAudioCopiesChunksAndEmptyRecognitionNeverRunsGenerationOrSynthesis() = runTest {
         every { recognition.transcribeStreaming(byteArrayOf(1, 2, 3, 4)) } returns flowOf(RecognitionEvent.Final(" \n "))
         val connection = model.connect(manual)

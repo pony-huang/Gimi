@@ -5,7 +5,6 @@ import android.content.Context
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.serialization.adkJson
-import com.google.adk.kt.sessions.ListSessionsResponse
 import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
@@ -16,6 +15,7 @@ import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.data.conversation.conversationExportDirectorySpec
+import github.ponyhuang.gimi.domain.conversation.export.ConversationExportSession
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -24,7 +24,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.util.zip.ZipInputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -32,8 +31,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -61,8 +58,8 @@ class AndroidConversationExportRepositoryTest {
         return AndroidConversationExportRepository(context, service, storageRegistry)
     }
 
-    private fun session(id: String, events: List<Event> = emptyList()) = Session(
-        key = SessionKey(AgentSessionIdentity.APP_NAME, AgentSessionIdentity.DEFAULT_USER_ID, id),
+    private fun session(userId: String, id: String, events: List<Event> = emptyList()) = Session(
+        key = SessionKey(AgentSessionIdentity.APP_NAME, userId, id),
         state = State(mapOf("nested" to mapOf("list" to listOf("中文\n第二行", 42)))),
         events = events.toMutableList(),
     )
@@ -82,9 +79,9 @@ class AndroidConversationExportRepositoryTest {
             branch = "agent.child",
             errorMessage = "异常\n详情",
         )
-        val stored = session("one", listOf(event, Event(id = "empty", author = "assistant")))
+        val stored = session(AgentSessionIdentity.DEFAULT_USER_ID, "one", listOf(event, Event(id = "empty", author = "assistant")))
         coEvery { service.getSession(any(), any()) } returns stored
-        val request = requireNotNull(repository.prepare("one"))
+        val request = repository.prepare(ConversationExportSession(AgentSessionIdentity.DEFAULT_USER_ID, "one"))
         repository.export(request, "content://export")
 
         val lines = output.toString(Charsets.UTF_8.name()).lineSequence().filter(String::isNotEmpty).toList()
@@ -97,53 +94,36 @@ class AndroidConversationExportRepositoryTest {
         assertEquals(2, document.getValue("events").jsonArray.size)
         assertTrue(document.getValue("state").toString().contains("中文"))
         assertTrue(request.fileName.matches(Regex("\\d{8}_\\d{6}_one\\.jsonl")))
-        coVerify(exactly = 0) { service.listSessions(any(), any()) }
         assertTrue(files.root.listFiles().orEmpty().isEmpty())
     }
 
     @Test
-    fun multipleSessionsProduceSeparateSafeJsonlEntriesInAZip() = runTest {
+    fun chatbotPartitionSessionIsReadFromItsOwnUserId() = runTest {
         val repository = repository()
-        val sessions = listOf(session("first"), session("../second"))
-        coEvery { service.listSessions(any(), any()) } returns ListSessionsResponse(sessions)
+        val stored = session(AgentSessionIdentity.CHATBOT_USER_ID, "bot")
         coEvery { service.getSession(any(), any()) } answers {
-            sessions.single { it.key.id == firstArg<SessionKey>().id }
+            // 助手分区里没有同名会话：只有按 user-chatbot 组键才能读到。
+            if (firstArg<SessionKey>().userId == AgentSessionIdentity.CHATBOT_USER_ID) stored else null
         }
-        val request = requireNotNull(repository.prepare(null))
-        assertEquals("application/zip", request.mimeType)
+        val request = repository.prepare(ConversationExportSession(AgentSessionIdentity.CHATBOT_USER_ID, "bot"))
         repository.export(request, "content://export")
-        val names = mutableListOf<String>()
-        ZipInputStream(output.toByteArray().inputStream()).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                names += entry.name
-                assertFalse(entry.name.contains('/'))
-                val document = Json.parseToJsonElement(zip.readBytes().toString(Charsets.UTF_8)).jsonObject
-                assertEquals(0, document.getValue("events").jsonArray.size)
-            }
-        }
-        assertEquals(2, names.size)
-        assertTrue(names.all { it.startsWith(request.timestamp + "_") && it.endsWith(".jsonl") })
-        assertTrue(files.root.listFiles().orEmpty().isEmpty())
-    }
 
-    @Test
-    fun emptyListDoesNotCreateAnExportAndOneSessionInAllUsesJsonl() = runTest {
-        val repository = repository()
-        coEvery { service.listSessions(any(), any()) } returns ListSessionsResponse(emptyList())
-        assertNull(repository.prepare(null))
-        coEvery { service.listSessions(any(), any()) } returns ListSessionsResponse(listOf(session("only")))
-        val request = requireNotNull(repository.prepare(null))
+        val document = Json.parseToJsonElement(output.toString(Charsets.UTF_8.name()).trim()).jsonObject
+        assertEquals(
+            AgentSessionIdentity.CHATBOT_USER_ID,
+            document.getValue("key").jsonObject.getValue("userId").jsonPrimitive.content,
+        )
         assertEquals("application/x-ndjson", request.mimeType)
-        assertTrue(request.allSessions)
-        verify(exactly = 0) { resolver.openOutputStream(any(), any()) }
+        coVerify {
+            service.getSession(SessionKey(AgentSessionIdentity.APP_NAME, AgentSessionIdentity.CHATBOT_USER_ID, "bot"))
+        }
     }
 
     @Test
     fun missingSessionAbortsBeforeOpeningDestinationAndRemovesStagedFile() = runTest {
         val repository = repository()
         coEvery { service.getSession(any(), any()) } returns null
-        val request = requireNotNull(repository.prepare("missing"))
+        val request = repository.prepare(ConversationExportSession(AgentSessionIdentity.DEFAULT_USER_ID, "missing"))
         try {
             repository.export(request, "content://export")
             fail("Expected missing session failure")
@@ -157,7 +137,7 @@ class AndroidConversationExportRepositoryTest {
     fun cancellationPropagatesWithoutCreatingOutputOrLeavingStagedData() = runTest {
         val repository = repository()
         coEvery { service.getSession(any(), any()) } throws CancellationException("cancelled")
-        val request = requireNotNull(repository.prepare("one"))
+        val request = repository.prepare(ConversationExportSession(AgentSessionIdentity.DEFAULT_USER_ID, "one"))
         try {
             repository.export(request, "content://export")
             fail("Expected cancellation")
@@ -170,10 +150,13 @@ class AndroidConversationExportRepositoryTest {
     @Test
     fun documentWriteFailurePropagatesAndRemovesStagedData() = runTest {
         val repository = repository()
-        coEvery { service.getSession(any(), any()) } returns session("one")
+        coEvery { service.getSession(any(), any()) } returns session(AgentSessionIdentity.DEFAULT_USER_ID, "one")
         every { resolver.openOutputStream(any(), "wt") } throws IOException("provider failed")
         try {
-            repository.export(requireNotNull(repository.prepare("one")), "content://export")
+            repository.export(
+                repository.prepare(ConversationExportSession(AgentSessionIdentity.DEFAULT_USER_ID, "one")),
+                "content://export",
+            )
             fail("Expected write failure")
         } catch (_: IOException) {
             assertTrue(files.root.listFiles().orEmpty().isEmpty())

@@ -1,8 +1,8 @@
 # Spotify：AI 辅助开发与后续接入参考
 
-[English](../en/plugin/spotify.md) · 简体中文
+[English](../../en/plugin/spotify.md) · 简体中文
 
-核查日期：2026-10-19。本文是分析与项目建议，不是官方文档全文翻译，也不代表现有插件已满足全部要求。后续实现以重新获取的官方契约与专题文档为准。
+本文是分析与项目建议，不是官方文档全文翻译，也不代表现有插件已满足全部要求。后续实现以重新获取的官方契约与专题文档为准。
 
 ## 这篇文章解决什么问题
 
@@ -12,7 +12,7 @@
 
 ### 先核对 API 契约
 
-[官方 OpenAPI schema](https://developer.spotify.com/reference/web-api/open-api-schema.yaml) 已成功获取，当前文件声明 `openapi: '3.0.3'`。后续每项功能都要核对路径、HTTP 方法、参数所在位置、必填项、限制、OAuth scopes、成功状态及响应结构。schema 下载副本只放 `temp/`，不要把本文日期当成永久版本锁定。
+[官方 OpenAPI schema](https://developer.spotify.com/reference/web-api/open-api-schema.yaml) 已成功获取，当前文件声明 `openapi: '3.0.3'`。后续每项功能都要核对路径、HTTP 方法、参数所在位置、必填项、限制、OAuth scopes、成功状态及响应结构。schema 下载副本只放 `temp/`，不要把本文当成永久版本锁定。
 
 与刚修复的问题对应，schema 中 `PUT/DELETE /me/library` 的 `uris` 是查询参数；`GET /me/library/contains` 返回布尔数组。歌单条目新接口是 `/playlists/{playlist_id}/items`。这些例子用于说明核对维度，不能代替接入时重新查阅完整 operation。来源：[OpenAPI schema](https://developer.spotify.com/reference/web-api/open-api-schema.yaml)、[收藏接口](https://developer.spotify.com/documentation/web-api/reference/save-library-items)。
 
@@ -48,7 +48,7 @@
 
 以下是项目建议，不是官方教程原文：
 
-1. 明确用户动作、所需数据和副作用，加载本参考及对应官方 operation；记录核查日期。资料冲突时明确记录差异，再核实，不能凭模型记忆选一个。
+1. 明确用户动作、所需数据和副作用，加载本参考及对应官方 operation。资料冲突时明确记录差异，再核实，不能凭模型记忆选一个。
 2. 列出请求/响应映射：路径、方法、query/body、URI 类型、scopes、返回形状、错误与重试语义。开发模式或账号限制另查官方配额资料。
 3. 在 `:plugins:spotify` 的 HTTP/OAuth 边界完成适配；模型工具只暴露经过验证的参数和结果。跨模块工作继续遵循根目录架构约束。
 4. 用模拟网关或 HTTP 连接覆盖实际风险边界，包括空响应、数组、401/429、刷新失效、取消传播及不确定的修改结果。测试不调用真实付费模型或使用真实凭据。

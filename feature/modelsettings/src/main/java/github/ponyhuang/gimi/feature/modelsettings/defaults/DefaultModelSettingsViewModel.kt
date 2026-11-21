@@ -13,7 +13,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
@@ -22,10 +21,8 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -43,18 +40,14 @@ class DefaultModelSettingsViewModel @Inject constructor(
     private val dialog = MutableStateFlow<DefaultModelDialog?>(null)
     private val ttsVoiceOptions = MutableStateFlow<List<TtsVoice>>(emptyList())
     private val isTtsVoiceLoading = MutableStateFlow(false)
-    /** 当前选中的 Realtime 默认模型；音色覆盖要绑定到它上面。 */
-    private val realtimeSelection = MutableStateFlow<ModelSelection?>(null)
 
-    // 缓冲若干条一次性反馈，避免 Route 尚未开始收集时丢失。
-    private val _effects = MutableSharedFlow<DefaultModelSettingsEffect>(extraBufferCapacity = 8)
-    val effects = _effects.asSharedFlow()
+    // 一次性反馈以状态承载：晚于发送开始的收集也不会丢失，呈现后经 ConsumeNotice 清除。
+    private val mutableNotice = MutableStateFlow<DefaultModelSettingsNotice?>(null)
 
     init {
         viewModelScope.launch {
             observeSettings()
                 .collectLatest { settings ->
-                    realtimeSelection.value = settings.realtimeSelection
                     val selection = settings.ttsSelection
                     if (selection == null) {
                         ttsVoiceOptions.value = emptyList()
@@ -82,21 +75,35 @@ class DefaultModelSettingsViewModel @Inject constructor(
         }
     }
 
+    // 独立于 uiState 订阅：用户动作不能依赖界面是否已开始收集状态。
+    private val settingsSnapshot = observeSettings().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = DefaultModelSettings(
+            instances = emptyList(),
+            assistantSelection = null,
+            fastSelection = null,
+            speechSelection = null,
+            ttsSelection = null,
+            ttsVoiceId = "",
+        ),
+    )
+
     val uiState = combine(
-        observeSettings(),
+        settingsSnapshot,
         dialog,
         runWhenAgentIdle.state,
-        ttsVoiceOptions,
-        isTtsVoiceLoading,
-    ) { settings, currentDialog, runtimeState, voices, loading ->
+        combine(ttsVoiceOptions, isTtsVoiceLoading) { options, loading -> options to loading },
+        mutableNotice,
+    ) { settings, currentDialog, runtimeState, voiceOptions, notice ->
         val ttsTemplateId = settings.instances.resolveConnection(settings.ttsSelection)?.templateId
         settings.toUiState(
             dialog = currentDialog,
             isMutationBlocked = runtimeState.isBusy,
-            ttsVoiceOptions = voices.ifEmpty { voiceCatalog.builtInVoices(ttsTemplateId) },
-            isTtsVoiceLoading = loading,
+            ttsVoiceOptions = voiceOptions.first.ifEmpty { voiceCatalog.builtInVoices(ttsTemplateId) },
+            isTtsVoiceLoading = voiceOptions.second,
             ttsTemplateId = ttsTemplateId,
-        )
+        ).copy(notice = notice)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -116,9 +123,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
             is DefaultModelSettingsAction.SelectRealtimeModel -> {
                 mutate { updateSettings.realtimeModel(action.selection) }
             }
-            is DefaultModelSettingsAction.SelectRealtimeVoice -> {
-                mutate { updateSettings.realtimeVoice(action.voiceId?.let { overrideFor(it) }) }
-            }
+            DefaultModelSettingsAction.ConsumeNotice -> mutableNotice.value = null
         }
     }
 
@@ -132,26 +137,24 @@ class DefaultModelSettingsViewModel @Inject constructor(
         this.dialog.value = dialog
     }
 
-    /**
-     * 把音色覆盖绑定到当前的 Realtime 模型。
-     *
-     * 音色与模型强绑定（同一厂商不同代际的合法音色集互不相同），因此覆盖值必须记住所属模型，
-     * 换模型后旧覆盖自动失效并回落到新模型的缺省音色。
-     */
-    private fun overrideFor(voiceId: String): RealtimeVoiceOverride? {
-        val selection = realtimeSelection.value ?: return null
-        return RealtimeVoiceOverride(selection = selection, voiceId = voiceId)
-    }
-
-    /** 执行一次配置写入；被前台 Agent 阻塞时用 Toast 反馈，成功则关闭当前弹窗。 */
-    private fun mutate(block: () -> Unit) {
+    /** 执行一次配置写入；被前台 Agent 阻塞或写盘失败都用 Toast 反馈，成功则关闭当前弹窗。 */
+    private fun mutate(block: suspend () -> Unit) {
         viewModelScope.launch {
-            when (runWhenAgentIdle { block() }) {
-                is AgentMutationResult.Applied -> dialog.value = null
-                AgentMutationResult.BlockedByActiveAgent -> _effects.emit(
-                    DefaultModelSettingsEffect.ShowToast(
-                        github.ponyhuang.gimi.feature.modelsettings.R.string.modelsettings_agent_mutation_blocked,
-                    ),
+            try {
+                when (runWhenAgentIdle { block() }) {
+                    is AgentMutationResult.Applied -> dialog.value = null
+                    AgentMutationResult.BlockedByActiveAgent -> mutableNotice.value =
+                        DefaultModelSettingsNotice.ShowToast(
+                            github.ponyhuang.gimi.feature.modelsettings.R.string.modelsettings_agent_mutation_blocked,
+                        )
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // 语音偏好写入失败会从仓库上抛：反馈保存失败并保留弹窗供重试，
+                // 不能让异常穿出 viewModelScope 导致进程崩溃。
+                mutableNotice.value = DefaultModelSettingsNotice.ShowToast(
+                    github.ponyhuang.gimi.feature.modelsettings.R.string.modelsettings_write_failed,
                 )
             }
         }
@@ -166,9 +169,8 @@ class DefaultModelSettingsViewModel @Inject constructor(
             // 把新模型的第一个音色落成显式选择；已配置音色不被改写。
             DefaultModelDialog.Tts -> updateSettings.tts(selection)
             DefaultModelDialog.TtsVoice -> Unit
-            // Realtime 模型与音色有各自的取值语义（含"清除"），走专用动作。
+            // Realtime 模型有清除语义，走专用动作。
             DefaultModelDialog.RealtimeModel -> Unit
-            DefaultModelDialog.RealtimeVoice -> Unit
         }
     }
 
@@ -230,9 +232,6 @@ class DefaultModelSettingsViewModel @Inject constructor(
                     }
                 }
             }
-        val realtimeTemplateId = instances.resolveConnection(realtimeSelection)?.templateId
-        val realtimeSupport = realtimeTemplateId?.let { voiceCapabilities.realtimeSupport(it) }
-        val applicableVoice = realtimeVoice?.takeIf { it.selection == realtimeSelection }
         return DefaultModelSettingsUiState(
             assistantSelection = assistantSelection,
             fastSelection = fastSelection,
@@ -257,14 +256,6 @@ class DefaultModelSettingsViewModel @Inject constructor(
             ),
             realtimeSelection = realtimeSelection,
             realtimeModels = realtimeRows,
-            realtimeVoiceOptions = realtimeSelection
-                ?.let { selection -> realtimeSupport?.voicesFor(selection.modelId) }
-                .orEmpty(),
-            realtimeDefaultVoice = realtimeSelection
-                ?.let { selection -> realtimeSupport?.defaultVoiceFor(selection.modelId) }
-                .orEmpty(),
-            realtimeVoiceId = applicableVoice?.voiceId,
-            realtimeCustomVoiceAllowed = realtimeSupport?.customVoiceAllowed == true,
             dialog = dialog,
             isMutationBlocked = isMutationBlocked,
         )

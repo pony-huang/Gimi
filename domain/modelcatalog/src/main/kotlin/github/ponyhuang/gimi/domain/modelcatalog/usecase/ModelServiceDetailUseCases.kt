@@ -74,6 +74,15 @@ class SetModelInstanceEnabledUseCase @Inject constructor(private val repository:
         repository.setInstanceEnabled(instanceId, enabled)
 }
 
+/**
+ * 独立设置实例级"文件上传"开关：对该厂商实例下全部对话模型统一生效，默认关。
+ * 关闭不影响已含厂商 file 引用附件的旧会话（准入语义只管新附件）。
+ */
+class SetModelInstanceFileUploadUseCase @Inject constructor(private val repository: ModelCatalogRepository) {
+    suspend operator fun invoke(instanceId: String, enabled: Boolean): Boolean =
+        repository.setFileUploadEnabled(instanceId, enabled)
+}
+
 /** 删除实例；同一提交内清理受影响默认分配与绑定音色。 */
 class DeleteModelInstanceUseCase @Inject constructor(private val repository: ModelCatalogRepository) {
     suspend operator fun invoke(instanceId: String): Boolean = repository.deleteInstance(instanceId)

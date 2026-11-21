@@ -44,6 +44,8 @@ data class SandboxSettingsUiState(
     val errors: Set<SandboxSettingField> = emptySet(),
     val templates: List<SandboxTemplate> = emptyList(),
     val templateLoadState: SandboxTemplateLoadState = SandboxTemplateLoadState.IDLE,
+    /** 待呈现的一次性通知；Route 呈现后经 [SandboxSettingsAction.ConsumeNotice] 清除。 */
+    val notice: SandboxSettingsNotice? = null,
 ) {
     /** 已配置且无修改时不重复提交；E2B 未启用时仍允许保存配置供以后使用。 */
     val canSave: Boolean get() = !busy && (dirty || !configured)
@@ -80,7 +82,10 @@ sealed interface SandboxSettingsAction {
     data object ToggleKeyVisibility : SandboxSettingsAction
     /** 校验并保存连接草稿。 */
     data object Save : SandboxSettingsAction
+
+    /** 确认一次性通知已呈现，清空 [SandboxSettingsUiState.notice]。 */
+    data object ConsumeNotice : SandboxSettingsAction
 }
 
-/** Route 消费的用户通知，不持久化。 */
-enum class SandboxSettingsEffect { SAVED, SAVE_FAILED }
+/** 设置页一次性通知；以 UiState 字段承载，由 Route 呈现后消费清除。 */
+enum class SandboxSettingsNotice { SAVED, SAVE_FAILED }

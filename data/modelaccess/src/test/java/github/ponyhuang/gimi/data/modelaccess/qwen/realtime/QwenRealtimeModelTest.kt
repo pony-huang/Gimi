@@ -36,8 +36,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /**
  * Qwen Realtime 模型的 WebSocket 边界：握手后第一帧是 session.update（百炼结构）、

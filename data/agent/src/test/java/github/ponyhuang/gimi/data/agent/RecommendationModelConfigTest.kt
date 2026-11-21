@@ -12,12 +12,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
 
 class RecommendationModelConfigTest {
     private val modelServices = mockk<AgentModelConfigurationSource>()
-    private val factory = AgentLLMModelFactory(modelServices)
+    private val factory = DefaultAgentLLMModelFactory(modelServices)
 
     @Test
     fun deepSeekAnthropicRecommendationUsesItsConfiguredChatCompletionsEndpoint() {

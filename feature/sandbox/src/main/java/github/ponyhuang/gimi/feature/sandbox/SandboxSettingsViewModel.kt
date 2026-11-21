@@ -16,9 +16,7 @@ import java.io.IOException
 import java.security.GeneralSecurityException
 import javax.inject.Inject
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,8 +32,6 @@ class SandboxSettingsViewModel @Inject constructor(
     private var templateGeneration = 0L
     private val mutableState = MutableStateFlow(fromConfiguration(repository.configuration.value))
     val uiState = mutableState.asStateFlow()
-    private val mutableEffects = MutableSharedFlow<SandboxSettingsEffect>(extraBufferCapacity = 1)
-    val effects = mutableEffects.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -51,6 +47,10 @@ class SandboxSettingsViewModel @Inject constructor(
     }
 
     fun onAction(action: SandboxSettingsAction) {
+        if (action == SandboxSettingsAction.ConsumeNotice) {
+            mutableState.update { it.copy(notice = null) }
+            return
+        }
         if (uiState.value.busy) return
         when (action) {
             is SandboxSettingsAction.SetApiUrl -> {
@@ -131,7 +131,7 @@ class SandboxSettingsViewModel @Inject constructor(
 
     private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
         fromConfiguration(configuration, state).copy(
-            keyVisible = state.keyVisible, busy = state.busy,
+            keyVisible = state.keyVisible, busy = state.busy, notice = state.notice,
             templates = if (sameCredentials(configuration.connection, state)) state.templates else emptyList(),
             templateLoadState = if (sameCredentials(configuration.connection, state)) state.templateLoadState else SandboxTemplateLoadState.IDLE,
         )
@@ -157,13 +157,12 @@ class SandboxSettingsViewModel @Inject constructor(
             try {
                 operation()
                 if (connectionSaved) {
-                    mutableState.update { state -> restore(repository.configuration.value, state) }
-                    mutableEffects.emit(SandboxSettingsEffect.SAVED)
+                    mutableState.update { state -> restore(repository.configuration.value, state).copy(notice = SandboxSettingsNotice.SAVED) }
                 }
             } catch (_: IOException) {
-                mutableEffects.emit(SandboxSettingsEffect.SAVE_FAILED)
+                mutableState.update { it.copy(notice = SandboxSettingsNotice.SAVE_FAILED) }
             } catch (_: GeneralSecurityException) {
-                mutableEffects.emit(SandboxSettingsEffect.SAVE_FAILED)
+                mutableState.update { it.copy(notice = SandboxSettingsNotice.SAVE_FAILED) }
             } finally {
                 val saved = repository.configuration.value
                 mutableState.update { it.copy(enabled = saved.enabled, configured = saved.isConfigured, busy = false) }

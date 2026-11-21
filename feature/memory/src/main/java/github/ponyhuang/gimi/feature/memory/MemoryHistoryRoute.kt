@@ -21,15 +21,16 @@ fun MemoryHistoryRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            val message = when (effect) {
-                MemoryHistoryEffect.Deleted -> R.string.memory_history_deleted
-                MemoryHistoryEffect.FeedbackSubmitted -> R.string.memory_history_feedback_submitted
-                MemoryHistoryEffect.OperationFailed -> R.string.memory_history_operation_failed
-            }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
+    val noticeMessage = when (state.notice) {
+        MemoryHistoryNotice.Deleted -> stringResource(R.string.memory_history_deleted)
+        MemoryHistoryNotice.FeedbackSubmitted -> stringResource(R.string.memory_history_feedback_submitted)
+        MemoryHistoryNotice.OperationFailed -> stringResource(R.string.memory_history_operation_failed)
+        null -> null
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        val message = noticeMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.onAction(MemoryHistoryAction.ConsumeNotice)
     }
     PreferenceScaffold(
         style = PreferenceStyle.Compact,

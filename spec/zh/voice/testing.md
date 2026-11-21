@@ -30,12 +30,12 @@
 | `VoiceCapabilityRegistryTest` | 按 `(serviceId, capability)` 解析、未注册能力显式失败、Realtime 能力随原生适配器声明判定 |
 | `DefaultSpeechRepositoriesTest` | 识别需已配 STT 模型、结果 trim、合成取首个 Key |
 | `DefaultTtsVoiceRepositoryTest` | 按 serviceId 路由、缓存键含 modelId |
-| `SimpleChatPromptPreferencesTest` | 预设增删改查、坏数据丢弃、官方预设可选不可删、说明字段往返 |
+| `data:conversation` / `ChatbotRolePreferencesTest` | 角色增删改查、坏数据丢弃、内置角色只读、会话选择隔离、删除角色后的选择回退、简介字段往返 |
 | `SpeechSettingsPreferencesTest` | 自动播报默认关闭且跨实例保留 |
 | `VoiceAudioDeviceSelectionTest` | 按连接顺序而非平台顺序、手动不被覆盖、断开逐级回退 |
 | `VoiceAudioRoutingControllerTest` | 手动选择保持、断开清偏好、被拒保留实际设备、`close()` 复原 |
 | `VoiceSessionLifecycleTest` | 并发 `close()` 只释放一次且都等到释放完成 |
-| `InMemoryRealtimeVoiceCallControllerTest` | 重开等旧资源、模式切换等 flush/close、`Persistence` 阻止切换、双入口幂等、Realtime 模式采用默认选择与音色、未配置时不新建会话 |
+| `InMemoryRealtimeVoiceCallControllerTest` | 重开等旧资源、配置切换等 flush/close、`Persistence` 阻止切换、双入口幂等、原生实时按有效配置解析模型与音色、未配置时不新建会话 |
 | `RealtimeVoiceCallNotificationContentTest` | 通知快照折叠优先级、高频语音更新不改快照、状态复位驱动服务退出 |
 
 相关但不在 `data:voice` 的：`core:audio` 的 `VoiceActivitySegmenterTest` /
@@ -47,17 +47,19 @@
 
 | 文件 | 验证的契约 |
 |---|---|
-| `domain:voice` 的 `BuiltInVoicePresetsTest` | 官方目录条目 id 唯一、字段非空、正文保持实时语音分节结构（Role … Escalation） |
+| `domain:conversation` 的 `BuiltInChatbotRolesTest` | 官方目录条目 id 唯一、字段非空、正文保持实时语音分节结构（Role … Escalation） |
 | `feature:chat` 的 `SimpleChatPromptViewModelTest` | 新建预设落库带生成的 id、空白输入不入库、编辑保留原 id、官方预设可列出且只看不进编辑 |
 
-默认 Realtime 选择这一层的测试：
+默认 Realtime 模型与语音对话全局默认这一层的测试：
 
 | 文件 | 验证的契约 |
 |---|---|
 | `:data:modelaccess` 的 `VoiceLiveModelFactoryTest` | Realtime/级联按能力标记分派、上行契约随适配器声明、会话音色缺省按模型代际解析、自定义音色覆盖缺省 |
-| `data:modelcatalog` 的 `ModelServiceConfigurationPersistenceTest` | 默认 Realtime 模型与音色覆盖跨重启存活、可清除；服务级音色字段已移除 |
-| `feature:modelsettings` 的 `DefaultModelSettingsRealtimeTest` | 候选只列声明了原生适配器的服务、音色候选跟随所选模型、自定义音色绑定到模型、清除模型与清除音色各自落库 |
-| `feature:modelsettings` 的 `DefaultModelSettingsViewModelCharacterizationTest` | 既有按能力分组与 TTS 音色回落行为不受 Realtime 默认值影响 |
+| `data:modelcatalog` 的 `ModelServiceConfigurationPersistenceTest` | 默认 Realtime 模型与目录级音色覆盖跨重启存活、可清除；服务级音色字段已移除（运行时音色解析已改走对话覆盖 → 按模型记忆 → 厂商默认，不再读取目录级音色覆盖） |
+| `feature:modelsettings` 的 `DefaultModelSettingsRealtimeTest` | 候选只列声明了原生适配器的服务、清除 Realtime 模型不落选择；链路启动自全局默认、选择即更新落库；半级联选择被拒绝 |
+| `feature:modelsettings` 的 `DefaultModelSettingsViewModelCharacterizationTest` | 既有按能力分组与 TTS 音色回落行为不受语音对话默认值影响 |
 
 `data:voice` 与 `core:audio` 都**只有 `test` 源集、没有 `androidTest`**。所以麦克风、
 AEC、蓝牙路由、`AudioTrack` 只能靠真机验证，CI 抓不到。
+
+Chatbot 角色与导航还由以下用例保护。`SimpleChatPromptViewModelTest` 覆盖会话选择隔离、未绑定会话的管理页与内置角色复制。`RealtimeVoiceViewModelTest` 覆盖等待通话清理、保留最近一次导航意图、保留模型能力与按顶部模式起呼。`AgentChatRunnerCacheTest` 覆盖角色运行时缓存。两厂商协议测试覆盖只更新指令的会话帧。`AdkVoiceAudioBackendTest` 验证级联与原生 Chatbot 语音都显式绑定选中的会话。

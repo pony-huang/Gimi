@@ -55,16 +55,13 @@ fun PluginConfigRoute(
     PluginExternalLinkEffect(state.callback) {
         viewModel.onAction(PluginConfigAction.DismissActionCallback)
     }
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                is PluginConfigEffect.ShowToast -> Toast.makeText(
-                    context,
-                    effect.message ?: effect.messageRes?.let(context::getString).orEmpty(),
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-        }
+    val noticeMessage = (state.notice as? PluginConfigNotice.ShowToast)?.let { notice ->
+        notice.message ?: notice.messageRes?.let(context::getString).orEmpty()
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        val message = noticeMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.onAction(PluginConfigAction.ConsumeNotice)
     }
     PluginOAuthConfigRoute(
         config = state,

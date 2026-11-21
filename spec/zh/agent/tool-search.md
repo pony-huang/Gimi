@@ -1,6 +1,6 @@
 # 工具搜索（按需工具加载）
 
-校对日期：2026-11-12。读者：修改 `ON_DEMAND` 工具访问、`ToolSearchToolset`、工具候选源或厂商工具加载协议的 agent 与开发者。英文版：[English](../../en/agent/tool-search.md)。agent 装配背景见 [Agent 业务执行](agent-execution.md)。
+读者：修改 `ON_DEMAND` 工具访问、`ToolSearchToolset`、工具候选源或厂商工具加载协议的 agent 与开发者。英文版：[English](../../en/agent/tool-search.md)。agent 装配背景见 [Agent 业务执行](agent-execution.md)。
 
 ## 概念基准
 

@@ -3,8 +3,8 @@ package github.ponyhuang.gimi.data.agent.subtasks
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.tools.ToolContext
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.AgentLlmModelSource
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -22,7 +22,7 @@ import org.junit.Test
 class SubtaskModelSelectionTest {
     @Test
     fun snapshotsFastModelFallsBackWhenUnavailableAndInvalidatesCacheOnSelectionChange() = runTest {
-        val models = mockk<AgentLLMModelFactory>()
+        val models = mockk<AgentLlmModelSource>()
         val primary = ModelConfig("primary", null, ApiProtocol.OpenaiChatcompletions, "chat", "primary-key", "https://fixture.invalid")
         val fast = primary.copy(serviceId = "fast", modelId = "fast", apiKey = "fast-key")
         every { models.selectModelConfig(any()) } returns primary

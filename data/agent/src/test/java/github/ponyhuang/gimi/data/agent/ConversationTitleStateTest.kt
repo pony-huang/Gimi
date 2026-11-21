@@ -14,6 +14,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin
+import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +25,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 
 /**
  * 标题写入会话状态的时机与可见性。
@@ -46,14 +47,14 @@ class ConversationTitleStateTest {
             }
         }
         // 未配置快速模型时标题请求回落到会话模型；relaxed mock 会返回假模型，必须显式返回 null。
-        val factory = mockk<AgentLLMModelFactory>(relaxed = true) {
+        val factory = mockk<DefaultAgentLLMModelFactory>(relaxed = true) {
             every { selectFastModelConfig() } returns null
         }
         val runner = InMemoryRunner(
             App(
                 appName = AgentChatRunner.APP_NAME,
                 rootAgent = LlmAgent(name = "agent", model = model),
-                plugins = listOf(ConversationGenerateTitlePlugin(factory)),
+                plugins = listOf(ConversationGenerateTitlePlugin(AgentModelRuntime(factory))),
             ),
             sessionService = sessions,
         )
@@ -73,6 +74,109 @@ class ConversationTitleStateTest {
                 event.author == "user" && event.content?.parts.orEmpty().any { it.text == "你好" }
             },
         )
+    }
+
+    @Test
+    fun inlineVendorTitleCompletesTheFlowWithoutASeparateRequest() = runTest {
+        val sessions: SessionService = InMemorySessionService()
+        var modelCalls = 0
+        val model = object : Model {
+            override val name = "title-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                // 厂商适配器开启会话标题时（如 DeepSeek Chatbot）：首轮响应顺带携带标题（customMetadata）。
+                modelCalls++
+                emit(LlmResponse(
+                    content = Content(role = Role.MODEL, parts = listOf(Part(text = "第一次回答"))),
+                    customMetadata = mapOf(CONVERSATION_TITLE_METADATA_KEY to "北京明天天气"),
+                ))
+            }
+        }
+        val factory = mockk<DefaultAgentLLMModelFactory>(relaxed = true) {
+            every { selectFastModelConfig() } returns null
+        }
+        val runner = InMemoryRunner(
+            App(
+                appName = AgentChatRunner.APP_NAME,
+                rootAgent = LlmAgent(name = "agent", model = model),
+                plugins = listOf(ConversationGenerateTitlePlugin(AgentModelRuntime(factory))),
+            ),
+            sessionService = sessions,
+        )
+        val execution = AgentChatExecution("user", "session", runner, emptyMap())
+
+        execution.send("你好").toList()
+
+        val full = sessions.getSession(SessionKey(AgentChatRunner.APP_NAME, "user", "session"))!!
+        // 标题内联命中后不再发起独立的标题模型请求。
+        assertEquals(1, modelCalls)
+        assertEquals("北京明天天气", full.state[TITLE_STATE_KEY])
+    }
+
+    @Test
+    fun chatbotExecutionEmitsTheGeneratedTitleAsAFinalEvent() = runTest {
+        val sessions: SessionService = InMemorySessionService()
+        var modelCalls = 0
+        val model = object : Model {
+            override val name = "title-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                // 第一次是对话本身，之后是标题插件发起的独立请求（非 DeepSeek 厂商无内联标题）。
+                val text = if (modelCalls++ == 0) "第一次回答" else "标题A"
+                emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(Part(text = text)))))
+            }
+        }
+        val factory = mockk<DefaultAgentLLMModelFactory>(relaxed = true) {
+            every { selectFastModelConfig() } returns null
+        }
+        val runner = InMemoryRunner(
+            App(
+                appName = AgentChatRunner.APP_NAME,
+                rootAgent = LlmAgent(name = "agent", model = model),
+                plugins = listOf(ConversationGenerateTitlePlugin(AgentModelRuntime(factory))),
+            ),
+            sessionService = sessions,
+        )
+        val execution = AgentChatExecution("user", "session", runner, emptyMap(), emitSessionTitle = true)
+
+        val events = execution.send("你好").toList()
+
+        // 标题在轮次收尾补发为一次事件，宿主据此把 AI 生成标题写入会话。
+        assertEquals(1, events.count { event ->
+            event.customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) != null
+        })
+        assertEquals("标题A", events.last().customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY))
+    }
+
+    @Test
+    fun assistantExecutionDoesNotEmitTheSessionTitleEvent() = runTest {
+        val sessions: SessionService = InMemorySessionService()
+        var modelCalls = 0
+        val model = object : Model {
+            override val name = "title-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                val text = if (modelCalls++ == 0) "第一次回答" else "标题A"
+                emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(Part(text = text)))))
+            }
+        }
+        val factory = mockk<DefaultAgentLLMModelFactory>(relaxed = true) {
+            every { selectFastModelConfig() } returns null
+        }
+        val runner = InMemoryRunner(
+            App(
+                appName = AgentChatRunner.APP_NAME,
+                rootAgent = LlmAgent(name = "agent", model = model),
+                plugins = listOf(ConversationGenerateTitlePlugin(AgentModelRuntime(factory))),
+            ),
+            sessionService = sessions,
+        )
+        val execution = AgentChatExecution("user", "session", runner, emptyMap())
+
+        val events = execution.send("你好").toList()
+
+        // 助手形态的标题只落会话状态，由会话列表读侧消费，不补发事件。
+        assertTrue(events.none { event ->
+            event.customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) != null
+        })
+        assertEquals("标题A", sessions.getSession(SessionKey(AgentChatRunner.APP_NAME, "user", "session"))!!.state[TITLE_STATE_KEY])
     }
 
     private companion object {

@@ -90,13 +90,6 @@
     <string name="settings_group_about">关于</string>
     <string name="settings_appfunction_title">AppFunction</string>
     <string name="settings_appfunction_subtitle">应用提供的功能</string>
-    <string name="session_export_all">导出全部会话</string>
-    <string name="session_export_subtitle">单会话 JSONL，多会话 ZIP</string>
-    <string name="session_export_working">正在导出，请稍候…</string>
-    <string name="session_export_empty">暂无会话可导出</string>
-    <string name="session_export_blocked">任务进行中，结束后可导出</string>
-    <string name="session_export_succeeded">会话已导出</string>
-    <string name="session_export_failed">导出失败，请重试</string>
     <string name="settings_speech_models_title">语音模型</string>
     <string name="settings_speech_models_subtitle">识别、音频理解与合成</string>
 </resources>

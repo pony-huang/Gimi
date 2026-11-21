@@ -41,23 +41,25 @@ import kotlin.random.Random
 /** 粒子数量：雾状微尘的密度下限，兼顾中端机每帧绘制成本（对照参考视频校准）。 */
 private const val ParticleCount = 2400
 
-/** 每颗粒子的静态参数步长：x/y/z、半径抖动、差速档位、尺寸、亮度、闪烁频率、闪烁相位、是否带品牌蓝。 */
+/** 每颗粒子的静态参数步长：x/y/z、半径抖动、半径抖动平方、尺寸、亮度、闪烁频率、闪烁相位、是否带品牌蓝。 */
 private const val ParticleStride = 10
+
+/** 差速档位数量：外圈 0、中层 1、内圈 2。 */
+private const val ShellTierCount = 3
 
 /** 预览与静音/失败态无帧动画时的固定相位，保证静态渲染仍是完整球形。 */
 private const val PreviewYaw = 1.1f
 private const val PreviewSwirl = 2.4f
 
 /**
- * 粒子场静态参数（一次性生成、逐帧复用，无逐帧分配）：
+ * 粒子场静态几何参数（进程级单例，仅生成一次，切换语音页零初始化开销）：
  * 斐波那契球面均匀采样 + 半径抖动形成边缘更致密的球壳投影；
  * 差速档位 k 按球壳分级（外圈 0、中层 1、内圈 2），漩涡相位为整数倍周期，循环复位不跳变。
  * 固定种子保证 Preview 与真机形态一致。
  */
-private class VoiceParticleField(count: Int) {
+private class VoiceParticleGeometry(count: Int) {
     val base = FloatArray(count * ParticleStride)
-    val prevX = FloatArray(count) { Float.NaN }
-    val prevY = FloatArray(count) { Float.NaN }
+    val shellTier = IntArray(count)
 
     init {
         val rng = Random(1013)
@@ -73,10 +75,11 @@ private class VoiceParticleField(count: Int) {
             // 半径抖动偏外侧：pow<1 抬高分布，形成视频里边缘致密、中心稀疏的观感
             val jit = .90f + rng.nextFloat().pow(.55f) * .15f
             base[o + 3] = jit
-            base[o + 4] = when {
-                jit < .93f -> 2f
-                jit < .975f -> 1f
-                else -> 0f
+            base[o + 4] = jit * jit
+            shellTier[i] = when {
+                jit < .93f -> 2
+                jit < .975f -> 1
+                else -> 0
             }
             // 细雾为主，少量大亮星；亮度与闪烁相位彼此独立
             base[o + 5] = .5f + rng.nextFloat().pow(3f) * 1.5f
@@ -88,6 +91,23 @@ private class VoiceParticleField(count: Int) {
     }
 }
 
+private val SharedParticleGeometry by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    VoiceParticleGeometry(ParticleCount)
+}
+
+/** 预热粒子场静态几何，避免首次进入语音页在首帧同步计算三角与幂函数。 */
+internal fun prewarmVoiceParticleGeometry() {
+    SharedParticleGeometry
+}
+
+/** 单实例帧间历史坐标：仅用于差速拖尾计算，与静态几何分离，分配开销极小。 */
+private class VoiceParticleTrailBuffer(count: Int) {
+    val prevX = FloatArray(count) { Float.NaN }
+    val prevY = FloatArray(count) { Float.NaN }
+    val shellCos = FloatArray(ShellTierCount)
+    val shellSin = FloatArray(ShellTierCount)
+}
+
 /**
  * 实时语音粒子球：微尘球体浮在主题画布上，保留参考视频的球体形态与运动语言。
  *
@@ -96,6 +116,7 @@ private class VoiceParticleField(count: Int) {
  * 状态文字（statusText）居中球心，切换时交叉淡入淡出；球体本身纯装饰，语义由文字承载。
  *
  * @param ink 粒子与状态文字的墨色，由场景传入以便跟随主题明暗。
+ * @param isVisible 页面是否处于可见或过渡态；隐藏时停止无限动画帧循环。
  */
 @Composable
 internal fun VoiceOrb(
@@ -104,6 +125,7 @@ internal fun VoiceOrb(
     statusText: String,
     modifier: Modifier = Modifier,
     ink: Color = MaterialTheme.colorScheme.onSurface,
+    isVisible: Boolean = true,
 ) {
     val quiet = state.muted || state.phase == RealtimeVoicePhase.Failed
     val speaking = state.phase == RealtimeVoicePhase.Speaking
@@ -152,7 +174,7 @@ internal fun VoiceOrb(
         animationSpec = tween(600), label = "voiceTint",
     )
     val preview = LocalInspectionMode.current
-    val transition = if (!quiet && !preview) rememberInfiniteTransition(label = "voiceParticles") else null
+    val transition = if (!quiet && !preview && isVisible) rememberInfiniteTransition(label = "voiceParticles") else null
     // Compose 动画运行时跟随系统动画时长缩放，关闭动画时不运行手写帧循环；
     // 双循环周期不同但粒子角度为整数倍相位，循环复位时投影连续不跳变。
     val yaw = transition?.animateFloat(
@@ -165,13 +187,16 @@ internal fun VoiceOrb(
         animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing)), label = "voiceSwirl",
     )
         ?: remember { mutableFloatStateOf(PreviewSwirl) }
-    val particles = remember { VoiceParticleField(ParticleCount) }
+    val geometry = remember { SharedParticleGeometry }
+    val trailBuffer = remember { VoiceParticleTrailBuffer(ParticleCount) }
     Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.matchParentSize()) {
-            drawParticleOrb(
-                particles, yaw.value, swirlPhase.value, level, inputContraction, expansion,
-                dim, trail, contract, tintStrength, ink,
-            )
+        if (isVisible) {
+            Canvas(Modifier.matchParentSize()) {
+                drawParticleOrb(
+                    geometry, trailBuffer, yaw.value, swirlPhase.value, level, inputContraction, expansion,
+                    dim, trail, contract, tintStrength, ink,
+                )
+            }
         }
         Crossfade(targetState = statusText, animationSpec = tween(200), label = "voiceStatus") { text ->
             Text(
@@ -187,7 +212,8 @@ internal fun VoiceOrb(
 
 /** 逐帧粒子绘制：旋转投影、深度明暗、边缘柔化、差速拖尾与品牌蓝混色，全部在 draw 阶段完成。 */
 private fun DrawScope.drawParticleOrb(
-    field: VoiceParticleField,
+    geometry: VoiceParticleGeometry,
+    trailBuffer: VoiceParticleTrailBuffer,
     yaw: Float,
     swirlPhase: Float,
     level: Float,
@@ -218,19 +244,30 @@ private fun DrawScope.drawParticleOrb(
     val tilt = .30f + .06f * sin(swirlPhase * 3f)
     val ct = cos(tilt)
     val st = sin(tilt)
+    // 预计算三档球壳的旋转正余弦，将每帧 2400 次三角函数收敛为 3 次。
+    val shellCos = trailBuffer.shellCos
+    val shellSin = trailBuffer.shellSin
+    for (tier in 0 until ShellTierCount) {
+        val ang = yaw + tier * swirlPhase
+        shellCos[tier] = cos(ang)
+        shellSin[tier] = sin(ang)
+    }
     // 播报时少量粒子混向品牌蓝：这是全屏唯一的彩色层，其余一律保持中性墨色。
     val tinted = lerp(ink, BrandBlue, tintStrength)
     // 闪烁相位借用 48s 自转周期折算时间；复位只是重掷一次噪声，几何投影仍连续。
     val time = yaw * 48f
     val levelAlpha = 1f + level * .3f
     val levelSize = 1f + level * .18f
-    val base = field.base
+    val base = geometry.base
+    val shellTier = geometry.shellTier
+    val prevX = trailBuffer.prevX
+    val prevY = trailBuffer.prevY
     for (i in 0 until ParticleCount) {
         val o = i * ParticleStride
         val jit = base[o + 3]
-        val ang = yaw + base[o + 4] * swirlPhase
-        val cs = cos(ang)
-        val sn = sin(ang)
+        val tier = shellTier[i]
+        val cs = shellCos[tier]
+        val sn = shellSin[tier]
         val bx = base[o]
         val by = base[o + 1]
         val bz = base[o + 2]
@@ -244,13 +281,16 @@ private fun DrawScope.drawParticleOrb(
         val d01 = (z2 + 1f) * .5f
         val shimmer = .55f + .45f * sin(time * base[o + 7] + base[o + 8])
         var alpha = base[o + 6] * (.26f + .74f * d01 * sqrt(d01)) * shimmer * dim * levelAlpha
-        // 边缘柔化：出球壳后迅速淡出，避免硬轮廓
-        val rOut = sqrt(x * x + y2 * y2) * jit
-        if (rOut > .97f) alpha *= ((1.03f - rOut) / .06f).coerceIn(0f, 1f)
-        val prevPx = field.prevX[i]
-        val prevPy = field.prevY[i]
-        field.prevX[i] = px
-        field.prevY[i] = py
+        // 边缘柔化：利用单位球 x^2 + y2^2 = 1 - z2^2 先做平方门控，仅外缘薄壳粒子开方。
+        val rOutSq = (1f - z2 * z2).coerceAtLeast(0f) * base[o + 4]
+        if (rOutSq > .9409f) {
+            val rOut = sqrt(rOutSq)
+            alpha *= ((1.03f - rOut) / .06f).coerceIn(0f, 1f)
+        }
+        val prevPx = prevX[i]
+        val prevPy = prevY[i]
+        prevX[i] = px
+        prevY[i] = py
         if (alpha <= .004f) continue
         val pSize = base[o + 5] * (.70f + .50f * d01) * levelSize
         // 差速拖尾：仅较亮粒子，长度随状态强度伸缩；首帧无历史位置不画

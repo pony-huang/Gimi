@@ -18,14 +18,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 应用统一的胶囊搜索输入框；查询与结果由页面持有，尾部支持清除或筛选操作。
  *
  * 占位文案固定单行省略：长占位一旦换行就会撑高输入框，让同一抽屉里的
- * 搜索框高度不一致。
+ * 搜索框高度不一致。容器色取 M3 `surfaceContainerHigh`，在抽屉与弹窗底板上自然区分。
  */
 @Composable
 fun GimiSearchField(
@@ -37,7 +36,7 @@ fun GimiSearchField(
     trailingIcon: (@Composable () -> Unit)? = null,
     onSearch: (String) -> Unit = {},
 ) {
-    val container = preferenceGroupCardColor()
+    val container = MaterialTheme.colorScheme.surfaceContainerHigh
     TextField(
         value = value,
         onValueChange = onValueChange,

@@ -52,9 +52,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
+import github.ponyhuang.gimi.domain.modelaccess.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.data.agent.chatbot.ChatbotOfficialToolset
 
 /**
  * 两种工具访问模式的 Agent 组装验证。
@@ -338,9 +339,9 @@ class AgentFactoryToolAccessTest {
         val modelServices = mockk<AgentModelConfigurationSource> {
             every { configurationRevision } returns MutableStateFlow(0L)
         }
-        val modelFactory = mockk<AgentLLMModelFactory>()
+        val modelFactory = mockk<DefaultAgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
-        every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
+        every { modelFactory.createModel(any(), any()) } returns mockk<Model>(relaxed = true)
         val plugin = FakeAgentPlugin("test", pluginTools = pluginTools, pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
 
@@ -366,8 +367,9 @@ class AgentFactoryToolAccessTest {
         return Fixture(
             agentFactory = AgentFactory(
                 contributions = registry,
-                agentLLMModelFactory = modelFactory,
+                agentLLMModelFactory = AgentModelRuntime(modelFactory),
                 toolVectorSearch = vectorSearch,
+                chatbotTools = ChatbotOfficialToolset(officialToolset, officialCatalog),
             ),
             pluginRuntime = pluginRuntimeProvider.runtime.value,
             officialToolset = officialToolset,

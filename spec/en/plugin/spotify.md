@@ -1,6 +1,6 @@
 # Spotify Web API integration reference
 
-Reviewed: 2026-10-19. Audience: agents and developers changing `plugins/spotify`. Chinese companion: [中文说明](../zh/plugin/spotify.md). This is a dated reference; re-fetch the relevant official documents before changing a contract.
+Audience: agents and developers changing `plugins/spotify`. Chinese companion: [中文说明](../../zh/plugin/spotify.md). Re-fetch the relevant official documents before changing a contract.
 
 ## What the AI tutorial establishes
 
@@ -8,7 +8,7 @@ Spotify's guide is about using AI to develop integrations. It supplies an OpenAP
 
 ## Contract and endpoint freshness
 
-The official [OpenAPI YAML](https://developer.spotify.com/reference/web-api/open-api-schema.yaml) was reachable and declared OpenAPI 3.0.3 on the review date. Read the operation's method, parameter location, limits, security scopes, success status, and response shape together. Current playlist item operations use `/playlists/{playlist_id}/items`; the older `/tracks` operations are marked deprecated. Library mutations use `PUT`/`DELETE /me/library` with required comma-separated `uris` in the query, maximum 40; `GET /me/library/contains` returns a Boolean array. Do not infer these contracts from similar endpoints. [Source: official schema](https://developer.spotify.com/reference/web-api/open-api-schema.yaml).
+The official [OpenAPI YAML](https://developer.spotify.com/reference/web-api/open-api-schema.yaml) was reachable and declared OpenAPI 3.0.3. Read the operation's method, parameter location, limits, security scopes, success status, and response shape together. Current playlist item operations use `/playlists/{playlist_id}/items`; the older `/tracks` operations are marked deprecated. Library mutations use `PUT`/`DELETE /me/library` with required comma-separated `uris` in the query, maximum 40; `GET /me/library/contains` returns a Boolean array. Do not infer these contracts from similar endpoints. [Source: official schema](https://developer.spotify.com/reference/web-api/open-api-schema.yaml).
 
 ## Authorization and permissions
 
@@ -44,7 +44,7 @@ Spotify's API documentation also prohibits using Spotify Platform/content to tra
 
 These are project recommendations, not extra Spotify API guarantees:
 
-1. Fetch the current schema and relevant operation pages; record the review date and any disagreement between them.
+1. Fetch the current schema and relevant operation pages; record any disagreement between them.
 2. Review the proposed endpoint/method, parameter placement, response shape, enabled scopes, redirect, credential owner, refresh lifecycle, and policy applicability before coding.
 3. Keep SDK/HTTP/authentication details in the Spotify plugin boundary. Follow repository architecture, i18n, preview, and proportional-testing rules for host changes.
 4. Validate request mapping, empty/object/array responses, invalid credentials, 403, 429, cancellation, and mutation retry decisions using fakes or a local HTTP boundary; use no live credentials in tests.
@@ -52,7 +52,7 @@ These are project recommendations, not extra Spotify API guarantees:
 
 ## Existing implementation follow-up, not a completed audit
 
-Inspection on the review date found the following review points; this document makes no implementation changes:
+Inspection found the following review points; this document makes no implementation changes:
 
 - `SpotifyAuth.kt` exchanges and refreshes using Basic authentication with a client secret, rather than PKCE. Its redirect parser accepts `localhost`, and its KDoc incorrectly describes that host as supported. Revisit these against the auth and redirect references above.
 - `SpotifyAuth.kt` requests one scope list covering all tools. Review whether all those tools are enabled and necessary for each authorization scenario.

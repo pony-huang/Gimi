@@ -8,7 +8,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
-import github.ponyhuang.gimi.data.modelaccess.mimo.speech.MiMoTtsVoices
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
 import github.ponyhuang.gimi.domain.voice.model.TtsVoiceContext
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceProvider
@@ -61,7 +60,10 @@ class DefaultTtsVoiceRepositoryTest {
         )
 
         val voiceCatalog = mockk<VoiceCatalogResolver> {
-            every { builtInVoices("mimo") } returns MiMoTtsVoices.all
+            every { builtInVoices("mimo") } returns listOf(
+                TtsVoice("mimo-1", "冰糖", null, null),
+                TtsVoice("mimo-2", "茉莉", null, null),
+            )
         }
 
         val repository = DefaultTtsVoiceRepository(
@@ -71,7 +73,7 @@ class DefaultTtsVoiceRepositoryTest {
         )
 
         val voices = repository.getVoices(ModelSelection(instanceId = "instance-mimo", connectionId = "connection", modelId = "m1"))
-        assertEquals(MiMoTtsVoices.all.map { it.id }, voices.map { it.id })
+        assertEquals(listOf("mimo-1", "mimo-2"), voices.map { it.id })
     }
 
     @Test

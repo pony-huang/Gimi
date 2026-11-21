@@ -66,9 +66,19 @@ interface SpeechRecognitionRepository {
 interface SpeechSynthesisRepository {
     val availability: Flow<Boolean>
 
-    fun isAvailable(): Boolean
+    fun isAvailable(selection: ModelSelection? = null): Boolean
 
-    fun synthesize(text: String): Flow<ByteArray>
+    /**
+     * 合成一段文本。
+     *
+     * @param voiceId 会话级音色覆盖；null 表示沿用全局合成音色（模型目录配置或厂商默认），
+     *   供语音通话中按对话覆盖指定音色，普通朗读不传。
+     */
+    fun synthesize(
+        text: String,
+        voiceId: String? = null,
+        selection: ModelSelection? = null,
+    ): Flow<ByteArray>
 
     fun cacheIdentity(): String?
 
@@ -76,8 +86,10 @@ interface SpeechSynthesisRepository {
      * 打开一次会话式合成。
      *
      * 当前服务未接入会话式合成时返回 null，调用方据此回退到一次性合成。
+     *
+     * @param voiceId 会话级音色覆盖；null 表示沿用全局合成音色。
      */
-    fun openSession(): SpeechSynthesisSession?
+    fun openSession(voiceId: String? = null, selection: ModelSelection? = null): SpeechSynthesisSession?
 }
 
 interface SpeechPlaybackRepository {

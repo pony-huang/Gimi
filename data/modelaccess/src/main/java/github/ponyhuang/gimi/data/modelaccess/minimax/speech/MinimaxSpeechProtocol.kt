@@ -36,7 +36,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.BufferedSource
-import github.ponyhuang.gimi.data.modelaccess.shared.encodePcm16Wav
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
 import github.ponyhuang.gimi.data.modelaccess.shared.awaitSpeechRecognitionBody
 
 /** MiniMax 服务标识；与模型目录中的服务 ID 一致。 */

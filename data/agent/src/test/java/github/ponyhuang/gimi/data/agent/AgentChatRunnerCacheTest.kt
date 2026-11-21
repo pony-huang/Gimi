@@ -39,7 +39,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 
 class AgentChatRunnerCacheTest {
 
@@ -255,7 +255,7 @@ class AgentChatRunnerCacheTest {
                     pluginRuntime = snapshot,
                 )
             },
-            plugins = { runtimeSnapshot ->
+            plugins = { runtimeSnapshot, _ ->
                 pluginSnapshot = runtimeSnapshot
                 emptyList()
             },
@@ -408,6 +408,28 @@ class AgentChatRunnerCacheTest {
 
         assertEquals(readsBeforeResume, configurationReads)
         assertEquals(creationsBeforeResume, creations)
+    }
+
+
+    @Test
+    fun chatbotRoleChangesRebuildNextTurnAndRemainSessionScoped() = runTest {
+        val roles = mutableMapOf("first" to "角色一")
+        val builtInstructions = mutableListOf<String>()
+        val runner = AgentChatRunner(
+            factory = { spec -> builtInstructions += spec.instructionSuffix; runtime(spec.selection) },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
+            chatbotRoleContent = { id -> roles[id] },
+        )
+        val profile = github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile.CHATBOT
+        runner.createExecution("chatbot", "first", profile = profile)
+        runner.createExecution("chatbot", "first", profile = profile)
+        roles["first"] = "角色二"
+        runner.createExecution("chatbot", "first", profile = profile)
+        runner.createExecution("chatbot", "second", profile = profile)
+        assertEquals(listOf("角色一", "角色二", ""), builtInstructions)
     }
 
     private fun runtime(selection: ModelSelection? = null) = AgentRuntime(

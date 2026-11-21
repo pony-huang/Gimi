@@ -46,8 +46,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
 
 /** 验证应用工厂到官方后端的 HTTP 边界及主动接受的能力限制，不调用真实模型。 */
 class ChatCompletionsIntegrationTest {
@@ -55,7 +55,7 @@ class ChatCompletionsIntegrationTest {
     val temporaryFolder = TemporaryFolder(File("."))
 
     private lateinit var server: MockWebServer
-    private val factory = AgentLLMModelFactory(
+    private val factory = DefaultAgentLLMModelFactory(
         mockk<AgentModelConfigurationSource>(),
     )
 
@@ -86,12 +86,12 @@ class ChatCompletionsIntegrationTest {
         // OpenAI 兼容协议属于自定义服务，无厂商模板身份。
         val config = ModelConfig("compatible", null, ApiProtocol.OpenaiChatcompletions,
             "test-model", "test-key", server.url("/custom/v1/").toString())
-        val recommendationFactory = mockk<AgentLLMModelFactory>()
+        val recommendationFactory = mockk<DefaultAgentLLMModelFactory>()
         every { recommendationFactory.selectFastModelConfig() } returns config
         every { recommendationFactory.forRecommendationJson(config) } returns config
-        every { recommendationFactory.createModel(config) } answers { factory.createModel(config) }
+        every { recommendationFactory.createModel(config, any()) } answers { factory.createModel(config) }
         val generator = AgentRecommendationGenerator(
-            recommendationFactory, AgentContributionRegistry(emptySet()),
+            AgentModelRuntime(recommendationFactory), AgentContributionRegistry(emptySet()),
         )
 
         val recommendations = generator.generate(RecommendationGenerationInput(

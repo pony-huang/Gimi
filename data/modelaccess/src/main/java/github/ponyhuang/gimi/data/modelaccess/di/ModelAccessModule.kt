@@ -7,6 +7,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import github.ponyhuang.gimi.core.network.SpeechWebSocketClient
 import github.ponyhuang.gimi.data.modelaccess.deepseek.speech.DeepSeekSpeechRecognizer
 import github.ponyhuang.gimi.data.modelaccess.deepseek.speech.DeepSeekSpeechSynthesizer
@@ -140,6 +143,12 @@ abstract class ModelAccessModule {
         implementation: OpenAiSpeechSynthesizer,
     ): SpeechSynthesizer
 
+    @Binds
+    @Singleton
+    abstract fun bindVendorFileGateway(
+        implementation: github.ponyhuang.gimi.data.modelaccess.file.DefaultVendorFileGateway,
+    ): github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
+
     companion object {
         /**
          * 语音服务的 WebSocket 客户端。
@@ -195,6 +204,26 @@ abstract class ModelAccessModule {
         fun provideMinimaxBidiSynthesizer(
             @SpeechWebSocketClient speechWebSocketClient: OkHttpClient,
         ): StreamingSpeechSynthesizer = MinimaxBidiSynthesizer(speechWebSocketClient)
+
+        @Provides
+        @Singleton
+        @IntoSet
+        fun provideOpenAiProtocolFileClient(
+            @ApplicationContext context: Context,
+        ): github.ponyhuang.gimi.data.modelaccess.file.FileProtocolClient =
+            github.ponyhuang.gimi.data.modelaccess.file.OpenAiProtocolFileClient(
+                File(context.cacheDir, "vendor-files"),
+            )
+
+        @Provides
+        @Singleton
+        @IntoSet
+        fun provideClaudeProtocolFileClient(
+            @ApplicationContext context: Context,
+        ): github.ponyhuang.gimi.data.modelaccess.file.FileProtocolClient =
+            github.ponyhuang.gimi.data.modelaccess.file.ClaudeProtocolFileClient(
+                File(context.cacheDir, "vendor-files"),
+            )
 
         @Provides
         @Singleton

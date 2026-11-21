@@ -4,6 +4,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.flow.Flow
 
@@ -22,6 +23,7 @@ interface ChatAgentRepository {
         selection: ModelSelection,
         toolConfiguration: ConversationToolConfiguration? = null,
         a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
+        profile: AgentProfile = AgentProfile.ASSISTANT,
     ): ChatAgentExecution
 }
 

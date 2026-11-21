@@ -36,15 +36,16 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -56,7 +57,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,6 +86,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
+import github.ponyhuang.gimi.domain.conversation.model.ChatMode
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
@@ -94,8 +100,8 @@ private val DrawerGroupCornerRadius = 16.dp
 /** 分组卡片左右外边距，同时是行内文字与卡片边缘的距离基准。 */
 private val DrawerGroupHorizontalPadding = 16.dp
 
-/** 紧凑行最小高度：与设置页 `PreferenceListItem` 一致。 */
-private val DrawerRowMinHeight = GimiListDefaults.MinHeight
+/** 会话行最小高度：抽屉按设计评审比设置页 `GimiListDefaults.MinHeight` 更紧凑。 */
+private val DrawerRowMinHeight = 52.dp
 
 /** 底部渐隐高度：容纳右下角齿轮按钮及其留白。 */
 private val DrawerFooterHeight = 88.dp
@@ -103,9 +109,9 @@ private val DrawerFooterHeight = 88.dp
 /** 会话列表顶端的渐隐高度，柔化滚动内容与固定区头之间的边界。 */
 private val DrawerTopFadeHeight = 24.dp
 
-/** 常用功能行几何：图标 + 文字，与设置页列表行同一套语言。 */
-private val DrawerFunctionRowMinHeight = 56.dp
-private val DrawerFunctionIconSize = 22.dp
+/** 常用功能行几何：图标 + 文字，比设置页列表行更紧凑（行高、字号、图标同步缩小）。 */
+private val DrawerFunctionRowMinHeight = 48.dp
+private val DrawerFunctionIconSize = 20.dp
 private val DrawerFunctionDividerStart =
     DrawerGroupHorizontalPadding + DrawerFunctionIconSize + GimiListDefaults.ContentSpacing
 
@@ -113,11 +119,56 @@ private val DrawerFunctionDividerStart =
 private val DrawerGearButtonSize = 48.dp
 
 /**
+ * 历史列表的助手/Chatbot 筛选 tab。
+ *
+ * 语义上是"列表筛选"而非页面模式切换，用原生 TabRow：指示条自带滑动动画，
+ * 与列表 animateItem 同节奏；顶栏/语音页的胶囊开关保持不变。
+ */
+@Composable
+private fun ChatHistoryModeTabs(mode: ChatMode, onModeChange: (ChatMode) -> Unit, modifier: Modifier = Modifier) {
+    val selected = ChatMode.entries.indexOf(mode).coerceIn(0, ChatMode.entries.lastIndex)
+    SecondaryTabRow(
+        selectedTabIndex = selected,
+        modifier = modifier,
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.primary,
+        divider = {},
+        indicator = {
+            TabRowDefaults.SecondaryIndicator(
+                modifier = Modifier
+                    .tabIndicatorOffset(selected)
+                    .padding(horizontal = 24.dp)
+                    .clip(RoundedCornerShape(percent = 50)),
+                height = 3.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+    ) {
+        ChatMode.entries.forEach { value ->
+            Tab(
+                selected = mode == value,
+                onClick = { onModeChange(value) },
+                selectedContentColor = MaterialTheme.colorScheme.primary,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = {
+                    Text(
+                        text = stringResource(if (value == ChatMode.ASSISTANT) R.string.chat_mode_assistant else R.string.chat_mode_chatbot),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
+                },
+            )
+        }
+    }
+}
+
+/**
  * 历史对话抽屉 —— 预测性返回进度抽屉（[PredictiveBackDrawer]）的内容编排。
  *
  * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片。
- * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 语音通话 / 个性化 / 运行环境）→ 最近会话 + 管理（多选期间换成
- * 取消 / 已选数 / 全选 / 删除）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
+ * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 模型服务 / 自动播报开关 / 个性化）
+ * → 最近会话 + 管理（多选期间换成取消 / 已选数 / 全选 / 删除）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
+ * 自动播报从聊天顶栏下沉到抽屉，作为开关类设置与跳转类入口分层呈现。
  * 夜间模式等外观配置已移至设置的"个性化"分组，抽屉不再直接切换。
  *
  * 作为根级组合包装 [content]，宿主屏幕（如 Scaffold）放在 [content] 内部。
@@ -133,14 +184,18 @@ private val DrawerGearButtonSize = 48.dp
  * @param recentState          搜索、多选和删除进度状态
  * @param onRecentAction       最近会话操作，由 ViewModel 处理并再次校验删除保护
  * @param onNewConversationClick 点击"新对话"入口时回调（实现方负责新建会话并关闭抽屉）
- * @param onVoiceCallClick     点击"语音通话"入口时回调（实现方负责打开语音页并关闭抽屉）
+ * @param onModelServicesClick 点击"模型服务"入口时回调（实现方负责跳转模型服务配置并关闭抽屉）
  * @param onPersonalizeClick   点击"个性化"入口时回调（实现方负责跳转设置并关闭抽屉）
- * @param onRuntimeEnvironmentClick 点击"运行环境"入口时回调（实现方负责跳转运行环境页并关闭抽屉）
  * @param onSettingsClick      点击右下角齿轮时回调（实现方负责关闭抽屉并跳转）
+ * @param autoSpeakEnabled     自动播报全局开关当前值，驱动抽屉内开关卡片
+ * @param onToggleAutoSpeak    切换自动播报开关；由 ViewModel 写回并持久化
  * @param showUpdateBadge      是否在齿轮上点亮更新提醒点
  * @param onOpenChange         抽屉目标开关状态变化上报（手势提交、遮罩点击、拖拽收尾）
- * @param onExportConversation 长按菜单导出会话；实现方负责弹出系统文件选择器
+ * @param onExportConversation 长按菜单导出会话；实现方按档位解析分区并弹出系统文件选择器
  * @param onDeleteConversation 长按菜单删除单个会话；实现方负责再次校验删除保护
+ * @param historyMode          当前历史档位；非空时展示助手/Chatbot 筛选 Tab。
+ *                             `null` 只用于预览等不展示 Tab 的场合。
+ * @param onHistoryModeChange  历史档位切换回调（Tab 点击）
  * @param content              抽屉背后的主屏幕内容
  */
 @Composable
@@ -154,18 +209,21 @@ fun ChatDrawer(
     recentState: RecentConversationsState = RecentConversationsState(),
     onRecentAction: (RecentConversationsAction) -> Unit = {},
     onNewConversationClick: () -> Unit = {},
-    onVoiceCallClick: () -> Unit = {},
+    onModelServicesClick: () -> Unit = {},
     onPersonalizeClick: () -> Unit = {},
-    onRuntimeEnvironmentClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    autoSpeakEnabled: Boolean = false,
+    onToggleAutoSpeak: () -> Unit = {},
     showUpdateBadge: Boolean = false,
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
-    onExportConversation: (String) -> Unit = {},
+    onExportConversation: (String, ChatMode) -> Unit = { _, _ -> },
     onDeleteConversation: (String) -> Unit = {},
     onOpenChange: (Boolean) -> Unit = {},
     searchFocusRequester: FocusRequester = remember { FocusRequester() },
     onSearchExpanded: () -> Unit = {},
     onSearchSubmit: () -> Unit = {},
+    historyMode: ChatMode? = null,
+    onHistoryModeChange: (ChatMode) -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -195,10 +253,11 @@ fun ChatDrawer(
                         recentState = recentState,
                         onRecentAction = onRecentAction,
                         onNewConversationClick = onNewConversationClick,
-                        onVoiceCallClick = onVoiceCallClick,
+                        onModelServicesClick = onModelServicesClick,
                         onPersonalizeClick = onPersonalizeClick,
-                        onRuntimeEnvironmentClick = onRuntimeEnvironmentClick,
                         onSettingsClick = onSettingsClick,
+                        autoSpeakEnabled = autoSpeakEnabled,
+                        onToggleAutoSpeak = onToggleAutoSpeak,
                         showUpdateBadge = showUpdateBadge,
                         listState = historyListState,
                         exportState = exportState,
@@ -207,6 +266,8 @@ fun ChatDrawer(
                         searchFocusRequester = searchFocusRequester,
                         onSearchExpanded = onSearchExpanded,
                         onSearchSubmit = onSearchSubmit,
+                        historyMode = historyMode,
+                        onHistoryModeChange = onHistoryModeChange,
                     )
                 }
             }
@@ -229,18 +290,21 @@ private fun HistoryDrawerContent(
     recentState: RecentConversationsState,
     onRecentAction: (RecentConversationsAction) -> Unit,
     onNewConversationClick: () -> Unit,
-    onVoiceCallClick: () -> Unit,
+    onModelServicesClick: () -> Unit,
     onPersonalizeClick: () -> Unit,
-    onRuntimeEnvironmentClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    autoSpeakEnabled: Boolean = false,
+    onToggleAutoSpeak: () -> Unit = {},
     showUpdateBadge: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
-    onExportConversation: (String) -> Unit = {},
+    onExportConversation: (String, ChatMode) -> Unit = { _, _ -> },
     onDeleteConversation: (String) -> Unit = {},
     searchFocusRequester: FocusRequester = remember { FocusRequester() },
     onSearchExpanded: () -> Unit = {},
     onSearchSubmit: () -> Unit = {},
+    historyMode: ChatMode? = null,
+    onHistoryModeChange: (ChatMode) -> Unit = {},
 ) {
     val visible = recentState.visibleConversations(conversations)
     val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
@@ -285,6 +349,8 @@ private fun HistoryDrawerContent(
         ) {
             Column {
                 // 常用功能：图标 + 文字的紧凑入口行，免滚动直达高频操作。
+                // 新对话/模型服务一组，自动播报独立成卡，个性化独立成卡——
+                // 开关类设置与跳转类入口视觉分层；两档 tab 共用同一套入口。
                 DrawerFunctionEntry(
                     icon = Icons.Default.Add,
                     label = stringResource(R.string.chat_drawer_new_conversation),
@@ -293,26 +359,24 @@ private fun HistoryDrawerContent(
                     onClick = onNewConversationClick,
                 )
                 DrawerFunctionEntry(
-                    icon = Icons.Default.Call,
-                    label = stringResource(R.string.chat_drawer_voice_call),
-                    isFirst = false,
-                    isLast = false,
-                    onClick = onVoiceCallClick,
-                )
-                DrawerFunctionEntry(
-                    icon = Icons.Default.Palette,
-                    label = stringResource(R.string.chat_drawer_personalize),
-                    isFirst = false,
-                    isLast = false,
-                    onClick = onPersonalizeClick,
-                )
-                // 运行环境入口：图标与设置一级页"运行环境"行一致，便于跨页面识别同一目的地。
-                DrawerFunctionEntry(
-                    icon = Icons.Default.Code,
-                    label = stringResource(R.string.chat_drawer_runtime),
+                    icon = Icons.Default.SmartToy,
+                    label = stringResource(R.string.chatbot_model_services),
                     isFirst = false,
                     isLast = true,
-                    onClick = onRuntimeEnvironmentClick,
+                    onClick = onModelServicesClick,
+                )
+                Spacer(Modifier.height(12.dp))
+                DrawerAutoSpeakCard(
+                    enabled = autoSpeakEnabled,
+                    onToggle = onToggleAutoSpeak,
+                )
+                Spacer(Modifier.height(12.dp))
+                DrawerFunctionEntry(
+                    icon = Icons.Default.AutoAwesome,
+                    label = stringResource(R.string.chat_drawer_personalize),
+                    isFirst = true,
+                    isLast = true,
+                    onClick = onPersonalizeClick,
                 )
                 Spacer(Modifier.height(12.dp))
             }
@@ -377,6 +441,7 @@ private fun HistoryDrawerContent(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // 助手/Chatbot 两个档位都走同一套 recentAction 分流，管理多选两档通用。
                     TextButton(
                         enabled = !recentState.isDeleting && conversations.isNotEmpty(),
                         onClick = { onRecentAction(RecentConversationsAction.StartSelection()) },
@@ -386,6 +451,9 @@ private fun HistoryDrawerContent(
                     }
                 }
             }
+        }
+        if (historyMode != null) {
+            ChatHistoryModeTabs(historyMode, onHistoryModeChange, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         }
         Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
             LazyColumn(
@@ -406,6 +474,9 @@ private fun HistoryDrawerContent(
                 items(items = visible, key = { it.id }) { conversation ->
                     ConversationListItem(
                         conversation = conversation,
+                        // 助手/Chatbot 切档时两个数据源的条目增减用淡入淡出+位移过渡，
+                        // 与历史筛选 tab 指示条动画形成同一节奏。
+                        modifier = Modifier.animateItem(),
                         isCurrent = conversation.id == currentSessionId,
                         taskStatus = conversationTaskStatuses[conversation.id],
                         enabled = !recentState.isDeleting && (!recentState.isSelecting || conversation.id in eligible),
@@ -420,7 +491,7 @@ private fun HistoryDrawerContent(
                         canExport = exportState.canExport(conversation.id),
                         // 删除沿用批量删除的同一套保护：当前会话与任务进行中的会话不可删。
                         canDelete = conversation.id in eligible,
-                        onExport = { onExportConversation(conversation.id) },
+                        onExport = { onExportConversation(conversation.id, historyMode ?: ChatMode.ASSISTANT) },
                         onDelete = { onDeleteConversation(conversation.id) },
                         onLongClick = if (recentState.isSearching) {
                             { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) }
@@ -523,7 +594,7 @@ private fun DrawerFunctionEntry(
                 .fillMaxWidth()
                 .heightIn(min = DrawerFunctionRowMinHeight)
                 .clickable(onClickLabel = label, onClick = onClick)
-                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 8.dp),
+                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(GimiListDefaults.ContentSpacing),
         ) {
@@ -535,7 +606,7 @@ private fun DrawerFunctionEntry(
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -548,13 +619,64 @@ private fun DrawerFunctionEntry(
     }
 }
 
+// ── 自动播报开关 ────────────────────────────────────────────────
+
+/**
+ * 自动语音播报卡片：开关 + 说明副标题，独立于跳转入口行成卡。
+ * 从聊天顶栏下沉到抽屉：顶栏只留高频导航，低频持久开关归入抽屉设置区。
+ *
+ * @param enabled 自动播报全局开关当前值
+ * @param onToggle 切换开关；状态由 ViewModel 写回 [enabled]
+ */
+@Composable
+private fun DrawerAutoSpeakCard(enabled: Boolean, onToggle: () -> Unit) {
+    val label = stringResource(R.string.chat_drawer_auto_speak)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DrawerGroupHorizontalPadding)
+            .clip(RoundedCornerShape(DrawerGroupCornerRadius))
+            .background(preferenceGroupCardColor())
+            .toggleable(value = enabled, role = Role.Switch, onValueChange = { onToggle() }),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = DrawerFunctionRowMinHeight)
+                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GimiListDefaults.ContentSpacing),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                contentDescription = null,
+                tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(DrawerFunctionIconSize),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.chat_drawer_auto_speak_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            github.ponyhuang.gimi.ui.components.GimiSwitch(checked = enabled, onCheckedChange = null)
+        }
+    }
+}
+
 // ── 对话列表项 ──────────────────────────────────────────────────
 
 /**
  * 分组卡片中的单个会话行：点击切换，长按显示导出/删除操作；多选时点击整行切换勾选。
  *
- * 行内只有标题与副标题，不额外加图标——会话行靠卡片、分隔线与排版区分层次，
- * 逐行重复同一个图标只会增加视觉噪声。
+ * 行内只有标题与末条消息摘要副标题（摘要为空时省略），不额外加图标——
+ * 会话行靠卡片、分隔线与排版区分层次，逐行重复同一个图标只会增加视觉噪声。
  *
  * @param isCurrent 当此行是当前正在使用的会话时 MUST 高亮且不可删除（防止用户把自己正在用的会话删掉）。
  * @param isFirst/isLast 首尾行落下圆角，相邻行拼成一张连续卡片。
@@ -623,7 +745,7 @@ private fun ConversationListItem(
                         onLongClick = { if (onLongClick != null) onLongClick() else showActions = true },
                     ),
                 )
-                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 10.dp),
+                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isSelecting) {
@@ -635,21 +757,24 @@ private fun ConversationListItem(
             ) {
                 Text(
                     text = conversation.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = contentColor.copy(alpha = rowAlpha),
                 )
-                // 副标题是辨识度的来源：标题可能都是"新对话"，时间 + 末条消息才能区分开。
-                Text(
-                    text = if (isCurrent) stringResource(R.string.chat_drawer_current_session_time, formatRelativeTime(conversation.timestamp)) else conversation.subtitle(),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = contentColor.copy(alpha = rowAlpha).copy(alpha = 0.6f),
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+                // 副标题只保留末条消息摘要：相对时间元数据按评审移除，摘要为空时整行省略。
+                val snippet = conversation.lastMessage.lineSequence().firstOrNull()?.trim().orEmpty()
+                if (snippet.isNotEmpty()) {
+                    Text(
+                        text = snippet,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = contentColor.copy(alpha = rowAlpha).copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
             when (taskStatus) {
                 is ConversationTaskStatus.Running -> CircularProgressIndicator(
@@ -725,7 +850,7 @@ private fun ConversationActionsMenu(
     onDelete: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
+        if (canExport) DropdownMenuItem(
             text = { Text(stringResource(R.string.session_export_single)) },
             leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
             enabled = canExport,
@@ -753,36 +878,6 @@ private fun ConversationActionsMenu(
                 onDelete()
             },
         )
-    }
-}
-
-/** 列表副标题：`2 小时前 · 末条消息…`；无消息时只有时间。 */
-@Composable
-private fun Conversation.subtitle(): String {
-    val time = formatRelativeTime(timestamp)
-    val snippet = lastMessage.lineSequence().firstOrNull()?.trim().orEmpty()
-    return if (snippet.isEmpty()) time else "$time · $snippet"
-}
-
-@Composable
-private fun formatRelativeTime(timestamp: Long): String {
-    val diff = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L)
-    val minutes = diff / 60_000L
-    val hours = diff / 3_600_000L
-    val days = diff / 86_400_000L
-    return when {
-        minutes < 1L -> stringResource(R.string.chat_time_just_now)
-        minutes < 60L -> stringResource(R.string.chat_time_minutes_ago, minutes)
-        hours < 24L -> stringResource(R.string.chat_time_hours_ago, hours)
-        days < 7L -> stringResource(R.string.chat_time_days_ago, days)
-        else -> {
-            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-            stringResource(
-                R.string.chat_time_date,
-                calendar.get(java.util.Calendar.MONTH) + 1,
-                calendar.get(java.util.Calendar.DAY_OF_MONTH),
-            )
-        }
     }
 }
 
@@ -929,9 +1024,8 @@ private fun RecentContentPreview(
                     recentState = recentState,
                     onRecentAction = {},
                     onNewConversationClick = {},
-                    onVoiceCallClick = {},
+                    onModelServicesClick = {},
                     onPersonalizeClick = {},
-                    onRuntimeEnvironmentClick = {},
                     onSettingsClick = {},
                     showUpdateBadge = true,
                 )

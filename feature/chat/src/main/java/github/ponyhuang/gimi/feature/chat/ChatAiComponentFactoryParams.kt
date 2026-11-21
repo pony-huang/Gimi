@@ -51,6 +51,8 @@ public data class ComposerInputContentParams(
     val onExpandedChange: (Boolean) -> Unit = { },
     val onAttachmentsClick: () -> Unit = { },
     val modelSelectorContent: @Composable () -> Unit = { },
+    /** 从文字输入区进入当前会话的实时语音页面；null 时隐藏通话入口。 */
+    val onOpenVoice: (() -> Unit)? = null,
     val configurationReady: Boolean = true,
     /** 内容请求只允许文字或语音，隐藏普通聊天的附件入口。 */
     val attachmentsEnabled: Boolean = true,
@@ -60,6 +62,10 @@ public data class ComposerInputContentParams(
     val onPermissionModeClick: () -> Unit = { },
     /** 当前会话是否处于完全批准模式；chip 据此切换状态颜色和无障碍说明。 */
     val fullAccess: Boolean = false,
+    /** 文档草稿的厂商上传状态（键为草稿 reference）；chip 三态渲染数据源。 */
+    val attachmentUploadStates: Map<String, DraftUploadState> = emptyMap(),
+    /** 上传失败的 chip 原地重试。 */
+    val onRetryAttachmentUpload: (DraftAttachment) -> Unit = {},
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

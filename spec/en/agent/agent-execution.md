@@ -1,6 +1,6 @@
 # Agent business execution
 
-Reviewed: 2026-11-07. Audience: agents and developers changing chat/agent execution, tool wiring, run lifecycle, or confirmation behavior. Chinese companion: [中文说明](../../zh/agent/agent-execution.md).
+Audience: agents and developers changing chat/agent execution, tool wiring, run lifecycle, or confirmation behavior. Chinese companion: [中文说明](../../zh/agent/agent-execution.md).
 
 Read this before adding an `AgentContribution`, changing run lifecycle or confirmation semantics, or touching the event pipeline. For voice-specific subsystems see [Realtime voice system](../voice/realtime-voice-system.md); for the A2UI generation/rendering pipeline see [A2UI business execution](../a2ui/a2ui-execution.md); for the AppFunctions tool family see [AppFunctions](../appfunctions.md).
 
@@ -51,6 +51,8 @@ Three cooperating pieces, all in `data/agent/src/main/java/github/ponyhuang/gimi
 3. **`AgentFactory` + `AgentChatRunner`** — the factory resolves the model (`AgentLLMModelFactory` in `:data:modelaccess`, fallback chain: explicit selection → chat-screen selection → first enabled service; errors with a Settings pointer when none), builds the ADK `LlmAgent` from `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`, thinking config, aggregated tools/toolsets/sub-agents, and global `RemoteAgentFailureRecovery` callbacks. In `ON_DEMAND` mode it adds a `ToolSearchToolset` (vector search over an ObjectBox + embeddings store — treated as a rebuildable cache, never migrated; implementation principles in [Tool search](tool-search.md)). The runner LRU-caches at most 10 `SharedRuntime`s keyed on `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)` — the `revision` is a single combined value: `AgentBuildConfigurationSnapshot` captures all contribution `revision()` outputs at cache-lookup time, and its `pluginRuntime` snapshot is what actually gets assembled — and returns a per-turn `AgentChatExecution`.
 
 **Registration**: one `@Binds @IntoSet` line per contribution in `di/AgentContributionModule.kt` (subtasks binds in its own module). Adding a tool/config source = implement `AgentContribution` + one binding line; no orchestration code changes. This abstract-module multibinding is the established, working pattern — the gotcha below about `@Binds` failing to aggregate concerns plain singleton bindings elsewhere in data modules. After adding a binding, verify the contribution actually joins the set (e.g. registry duplicate-id failure or tool-catalog output).
+
+Chatbot role content is resolved by conversation for each execution and included in the existing `instructionSuffix` cache-key field. Identical roles share a runtime. A role change selects the updated runtime on the next turn while preserving session history.
 
 ## Run lifecycle, confirmation, and user input
 

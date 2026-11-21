@@ -7,8 +7,8 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.AgentLlmModelSource
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +16,7 @@ import javax.inject.Singleton
 /** 委派能力常驻声明；模型配置及快速模型选择变化时重建快照，不在运行中偷偷换模型。 */
 @Singleton
 class DelegateTasksContribution @Inject constructor(
-    private val models: AgentLLMModelFactory,
+    private val models: AgentLlmModelSource,
     private val modelSource: AgentModelConfigurationSource,
     private val executor: SubtaskBatchExecutor,
 ) : AgentContribution {

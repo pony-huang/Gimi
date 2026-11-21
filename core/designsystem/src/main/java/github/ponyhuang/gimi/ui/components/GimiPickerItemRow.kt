@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
@@ -30,7 +29,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.preference.LocalPreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
@@ -70,13 +68,22 @@ fun GimiPickerItemRow(
     trailing: (@Composable () -> Unit)? = null,
     role: Role = Role.RadioButton,
 ) {
-    val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     val disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        preferenceGroupCardColor()
+    }
+    val titleColor = when {
+        !enabled -> disabledColor
+        selected -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(if (compact) 16.dp else 24.dp))
-            .background(preferenceGroupCardColor())
+            .clip(MaterialTheme.shapes.large)
+            .background(containerColor)
             .heightIn(min = GimiListDefaults.MinHeight)
             .selectable(
                 selected = selected,
@@ -98,7 +105,7 @@ fun GimiPickerItemRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface else disabledColor,
+                    color = titleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),

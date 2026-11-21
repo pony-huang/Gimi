@@ -6,28 +6,26 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * 深色方案：纯黑画布 + 中性灰分层，品牌蓝只做强调。
- *
- * `primary` 用可访问的浅蓝（#AEBBFF），与 `onPrimary`（#10205C）成对使用；
- * [BrandBlue] 只留给焦点环与品牌图形，不承担普通字号的主操作色。
+ * 深色方案（M3 黑白墨灰 · Dark）：
+ * 徽墨黑画布（#0D0D0F）+ 5 级墨灰容器色阶，主操作色用宣纸白（#F4F4F6）与深墨字（#111113）成对。
  */
 val GimiDarkColorScheme = darkColorScheme(
     primary = BrandPrimaryDark,
-    onPrimary = Color(0xFF10205C),
+    onPrimary = BrandOnPrimaryDark,
     primaryContainer = BrandBlueDarkContainer,
-    onPrimaryContainer = Color(0xFFE3E8FF),
+    onPrimaryContainer = BrandOnPrimaryContainerDark,
     inversePrimary = BrandPrimaryLight,
-    secondary = NeutralDarkMutedText,
-    onSecondary = NeutralDarkBackground,
-    secondaryContainer = NeutralDarkSurfaceVariant,
-    onSecondaryContainer = NeutralDarkText,
-    tertiary = BrandPrimaryDark,
-    onTertiary = Color(0xFF10205C),
-    tertiaryContainer = BrandBlueDarkContainer,
-    onTertiaryContainer = Color(0xFFE3E8FF),
+    secondary = InkSecondaryDark,
+    onSecondary = InkOnSecondaryDark,
+    secondaryContainer = InkSecondaryContainerDark,
+    onSecondaryContainer = InkOnSecondaryContainerDark,
+    tertiary = InkTertiaryDark,
+    onTertiary = InkOnTertiaryDark,
+    tertiaryContainer = InkTertiaryContainerDark,
+    onTertiaryContainer = InkOnTertiaryContainerDark,
     error = Red80,
     onError = Red20,
     errorContainer = Red30,
@@ -41,9 +39,7 @@ val GimiDarkColorScheme = darkColorScheme(
     surfaceVariant = NeutralDarkSurfaceVariant,
     onSurfaceVariant = NeutralDarkMutedText,
     outline = NeutralDarkOutline,
-    // M3 默认的 outlineVariant 取自基线紫色色板，这里换成中性灰，避免紫色渗入分隔线。
-    outlineVariant = Color(0xFF383838),
-    // M3 默认 surfaceTint 等于 primary，抬升层会泛蓝；改用中性表面色保持无彩色层级。
+    outlineVariant = NeutralDarkOutlineVariant,
     surfaceTint = NeutralDarkSurface,
     surfaceDim = NeutralDarkSurfaceDim,
     surfaceBright = NeutralDarkSurfaceBright,
@@ -55,24 +51,25 @@ val GimiDarkColorScheme = darkColorScheme(
 )
 
 /**
- * 浅色方案：纯白画布 + 中性灰分层，主操作色用可访问的深蓝（#3D5BDB）。
+ * 浅色方案（M3 黑白墨灰 · Light）：
+ * 宣纸白画布（#FAFAFA）+ 5 级墨灰容器色阶，主操作色用浓墨黑（#18181B）与纯白字（#FFFFFF）成对。
  */
 val GimiLightColorScheme = lightColorScheme(
     primary = BrandPrimaryLight,
-    onPrimary = Color.White,
+    onPrimary = BrandOnPrimaryLight,
     primaryContainer = BrandBlueContainer,
-    onPrimaryContainer = Color(0xFF10205C),
+    onPrimaryContainer = BrandOnPrimaryContainerLight,
     inversePrimary = BrandPrimaryDark,
-    secondary = NeutralLightMutedText,
-    onSecondary = Color.White,
-    secondaryContainer = NeutralLightSurfaceVariant,
-    onSecondaryContainer = NeutralLightText,
-    tertiary = BrandPrimaryLight,
-    onTertiary = Color.White,
-    tertiaryContainer = BrandBlueContainer,
-    onTertiaryContainer = Color(0xFF10205C),
+    secondary = InkSecondaryLight,
+    onSecondary = InkOnSecondaryLight,
+    secondaryContainer = InkSecondaryContainerLight,
+    onSecondaryContainer = InkOnSecondaryContainerLight,
+    tertiary = InkTertiaryLight,
+    onTertiary = InkOnTertiaryLight,
+    tertiaryContainer = InkTertiaryContainerLight,
+    onTertiaryContainer = InkOnTertiaryContainerLight,
     error = Red40,
-    onError = Color.White,
+    onError = BrandOnPrimaryLight,
     errorContainer = Red90,
     onErrorContainer = Red10,
     background = NeutralLightBackground,
@@ -84,7 +81,7 @@ val GimiLightColorScheme = lightColorScheme(
     surfaceVariant = NeutralLightSurfaceVariant,
     onSurfaceVariant = NeutralLightMutedText,
     outline = NeutralLightOutline,
-    outlineVariant = Color(0xFFE5E5E6),
+    outlineVariant = NeutralLightOutlineVariant,
     surfaceTint = NeutralLightSurface,
     surfaceDim = NeutralLightSurfaceDim,
     surfaceBright = NeutralLightSurfaceBright,
@@ -95,6 +92,14 @@ val GimiLightColorScheme = lightColorScheme(
     surfaceContainerHighest = NeutralLightSurfaceContainerHighest,
 )
 
+/**
+ * 应用内实际生效的深浅主题；用户可在设置里锁定，此时它不一定等于系统 `uiMode`。
+ *
+ * 需要按主题切换资源的组件必须读这里，而不是 `isSystemInDarkTheme()` 或 `-night`
+ * 资源限定符：后者按系统 `uiMode` 解析，与应用内主题不一致时会选错图标版本。
+ */
+val LocalGimiDarkTheme = staticCompositionLocalOf { false }
+
 @Composable
 fun GimiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -102,14 +107,18 @@ fun GimiTheme(
 ) {
     val colorScheme = if (darkTheme) GimiDarkColorScheme else GimiLightColorScheme
 
-    // 用户气泡配色独立于品牌主题，确保主题色变化不会降低消息角色辨识度。
+    // 用户气泡配色对齐 M3 surfaceContainerHighest 墨灰容器。
     val userBubbleColors = if (darkTheme) DarkUserBubbleColors else LightUserBubbleColors
 
-    CompositionLocalProvider(LocalUserBubbleColors provides userBubbleColors) {
+    CompositionLocalProvider(
+        LocalUserBubbleColors provides userBubbleColors,
+        LocalGimiDarkTheme provides darkTheme,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
+            shapes = GimiShapes,
             typography = Typography,
-            content = content
+            content = content,
         )
     }
 }

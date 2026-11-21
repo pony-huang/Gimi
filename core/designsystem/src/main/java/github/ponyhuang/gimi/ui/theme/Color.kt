@@ -2,74 +2,100 @@ package github.ponyhuang.gimi.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── 品牌常量 ────────────────────────────────────────────────
-// BrandBlue 是规范里的品牌标准蓝，只用于焦点环、品牌图形与非文字强调；
-// 普通字号的可访问主操作色另用 BrandPrimaryLight / BrandPrimaryDark。
+// ── M3 黑白墨灰（Monochrome Ink-Gray）核心色板 ──────────────────
+// 主操作色（Primary）：浅色用浓墨黑（#18181B），深色用宣纸白（#F4F4F6）；
+// 主色容器（PrimaryContainer）：浅色用淡墨灰（#E4E4E7），深色用焦墨灰（#2C2C31）。
+val BrandPrimaryLight = Color(0xFF18181B)
+val BrandOnPrimaryLight = Color(0xFFFFFFFF)
+val BrandBlueContainer = Color(0xFFE4E4E7)
+val BrandOnPrimaryContainerLight = Color(0xFF111113)
+
+val BrandPrimaryDark = Color(0xFFF4F4F6)
+val BrandOnPrimaryDark = Color(0xFF111113)
+val BrandBlueDarkContainer = Color(0xFF2C2C31)
+val BrandOnPrimaryContainerDark = Color(0xFFF4F4F6)
+
+// 语音粒子球等特殊动效保留的微冷调点缀常量，不用于常规 UI 控件主色。
 val BrandBlue = Color(0xFF4D6BFE)
-val BrandPrimaryLight = Color(0xFF3D5BDB)
-val BrandPrimaryDark = Color(0xFFAEBBFF)
+
+// 次级色（Secondary · 砚灰）：用于 Tonal 按钮、设置列表图标底与次级筛选胶囊。
+val InkSecondaryLight = Color(0xFF52525B)
+val InkOnSecondaryLight = Color(0xFFFFFFFF)
+val InkSecondaryContainerLight = Color(0xFFECECEF)
+val InkOnSecondaryContainerLight = Color(0xFF18181B)
+
+val InkSecondaryDark = Color(0xFFA1A1AA)
+val InkOnSecondaryDark = Color(0xFF18181B)
+val InkSecondaryContainerDark = Color(0xFF252529)
+val InkOnSecondaryContainerDark = Color(0xFFE4E4E7)
+
+// 第三色（Tertiary · 石墨青灰）：用于辅助徽章与互补容器，保持水墨克制感。
+val InkTertiaryLight = Color(0xFF3F4850)
+val InkOnTertiaryLight = Color(0xFFFFFFFF)
+val InkTertiaryContainerLight = Color(0xFFE2E7EC)
+val InkOnTertiaryContainerLight = Color(0xFF141C22)
+
+val InkTertiaryDark = Color(0xFFB8C2CC)
+val InkOnTertiaryDark = Color(0xFF1F272E)
+val InkTertiaryContainerDark = Color(0xFF303840)
+val InkOnTertiaryContainerDark = Color(0xFFE2E7EC)
 
 /**
  * 强描边：输入框与控件边界需要达到 3:1 非文字对比度时使用。
- *
- * M3 的 `ColorScheme` 没有对应的强描边角色，普通边界仍走 `outline`；
- * 该色值是规范核心色板表的一部分，供后续强化边界时取用。
  */
-val BrandOutlineStrong = Color(0xFF737373)
+val BrandOutlineStrong = Color(0xFF71717A)
 
-// 主色容器：选中项、轻量强调与标签底色，按主题成对使用。
-val BrandBlueContainer = Color(0xFFE3E8FF)
-val BrandBlueDarkContainer = Color(0xFF27366D)
+// ── 中性色板（浅色 · 宣纸白与深墨字）─────────────────────────────
+val NeutralLightBackground = Color(0xFFFAFAFA)
+val NeutralLightSurface = Color(0xFFFAFAFA)
+val NeutralLightSurfaceVariant = Color(0xFFE4E4E7)
+val NeutralLightText = Color(0xFF111113)
+val NeutralLightMutedText = Color(0xFF52525B)
+val NeutralLightOutline = Color(0xFF71717A)
+val NeutralLightOutlineVariant = Color(0xFFD4D4D8)
 
-// ── 中性色板（浅色）─────────────────────────────────────────
-val NeutralLightBackground = Color(0xFFFFFFFF)
-val NeutralLightSurface = Color(0xFFF7F7F7)
-val NeutralLightSurfaceVariant = Color(0xFFEDEDED)
-val NeutralLightText = Color(0xFF1F1F1F)
-val NeutralLightMutedText = Color(0xFF666666)
-val NeutralLightOutline = Color(0xFFD4D4D4)
+// ── 中性色板（深色 · 徽墨黑与宣白字）─────────────────────────────
+val NeutralDarkBackground = Color(0xFF0D0D0F)
+val NeutralDarkSurface = Color(0xFF0D0D0F)
+val NeutralDarkSurfaceVariant = Color(0xFF27272A)
+val NeutralDarkText = Color(0xFFF4F4F6)
+val NeutralDarkMutedText = Color(0xFFA1A1AA)
+val NeutralDarkOutline = Color(0xFF8A8A93)
+val NeutralDarkOutlineVariant = Color(0xFF2E2E33)
 
-// ── 中性色板（深色）─────────────────────────────────────────
-val NeutralDarkBackground = Color(0xFF000000)
-val NeutralDarkSurface = Color(0xFF141414)
-val NeutralDarkSurfaceVariant = Color(0xFF242424)
-val NeutralDarkText = Color(0xFFF5F5F5)
-val NeutralDarkMutedText = Color(0xFFA3A3A3)
-val NeutralDarkOutline = Color(0xFF3D3D3D)
-
-// ── 中性表面色阶 ────────────────────────────────────────────
-// 固定这组灰阶，避免 Material 默认紫色渗入到底色、卡片与底部面板。
-val NeutralLightSurfaceDim = Color(0xFFE4E4E4)
+// ── M3 5 级中性表面色阶（Surface Container Hierarchy）───────────
+val NeutralLightSurfaceDim = Color(0xFFDADADD)
 val NeutralLightSurfaceBright = Color(0xFFFFFFFF)
 val NeutralLightSurfaceContainerLowest = Color(0xFFFFFFFF)
-val NeutralLightSurfaceContainerLow = Color(0xFFFAFAFA)
-val NeutralLightSurfaceContainer = Color(0xFFF5F5F5)
-val NeutralLightSurfaceContainerHigh = Color(0xFFF0F0F0)
-val NeutralLightSurfaceContainerHighest = Color(0xFFE9E9E9)
-val NeutralDarkSurfaceDim = Color(0xFF0A0A0A)
-val NeutralDarkSurfaceBright = Color(0xFF383838)
-val NeutralDarkSurfaceContainerLowest = Color(0xFF000000)
-val NeutralDarkSurfaceContainerLow = Color(0xFF0F0F0F)
-val NeutralDarkSurfaceContainer = Color(0xFF141414)
-val NeutralDarkSurfaceContainerHigh = Color(0xFF1A1A1A)
-val NeutralDarkSurfaceContainerHighest = Color(0xFF242424)
+val NeutralLightSurfaceContainerLow = Color(0xFFF4F4F5)
+val NeutralLightSurfaceContainer = Color(0xFFEFEFF1)
+val NeutralLightSurfaceContainerHigh = Color(0xFFE8E8EC)
+val NeutralLightSurfaceContainerHighest = Color(0xFFE0E0E5)
+
+val NeutralDarkSurfaceDim = Color(0xFF0D0D0F)
+val NeutralDarkSurfaceBright = Color(0xFF34343A)
+val NeutralDarkSurfaceContainerLowest = Color(0xFF08080A)
+val NeutralDarkSurfaceContainerLow = Color(0xFF161618)
+val NeutralDarkSurfaceContainer = Color(0xFF1C1C1F)
+val NeutralDarkSurfaceContainerHigh = Color(0xFF242428)
+val NeutralDarkSurfaceContainerHighest = Color(0xFF2E2E33)
 
 // ── Preference (settings) canvas & group card ────────────────
-// One UI 风格设置页配色：浅色为浅灰画布 + 纯白分组卡片；深色画布纯黑，
-// 卡片比画布略亮一档，保证分组层次在暗色下仍可辨。
-val PreferenceCanvasLight = Color(0xFFF5F5F5)
+// 对齐 M3 SurfaceContainer 层级：浅色为 surfaceContainerLow 画布 + surfaceContainerLowest 纯白卡片；
+// 深色为 surface 画布 + surfaceContainerLow 卡片。
+val PreferenceCanvasLight = NeutralLightSurfaceContainerLow
 val PreferenceCanvasDark = NeutralDarkBackground
-val PreferenceGroupCardLight = Color(0xFFFFFFFF)
-val PreferenceGroupCardDark = Color(0xFF141414)
+val PreferenceGroupCardLight = NeutralLightSurfaceContainerLowest
+val PreferenceGroupCardDark = NeutralDarkSurfaceContainerLow
 
 // ── 装饰性插画色 ────────────────────────────────────────────
 // 非语义角色：只用于插画自身的装饰配色，不参与品牌强调层级。
 val IllustrationSunAmber = Color(0xFFFABD1B)
 
 // ── Red (error) ──────────────────────────────────────────────
-val Red10 = Color(0xFF410001)
-val Red20 = Color(0xFF680003)
-val Red30 = Color(0xFF930006)
-val Red40 = Color(0xFFBA1B1B)
-val Red80 = Color(0xFFFFB4A9)
-val Red90 = Color(0xFFFFDAD4)
+val Red10 = Color(0xFF410002)
+val Red20 = Color(0xFF690005)
+val Red30 = Color(0xFF93000A)
+val Red40 = Color(0xFFBA1A1A)
+val Red80 = Color(0xFFFFB4AB)
+val Red90 = Color(0xFFFFDAD6)

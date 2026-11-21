@@ -51,30 +51,27 @@
     <string name="modelsettings_capability_tts">speech synthesis</string>
     <string name="modelsettings_model_capability_not_supported">This model has no %1$s integration</string>
 
-<string name="modelsettings_defaults_assistant_title">Default assistant model</string>
-    <string name="modelsettings_defaults_quick_title">Quick model</string>
+<string name="modelsettings_defaults_assistant_title">Assistant model</string>
+    <string name="modelsettings_defaults_quick_title">Quick response model</string>
     <string name="modelsettings_defaults_stt_title">Speech recognition model</string>
     <string name="modelsettings_defaults_stt_subtitle">Used for voice input</string>
     <string name="modelsettings_defaults_tts_title">Speech synthesis model</string>
     <string name="modelsettings_defaults_tts_subtitle">Used to read assistant replies aloud</string>
-    <string name="modelsettings_defaults_voice_title">Playback voice</string>
+    <string name="modelsettings_defaults_voice_title">Speaking voice</string>
     <string name="modelsettings_defaults_section_realtime">Realtime</string>
     <string name="modelsettings_defaults_realtime_model_title">Realtime model</string>
-    <string name="modelsettings_defaults_realtime_voice_title">Realtime voice</string>
-    <string name="modelsettings_defaults_realtime_model_none">Do not use Realtime</string>
 
-    <string name="modelsettings_dialog_pick_assistant">Select default assistant model</string>
-    <string name="modelsettings_dialog_pick_quick">Select quick model</string>
+    <string name="modelsettings_dialog_pick_assistant">Select assistant model</string>
+    <string name="modelsettings_dialog_pick_quick">Select quick response model</string>
     <string name="modelsettings_dialog_pick_stt">Select speech recognition model</string>
     <string name="modelsettings_dialog_pick_tts">Select speech synthesis model</string>
-    <string name="modelsettings_dialog_pick_voice">Select playback voice</string>
+    <string name="modelsettings_dialog_pick_voice">Select speaking voice</string>
     <string name="modelsettings_dialog_pick_realtime_model">Select Realtime model</string>
-    <string name="modelsettings_dialog_pick_realtime_voice">Select Realtime voice</string>
     <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Models first.</string>
 
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
     <string name="modelsettings_list_title">Models</string>
-    <string name="modelsettings_defaults_screen_title">Defaults</string>
+    <string name="modelsettings_defaults_screen_title">Default models</string>
     <string name="modelsettings_detail_title">Service details</string>
 
     <string name="modelsettings_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
@@ -175,8 +172,8 @@
     <!-- Unified model services: list, add catalog and default-model entries -->
     <string name="modelsettings_search_service">Search services or providers</string>
     <string name="modelsettings_list_section_preferences">Preferences</string>
-    <string name="modelsettings_defaults_entry_title">Defaults</string>
-    <string name="modelsettings_defaults_entry_subtitle">Choose models for chat, speech input and reading</string>
+    <string name="modelsettings_defaults_entry_title">Default models</string>
+    <string name="modelsettings_defaults_entry_subtitle">Choose models for chat, speech input and reading aloud</string>
     <string name="modelsettings_capability_count_chat">Chat %1$d</string>
     <string name="modelsettings_capability_count_recognition">Recognition %1$d</string>
     <string name="modelsettings_capability_count_synthesis">Synthesis %1$d</string>
@@ -201,7 +198,7 @@
     <string name="modelsettings_selected_count">%1$d selected</string>
     <string name="modelsettings_section_access">Access</string>
     <string name="modelsettings_connection_settings">Connection settings</string>
-    <string name="modelsettings_connection_settings_subtitle">Endpoint, credential source and connection test</string>
+    <string name="modelsettings_connection_settings_subtitle">Endpoint and connection test</string>
     <string name="modelsettings_official_tools">Provider tools</string>
     <string name="modelsettings_official_tools_subtitle">Web search, image generation and more</string>
     <string name="modelsettings_enable_service">Enable service</string>
@@ -234,6 +231,7 @@
     <string name="modelsettings_search_models">Search model name or ID</string>
     <string name="modelsettings_category_all">All</string>
     <string name="modelsettings_field_protocol">Protocol</string>
+    <string name="modelsettings_protocol_locked_hint">This service uses a fixed API protocol and cannot be changed.</string>
     <string name="modelsettings_field_endpoint">Endpoint</string>
     <string name="modelsettings_field_credential_source">Credential source</string>
     <string name="modelsettings_credential_shared">Use shared key</string>
@@ -296,4 +294,6 @@
     <string name="modelsettings_protocol_openai">Completions</string>
     <string name="modelsettings_protocol_anthropic">Messages</string>
     <string name="modelsettings_protocol_gemini">Gemini</string>
+    <string name="modelsettings_file_upload">Files</string>
+    <string name="modelsettings_file_upload_subtitle">Document attachments via Files API</string>
 </resources>

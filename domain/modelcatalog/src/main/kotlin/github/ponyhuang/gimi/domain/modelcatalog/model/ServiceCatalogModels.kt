@@ -36,6 +36,9 @@ enum class EndpointPolicy { VendorManaged, UserConfigured }
  * @property templateId 派生自的内置模板 ID；null 表示自定义 LLM 服务。
  * @property isEnabled 服务总开关；停用保留配置与默认引用，仅标记不可用。
  * @property isOfficialToolsEnabled 是否允许该服务的厂商工具参与会话。
+ * @property isFileUploadEnabled 服务实例级"文件上传"开关（默认关）：开启后该厂商实例下的
+ *   全部对话模型启用文档附件上传链路（FILE_REFERENCE）；关闭期间文档附件仍可选择，
+ *   但以本地路径文本送达模型（PATH_TEXT），不传输文件内容。已含 file 引用的旧会话不受影响。
  * @property sharedApiKey 服务级共享凭据；连接未覆盖时统一使用。
  * @property connections 该实例的能力连接集合；每条连接对应一个 [ServiceCapability]。
  */
@@ -45,6 +48,7 @@ data class ModelServiceInstance(
     val templateId: String?,
     val isEnabled: Boolean,
     val isOfficialToolsEnabled: Boolean,
+    val isFileUploadEnabled: Boolean = false,
     val sharedApiKey: String,
     val connections: List<ServiceConnection>,
 ) {
@@ -76,6 +80,61 @@ data class ModelServiceInstance(
      */
     fun canProvideOfficialTools(): Boolean =
         isEnabled && isOfficialToolsEnabled && conversationConnection?.let(::effectiveApiKey).orEmpty().isNotBlank()
+}
+
+/**
+ * 支持厂商文件上传的模板集合；实例级"文件上传"开关只在这些厂商展示与生效。
+ *
+ * 文件客户端按对话连接的生效协议分派；新增兼容厂商只需声明对应协议并加入本集合。
+ * 文档上限取各家保守公共值（单文件 100 MiB）。
+ */
+val FILE_UPLOAD_TEMPLATE_IDS: Set<String> = setOf("deepseek", "anthropic", "openai")
+
+/** 文件上传开启时文档能力的统一声明：走厂商 file 引用，单文件上限 100 MiB。 */
+private val fileUploadDocumentCapability = DocumentInputCapability(
+    ingestMode = FileIngestMode.FILE_REFERENCE,
+    maxInlineBytes = null,
+    maxUploadBytes = 100L * 1024 * 1024,
+)
+
+/** 文件上传关闭时文档能力的统一声明：文档以本地路径文本送达，不传输内容故无大小限额。 */
+private val pathTextDocumentCapability = DocumentInputCapability(
+    ingestMode = FileIngestMode.PATH_TEXT,
+    maxInlineBytes = null,
+)
+
+/**
+ * 按实例级"文件上传"开关推导该实例下全部模型的文档输入能力。
+ *
+ * 关闭（默认）：文档统一以本地路径文本送达模型（PATH_TEXT）——选择器仍接受文档，
+ * 发送时不传输文件内容，由 agent 决定是否用环境工具读取本地文件；
+ * 开启：文档统一走厂商 file 引用（重放直通 file_id，不做内联）。
+ * 开关只影响支持文件上传的厂商模板；其他实例原样返回。
+ *
+ * 这是 UI 准入侧的模型级推导（不区分协议）；运行时真正的注入形态以
+ * `ModelServiceConfigurationStore.derivedDocumentIngestMode`（按连接协议解析）为准，
+ * 两处语义需保持一致，改动任一侧时必须同步评估另一侧。
+ */
+fun ModelServiceInstance.withDerivedUploadCapabilities(): ModelServiceInstance {
+    if (templateId !in FILE_UPLOAD_TEMPLATE_IDS) return this
+    val documentInput = if (isFileUploadEnabled) fileUploadDocumentCapability else pathTextDocumentCapability
+    val changed = connections.any { connection ->
+        connection.models.any { it.multimodal.documentInput != documentInput }
+    }
+    if (!changed) return this
+    return copy(
+        connections = connections.map { connection ->
+            connection.copy(
+                models = connection.models.map { model ->
+                    if (model.multimodal.documentInput == documentInput) {
+                        model
+                    } else {
+                        model.copy(multimodal = model.multimodal.copy(documentInput = documentInput))
+                    }
+                },
+            )
+        },
+    )
 }
 
 /**
@@ -112,6 +171,7 @@ data class ServiceConnection(
  * @property templateId 派生模板 ID；null 表示自定义 LLM 服务。创建后不可变更。
  * @property name 用户命名。
  * @property isOfficialToolsEnabled 厂商工具偏好；无集成工具的服务不展示该开关。
+ * @property isFileUploadEnabled 服务实例级"文件上传"偏好；仅在 [FILE_UPLOAD_TEMPLATE_IDS] 厂商生效。
  * @property sharedApiKey 服务级共享凭据。
  * @property connections 连接草稿；连接 ID 保持稳定以便默认引用跟随。
  */
@@ -120,6 +180,7 @@ data class ModelServiceDraft(
     val templateId: String?,
     val name: String,
     val isOfficialToolsEnabled: Boolean,
+    val isFileUploadEnabled: Boolean = false,
     val sharedApiKey: String,
     val connections: List<ServiceConnection>,
 ) {

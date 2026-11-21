@@ -67,6 +67,41 @@ class RuntimeVersionDetectionTest {
         assertTrue(java.io.File(path).delete())
         assertTrue(java.io.File(repository.companionApk()).isFile)
     }
+    @Test fun missingBundledApkDegradesStatusInsteadOfFailing() = runTest {
+        every { assets.open("environment-runtime.apk") } throws java.io.FileNotFoundException("environment-runtime.apk")
+        every { packages.getPackageInfo(RUNTIME_PACKAGE, PackageManager.GET_META_DATA) } throws PackageManager.NameNotFoundException()
+        val state = repository.status()
+        assertFalse(state.available)
+        assertNull(state.bundledRuntimeVersion)
+        // 状态轮询不能重复读 assets，也不能把资源缺失变成异常。
+        repository.status()
+        verify(exactly = 1) { assets.open(any()) }
+    }
+    @Test fun missingBundledApkKeepsInstalledRuntimeUsable() = runTest {
+        every { assets.open("environment-runtime.apk") } throws java.io.FileNotFoundException("environment-runtime.apk")
+        val state = repository.status()
+        assertTrue(state.available)
+        assertTrue(state.runtimeUsable)
+        assertFalse(state.updateAvailable)
+        assertNull(state.bundledRuntimeVersion)
+    }
+    @Test fun invalidBundledArchiveOnlyClearsUpdateMetadata() = runTest {
+        every { packages.getPackageArchiveInfo(any(), PackageManager.GET_META_DATA) } returns null
+        val state = repository.status()
+        assertTrue(state.available)
+        assertNull(state.bundledRuntimeVersion)
+        assertFalse(state.updateAvailable)
+    }
+    @Test fun explicitInstallReportsMissingBundledApkWithStableMessage() = runTest {
+        every { assets.open("environment-runtime.apk") } throws java.io.FileNotFoundException("environment-runtime.apk")
+        repository.status()
+        try {
+            repository.companionApk()
+            fail("A missing bundled APK must fail explicit installation.")
+        } catch (error: IOException) {
+            assertTrue(error.message.orEmpty().contains("Bundled runtime APK is unavailable"))
+        }
+    }
     @Test fun absentPackageStillProvidesBundledVersion() = runTest {
         every { packages.getPackageInfo(RUNTIME_PACKAGE, PackageManager.GET_META_DATA) } throws PackageManager.NameNotFoundException()
         val state = repository.status()

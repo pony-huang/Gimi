@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
 import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
 
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
+import github.ponyhuang.gimi.domain.voice.repository.QWEN_SPEECH_SERVICE_ID
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest
@@ -29,8 +30,8 @@ import kotlinx.coroutines.flow.last
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** 百炼语音服务标识；与模型目录中的服务 ID 一致。 */
-internal const val DASHSCOPE_SERVICE_ID = "qwen"
+/** 百炼语音服务标识；单一事实源为 [QWEN_SPEECH_SERVICE_ID]，与模型目录中的服务 ID 一致。 */
+internal const val DASHSCOPE_SERVICE_ID = QWEN_SPEECH_SERVICE_ID
 
 /**
  * 百炼语音识别的协议内核。

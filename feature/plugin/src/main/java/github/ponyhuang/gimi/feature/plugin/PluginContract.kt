@@ -152,6 +152,8 @@ data class PluginConfigUiState(
     val fields: List<PluginConfigFieldUiState> = emptyList(),
     val actions: List<PluginActionUiState> = emptyList(),
     val callback: PluginActionCallbackUiState? = null,
+    /** 待呈现的一次性通知；Route 呈现后经 [PluginConfigAction.ConsumeNotice] 清除。 */
+    val notice: PluginConfigNotice? = null,
 ) {
     val hasFields: Boolean get() = fields.isNotEmpty()
     val hasActions: Boolean get() = actions.isNotEmpty()
@@ -215,11 +217,14 @@ sealed interface PluginConfigAction {
         val values: Map<String, String>,
     ) : PluginConfigAction
 
+    /** 确认一次性通知已呈现，清空 [PluginConfigUiState.notice]。 */
+    data object ConsumeNotice : PluginConfigAction
+
     /** 用户取消并关闭配置动作的回调交互页。 */
     data object DismissActionCallback : PluginConfigAction
 }
 
-sealed interface PluginConfigEffect {
+sealed interface PluginConfigNotice {
     /**
      * 通过宿主 Toast 展示插件动作或保存结果。
      *
@@ -229,5 +234,5 @@ sealed interface PluginConfigEffect {
     data class ShowToast(
         val message: String? = null,
         val messageRes: Int? = null,
-    ) : PluginConfigEffect
+    ) : PluginConfigNotice
 }

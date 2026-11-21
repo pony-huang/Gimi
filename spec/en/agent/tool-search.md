@@ -1,6 +1,6 @@
 # Tool search (on-demand tool loading)
 
-Reviewed: 2026-11-12. Audience: agents and developers changing `ON_DEMAND` tool access, `ToolSearchToolset`, tool candidate sources, or vendor tool-loading protocols. Chinese companion: [中文说明](../../zh/agent/tool-search.md). Agent assembly context: [Agent business execution](agent-execution.md).
+Audience: agents and developers changing `ON_DEMAND` tool access, `ToolSearchToolset`, tool candidate sources, or vendor tool-loading protocols. Chinese companion: [中文说明](../../zh/agent/tool-search.md). Agent assembly context: [Agent business execution](agent-execution.md).
 
 ## Concept of record
 

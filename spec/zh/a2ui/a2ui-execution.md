@@ -1,6 +1,6 @@
 # A2UI 业务执行
 
-校对日期：2026-11-07。读者：改动 A2UI 生成链路、协议校验、聊天 catalog 组件、或升级 androidx a2ui 依赖的 agent 与开发者。英文版：[English](../../en/a2ui/a2ui-execution.md)。
+读者：改动 A2UI 生成链路、协议校验、聊天 catalog 组件、或升级 androidx a2ui 依赖的 agent 与开发者。英文版：[English](../../en/a2ui/a2ui-execution.md)。
 
 新增/修改 catalog 组件、改 `generate_a2ui` 工具契约、改 surface 生命周期/重试语义、或升级协议依赖之前，先读本文。本文吸收了根 `AGENTS.md` 原有的 "Compose A2UI (agentic UI) reference" 一节。
 

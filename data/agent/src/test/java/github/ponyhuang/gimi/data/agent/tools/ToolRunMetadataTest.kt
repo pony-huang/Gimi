@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.data.agent.tools
 
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import kotlinx.serialization.json.Json

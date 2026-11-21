@@ -70,6 +70,7 @@ import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
 import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
 import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import kotlin.time.Duration.Companion.milliseconds
@@ -77,9 +78,11 @@ import kotlin.time.Duration.Companion.milliseconds
 /** App-level composition root. Feature modules own destination dispatch and never navigate directly. */
 @Composable
 fun MainScreen(
+    voiceCallController: RealtimeVoiceCallController,
     assistantSessionCoordinator: AssistantSessionCoordinator,
     assistantPanelInteractor: AssistantPanelInteractor,
     openChatRequest: Int = 0,
+    chatLaunchRequest: github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest? = null,
     openPermissionsRequest: Int = 0,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
@@ -114,10 +117,15 @@ fun MainScreen(
     val goBack: () -> Unit = {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
-    val navigate: (NavKey) -> Unit = backStack::add
+    // 普通入口和权限通知共用守卫，回调执行时读取通话状态以覆盖连接和挂断期间。
+    val navigate: (NavKey) -> Unit = { destination ->
+        if (!voiceCallController.state.value.configurationLocked) backStack.add(destination)
+    }
     val replaceCurrent: (NavKey) -> Unit = { destination ->
-        if (backStack.size > 1) backStack.removeLastOrNull()
-        backStack.add(destination)
+        if (!voiceCallController.state.value.configurationLocked) {
+            if (backStack.size > 1) backStack.removeLastOrNull()
+            backStack.add(destination)
+        }
     }
     val returnToChat = {
         // 不用 removeLast：minSdk 34 下 lint 会报 NewApi（API 35 的 java.util.List#removeLast）。
@@ -131,10 +139,13 @@ fun MainScreen(
     LaunchedEffect(openChatRequest) {
         if (openChatRequest > 0) returnToChat()
     }
+    LaunchedEffect(chatLaunchRequest) {
+        if (chatLaunchRequest != null) returnToChat()
+    }
 
     LaunchedEffect(openPermissionsRequest) {
         if (openPermissionsRequest > 0 && backStack.lastOrNull() != PermissionDestination.Settings) {
-            backStack.add(PermissionDestination.Settings)
+            navigate(PermissionDestination.Settings)
         }
     }
 
@@ -151,76 +162,16 @@ fun MainScreen(
                 key = destination,
                 contentKey = destination.navigationContentKey(),
             ) {
-                val handled = ChatEntryProvider(
+                AppEntryContent(
                     destination = destination,
-                    callbacks = ChatNavigationCallbacks(
-                        onBack = goBack,
-                        onReturnToChat = returnToChat,
-                        onOpenSettings = { navigate(SettingsDestination.Settings) },
-                        onOpenPersonalization = { navigate(RecommendationDestination.Settings) },
-                        onOpenRuntimeEnvironment = { navigate(EnvironmentDestination.Overview) },
-                        onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
-                        sharedMediaUris = currentSharedMediaUris,
-                        onSharedMediaConsumed = consumeSharedMedia,
-                    ),
-                ) || SettingsEntryProvider(
-                    destination = destination,
-                    appVersionName = BuildConfig.VERSION_NAME,
-                    callbacks = SettingsNavigationCallbacks(
-                        onBack = goBack,
-                                        onNavigateToModelService = {
-                            navigate(ModelSettingsDestination.ServiceList)
-                        },
-                        onNavigateToDefaultModels = {
-                            navigate(ModelSettingsDestination.Defaults())
-                        },
-                        onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
-                        onNavigateToRemoteAgents = { navigate(RemoteAgentDestination.AgentList) },
-                        onNavigateToAppFunctions = { navigate(AppFunctionDestination.Apps) },
-                        onNavigateToSandbox = { navigate(EnvironmentDestination.Overview) },
-                        onNavigateToMobileUse = { navigate(MobileUseDestination.Settings) },
-                        onNavigateToPlugins = { navigate(PluginDestination.Settings) },
-                        onNavigateToSkills = { navigate(SkillsDestination.Settings) },
-                        onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
-                        onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
-                        onNavigateToRecommendations = {
-                            navigate(RecommendationDestination.Settings)
-                        },
-                        onNavigateToMemory = { navigate(MemoryDestination.Settings) },
-                        onNavigateToAbout = { navigate(SettingsDestination.About) },
-                        onNavigateToPrivacyPolicy = { navigate(SettingsDestination.PrivacyPolicy) },
-                    ),
-                ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
-                    EnvironmentEntryProvider(destination, goBack, navigate,
-                        onOpenE2b = { navigate(SandboxDestination.Settings) },
-                        onInstallPackage = { path ->
-                            if (!context.packageManager.canRequestPackageInstalls()) {
-                                context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
-                            } else {
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", java.io.File(path))
-                                context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                            }
-                        }) ||
-                    SandboxEntryProvider(destination, goBack) ||
-                    McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
-                    A2aEntryProvider(destination, goBack, navigate) ||
-                    AppFunctionEntryProvider(destination, goBack, navigate) ||
-                    PluginEntryProvider(destination, goBack, navigate) ||
-                    MobileUseEntryProvider(destination, goBack) ||
-                    RecommendationEntryProvider(
-                        destination = destination,
-                        onBack = goBack,
-                        navigate = navigate,
-                        onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults()) },
-                        onOpenSimpleChatPromptSettings = { navigate(ChatDestination.SimpleChatPromptSettings) },
-                    ) ||
-                    MemoryEntryProvider(destination, goBack, navigate) ||
-                    PermissionEntryProvider(destination, goBack) ||
-                    SkillsEntryProvider(destination, goBack) ||
-                    WorkspaceEntryProvider(destination, goBack)
-
-                check(handled) { "No feature entry provider for $destination" }
+                    goBack = goBack,
+                    navigate = navigate,
+                    replaceCurrent = replaceCurrent,
+                    returnToChat = returnToChat,
+                    chatLaunchRequest = chatLaunchRequest,
+                    sharedMediaUris = currentSharedMediaUris,
+                    onSharedMediaConsumed = consumeSharedMedia,
+                )
             }
         },
         transitionSpec = {
@@ -282,6 +233,95 @@ fun MainScreen(
             }
         }
     }
+}
+
+/**
+ * 导航内容分发体：把当前 destination 依次交给各 feature 的公开 EntryProvider，
+ * 未注册的 destination 由 fail-fast check 兜底。抽成独立函数，让导航冒烟测试能
+ * 以同一分发逻辑直接驱动全部目的地，而无需拉起带权限弹窗与后台服务的 MainActivity。
+ */
+@Composable
+internal fun AppEntryContent(
+    destination: NavKey,
+    goBack: () -> Unit,
+    navigate: (NavKey) -> Unit,
+    replaceCurrent: (NavKey) -> Unit,
+    returnToChat: () -> Unit,
+    chatLaunchRequest: github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest?,
+    sharedMediaUris: List<Uri>,
+    onSharedMediaConsumed: () -> Unit,
+) {
+    val context = LocalContext.current
+    val handled = ChatEntryProvider(
+        destination = destination,
+        callbacks = ChatNavigationCallbacks(
+            chatLaunchRequest = chatLaunchRequest,
+            onBack = goBack,
+            onReturnToChat = returnToChat,
+            onOpenSettings = { navigate(SettingsDestination.Settings) },
+            onOpenPersonalization = { navigate(RecommendationDestination.Settings) },
+            onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
+            sharedMediaUris = sharedMediaUris,
+            onSharedMediaConsumed = onSharedMediaConsumed,
+        ),
+    ) || SettingsEntryProvider(
+        destination = destination,
+        appVersionName = BuildConfig.VERSION_NAME,
+        callbacks = SettingsNavigationCallbacks(
+            onBack = goBack,
+            onNavigateToModelService = {
+                navigate(ModelSettingsDestination.ServiceList)
+            },
+            onNavigateToDefaultModels = {
+                navigate(ModelSettingsDestination.Defaults())
+            },
+            onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
+            onNavigateToRemoteAgents = { navigate(RemoteAgentDestination.AgentList) },
+            onNavigateToAppFunctions = { navigate(AppFunctionDestination.Apps) },
+            onNavigateToSandbox = { navigate(EnvironmentDestination.Overview) },
+            onNavigateToMobileUse = { navigate(MobileUseDestination.Settings) },
+            onNavigateToPlugins = { navigate(PluginDestination.Settings) },
+            onNavigateToSkills = { navigate(SkillsDestination.Settings) },
+            onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
+            onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
+            onNavigateToRecommendations = {
+                navigate(RecommendationDestination.Settings)
+            },
+            onNavigateToMemory = { navigate(MemoryDestination.Settings) },
+            onNavigateToAbout = { navigate(SettingsDestination.About) },
+            onNavigateToPrivacyPolicy = { navigate(SettingsDestination.PrivacyPolicy) },
+        ),
+    ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
+        EnvironmentEntryProvider(destination, goBack, navigate,
+            onOpenE2b = { navigate(SandboxDestination.Settings) },
+            onInstallPackage = { path ->
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+                } else {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", java.io.File(path))
+                    context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                }
+            }) ||
+        SandboxEntryProvider(destination, goBack) ||
+        McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
+        A2aEntryProvider(destination, goBack, navigate) ||
+        AppFunctionEntryProvider(destination, goBack, navigate) ||
+        PluginEntryProvider(destination, goBack, navigate) ||
+        MobileUseEntryProvider(destination, goBack) ||
+        RecommendationEntryProvider(
+            destination = destination,
+            onBack = goBack,
+            navigate = navigate,
+            onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults()) },
+            onOpenSimpleChatPromptSettings = { navigate(ChatDestination.SimpleChatPromptSettings) },
+        ) ||
+        MemoryEntryProvider(destination, goBack, navigate) ||
+        PermissionEntryProvider(destination, goBack) ||
+        SkillsEntryProvider(destination, goBack) ||
+        WorkspaceEntryProvider(destination, goBack)
+
+    check(handled) { "No feature entry provider for $destination" }
 }
 
 private const val AssistantResultStayMs = 5_000L

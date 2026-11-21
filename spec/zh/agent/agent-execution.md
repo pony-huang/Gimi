@@ -1,6 +1,6 @@
 # Agent 业务执行
 
-校对日期：2026-11-07。读者：修改聊天/agent 执行、工具接线、运行生命周期或确认行为的 agent 与开发者。英文版：[English](../../en/agent/agent-execution.md)。
+读者：修改聊天/agent 执行、工具接线、运行生命周期或确认行为的 agent 与开发者。英文版：[English](../../en/agent/agent-execution.md)。
 
 新增 `AgentContribution`、改动运行生命周期/确认语义、或触碰事件管线之前，先读本文。语音子系统见[实时语音系统](../voice/realtime-voice-system.md)；A2UI 生成/渲染管线见 [A2UI 业务执行](../a2ui/a2ui-execution.md)；AppFunctions 工具族见 [AppFunctions](../appfunctions.md)。
 
@@ -51,6 +51,8 @@ Flow<ADK Event>
 3. **`AgentFactory` + `AgentChatRunner`** —— 工厂解析模型（`:data:modelaccess` 的 `AgentLLMModelFactory`，回退链：显式选择 → 聊天页选择 → 第一个启用服务；全无则报错并指向设置页），用 `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`、思考配置、聚合的工具/工具集/子代理以及全局 `RemoteAgentFailureRecovery` 回调构建 ADK `LlmAgent`。`ON_DEMAND` 模式下追加 `ToolSearchToolset`（ObjectBox + 向量检索，视为可重建缓存、永不迁移；实现原理见[工具搜索](tool-search.md)）。Runner 以 LRU 缓存至多 10 个 `SharedRuntime`，键为 `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)`——其中 `revision` 是单一合并值：`AgentBuildConfigurationSnapshot` 在查缓存时捕获全部 contribution 的 `revision()` 输出，其 `pluginRuntime` 快照就是实际参与装配的内容——返回每回合的 `AgentChatExecution`。
 
 **注册**：每个 contribution 在 `di/AgentContributionModule.kt` 一行 `@Binds @IntoSet`（subtasks 在自己模块绑定）。新增工具/配置源 = 实现 `AgentContribution` + 一行绑定，不改编排代码。这个抽象模块多绑定是既定可用的模式——下文「坑」里 `@Binds` 不聚合的问题指 data 模块里其他普通单例绑定。加完绑定后要验证 contribution 真的进了集合（如注册表重复 id 报错或工具目录输出）。
+
+Chatbot 每轮按会话读取角色正文，复用已有 `instructionSuffix` 缓存键字段。同一角色共用运行时，更换角色后下一轮选择新运行时，会话历史保留。
 
 ## 运行生命周期、确认与用户输入
 

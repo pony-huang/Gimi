@@ -32,9 +32,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.TOOL_SEARCH_NAME
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.INLINE_DEFINITIONS
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.domain.modelaccess.INLINE_DEFINITIONS
 
 class ToolSearchToolsetTest {
 

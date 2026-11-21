@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent
 
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -24,6 +25,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  * @property voiceResponse 是否采用语音输出契约；参与缓存键，避免复用文字格式指令。
  * @property a2uiSupported 调用方是否提供 A2UI 渲染能力（执行时传入 capabilities）。
  *   为 false 时不声明 `generate_a2ui`，避免语音等无渲染端看到必然失败的工具；参与缓存键。
+ * @property profile Agent 形态：助手形态装配全部能力贡献方，Chatbot 形态只装配官方联网工具。
  */
 data class AgentBuildSpec(
     val selection: ModelSelection? = null,
@@ -34,4 +36,5 @@ data class AgentBuildSpec(
     val instructionSuffix: String = "",
     val a2uiSupported: Boolean = true,
     val voiceResponse: Boolean = false,
+    val profile: AgentProfile = AgentProfile.ASSISTANT,
 )

@@ -115,7 +115,8 @@ class VoiceCapabilityRegistry @Inject constructor(
             streamingSynthesizers.any { serviceId in it.serviceIds }
         ModelCapability.STT -> recognizers.any { serviceId in it.serviceIds && ModelCapability.STT in it.capabilities }
         ModelCapability.ASR -> recognizers.any { serviceId in it.serviceIds && ModelCapability.ASR in it.capabilities }
-        ModelCapability.LLM -> true
+        ModelCapability.LLM,
+        ModelCapability.Omni -> true
         // 原生实时会话由 Realtime 适配器自述接入情况；未接入的服务不得选它的 Realtime 模型。
         ModelCapability.Realtime -> realtimeSupports.any { it.serviceId == serviceId }
     }

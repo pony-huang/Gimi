@@ -14,6 +14,16 @@ import org.junit.Test
 class QwenRealtimeProtocolTest {
 
     @Test
+    fun roleUpdateOnlyChangesInstructions() {
+        val payload = QwenRealtimeProtocol.instructionsUpdate("新的角色正文")
+        assertEquals("session.update", payload.get("type").asString)
+        val session = payload.getAsJsonObject("session")
+        assertEquals(setOf("instructions"), session.keySet())
+        assertEquals("新的角色正文", session.get("instructions").asString)
+    }
+
+
+    @Test
     fun `sessionUpdate carries dashscope session config`() {
         val payload = QwenRealtimeProtocol.sessionUpdate(instructions = "voice persona", voice = "longanqian_v3.1")
         assertEquals("session.update", payload.get("type").asString)
@@ -54,7 +64,7 @@ class QwenRealtimeProtocolTest {
         assertEquals("object", parameters.get("type").asString)
         assertTrue(parameters.getAsJsonObject("properties").has("city"))
 
-        // 实时轻聊不下发 tools 键。
+        // 实时 Chatbot 不下发 tools 键。
         val light = QwenRealtimeProtocol.sessionUpdate(instructions = "voice persona", voice = "longanqian_v3.1")
         assertTrue(!light.getAsJsonObject("session").has("tools"))
     }

@@ -9,32 +9,51 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionS
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
-import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
-import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
+import github.ponyhuang.gimi.domain.voice.repository.ApplyVoiceConfigUseCase
+import github.ponyhuang.gimi.domain.voice.repository.ConversationVoiceOverrides
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceModeRepository
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceApplyResult
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigDraft
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigField
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigLookup
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
+import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalDefaults
+import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalPreference
+import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalDefaultsRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceInputResult
+import github.ponyhuang.gimi.domain.voice.repository.VoiceMemoryRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceFieldOverride
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
+import github.ponyhuang.gimi.domain.voice.repository.orElse
+import github.ponyhuang.gimi.feature.chat.ChatSubmissionResult
+import github.ponyhuang.gimi.feature.chat.MessageData
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,15 +61,16 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 
 /**
- * 模式抽屉与会话的回归线：
- * 1. Realtime 可用性只看默认模型配置，不跟通话状态快照走（待启动/挂断后也必须可用）；
- * 2. 语音开启后不允许更换任何模式，只有待启动态能预选并在「开始通话」时生效；
- * 3. 轻聊预设的选中态经抽屉暴露并写穿到仓库，通话中被 mutate 闸门拒绝；
- * 4. 预选模式写穿到模式仓库，下次进入语音页恢复，通话中的被拒预选不落盘；
- * 5. 新建会话仅待启动态可用：助手模式创建并换绑待启动参数，通话中与轻聊/实时模式一律拒绝。
+ * 语音配置抽屉与会话的回归线：
+ * 1. 链路可用性由目录实例与有效配置计算，不随通话快照挂断复位而清零；
+ * 2. 半级联暂未接入具体业务：链路选择被拒绝，草稿保持原链路；
+ * 3. 草稿编辑 → 应用：原子提交对话覆盖，应用后草稿回到干净状态；
+ * 4. 通话中应用必须先取得重建确认，确认后按草稿配置切换或按当前有效配置重建；
+ * 5. 「开始通话」先原子应用未保存草稿再启动；缺项时保留草稿并阻止启动；
+ * 6. 音色快捷选择立即保存覆盖并记忆到模型；
+ * 7. 新建会话仅待启动态的级联助手可用；Chatbot 预设经 mutate 闸门写穿。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealtimeVoiceViewModelTest {
@@ -58,245 +78,478 @@ class RealtimeVoiceViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun configuredRealtimeModelIsAvailableBeforeCallStarts() = runTest {
-        // 控制器快照保持默认（realtimeAvailable = false），模拟懒启动待启动/挂断后复位。
+    fun availabilitySurvivesControllerStateReset() = runTest {
+        // 控制器快照保持默认（可用性 false），模拟挂断后整体复位；
+        // 配置齐备时链路可用性必须由配置计算，不能随通话快照一起清零。
         val viewModel = viewModel()
 
         viewModel.uiState.test {
             awaitItem() // stateIn 的初始空状态
             val state = awaitItem()
+            assertTrue(state.cascadedAvailable)
             assertTrue(state.realtimeAvailable)
-            assertEquals("Qwen Realtime", state.realtimeModelName)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun staleRealtimeSelectionKeepsRealtimeModesUnavailable() = runTest {
-        val viewModel = viewModel(
-            settings = configuredRealtimeSettings().copy(
-                realtimeSelection = ModelSelection("qwen", "realtime", "removed-model"),
-            ),
-        )
+    fun realtimeIsUnavailableWithoutAConfiguredRealtimeModel() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture().copy(realtimeModel = null))
+        val lookup = FakeVoiceConfigLookup().apply {
+            validModels += defaultsFixture().cascadedRecognitionModel!!
+            validModels += defaultsFixture().cascadedSynthesisModel!!
+        }
+        val viewModel = viewModel(defaults = defaults, lookup = lookup)
 
         viewModel.uiState.test {
             awaitItem()
-            assertFalse(awaitItem().realtimeAvailable)
+            val state = awaitItem()
+            assertTrue(state.cascadedAvailable)
+            assertFalse(state.realtimeAvailable)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun realtimeModeCanBePreselectedAndStartedBeforeCallStarts() = runTest {
-        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
-            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
-        }
-        val viewModel = viewModel(controller = controller)
+    fun mimoOmniEnablesSemiCascadedWithOnlyGlobalSynthesisConfigured() = runTest {
+        val settings = configuredSettings()
+        val instance = settings.instances.single()
+        val instances = listOf(instance.copy(connections = instance.connections.map { connection ->
+            if (connection.id == "chat") {
+                connection.copy(models = listOf(Model("mimo-v2.6-pro", "MiMo 2.6 Pro")))
+            } else {
+                connection
+            }
+        }))
+        val viewModel = viewModel(settings = settings.copy(instances = instances))
+        val selection = ModelSelection(instance.id, "chat", "mimo-v2.6-pro")
+        viewModel.prepare("conversation", selection, "")
 
-        viewModel.uiState.test {
-            awaitItem()
-            assertTrue(awaitItem().realtimeAvailable)
-            viewModel.selectMode(RealtimeVoiceMode.RealtimeAssistant)
-            assertEquals(RealtimeVoiceMode.RealtimeAssistant, awaitItem().mode)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        val selection = ModelSelection("qwen", "chat", "chat-model")
-        viewModel.prepare("conversation", selection, "当前聊天")
-        viewModel.startCall()
-        verify {
-            controller.start("conversation", selection, "当前聊天", RealtimeVoiceMode.RealtimeAssistant)
-        }
-    }
-
-    @Test
-    fun modeCannotBeChangedWhileCallIsActive() = runTest {
-        val callState = MutableStateFlow(
-            RealtimeVoiceCallState(active = true, mode = RealtimeVoiceMode.Chat, realtimeAvailable = true),
-        )
-        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
-            every { state } returns callState
-        }
-        val viewModel = viewModel(controller = controller)
-
-        viewModel.uiState.test {
-            awaitItem()
-            assertEquals(RealtimeVoiceMode.Chat, awaitItem().mode)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        viewModel.selectMode(RealtimeVoiceMode.Realtime)
-        verify(exactly = 0) { controller.selectMode(any()) }
-        // 挂断回到待启动态后仍是通话前的预选模式，证明通话中的选择被彻底忽略。
-        callState.value = RealtimeVoiceCallState()
         viewModel.uiState.test {
             var state = awaitItem()
-            if (state.mode != RealtimeVoiceMode.Simple) state = awaitItem()
-            assertEquals(RealtimeVoiceMode.Simple, state.mode)
+            while (state.chatModelName != "MiMo 2.6 Pro") state = awaitItem()
+            assertTrue(state.semiCascadedAvailable)
+            assertEquals(defaultsFixture().cascadedSynthesisModel, state.draft.semiSynthesisModel.value)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun promptPresetsAreExposedThroughSettingsState() = runTest {
-        val presets = FakePresetRepository()
-        val viewModel = viewModel(promptPresets = presets)
+    fun completePipelineSelectionSavesAutomatically() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture())
+        val overrides = FakeOverridesRepository()
+        val lookup = FakeVoiceConfigLookup().apply { validModels += defaultsFixture().realtimeModel!! }
+        val viewModel = viewModel(defaults = defaults, overrides = overrides, lookup = lookup)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
 
+        viewModel.prepare("conversation", selection, "当前聊天")
         viewModel.uiState.test {
-            awaitItem() // stateIn 的初始空状态
-            val settings = awaitItem().settings
-            assertEquals(listOf("builtin.roast", "builtin.companion"), settings.builtInPromptPresets.map { it.id })
-            assertEquals(listOf("p1"), settings.userPromptPresets.map { it.id })
-            assertNull(settings.selectedPromptPresetId)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun promptPresetSelectionWritesThroughRepository() = runTest {
-        val presets = FakePresetRepository()
-        val viewModel = viewModel(promptPresets = presets)
-
-        viewModel.uiState.test {
-            awaitItem() // stateIn 的初始空状态
             awaitItem()
-            viewModel.selectPromptPreset("builtin.roast")
-            // 写入走 mutate 协程：等到状态合流出新选中项，仓库此时必然已落值。
-            while (awaitItem().settings.selectedPromptPresetId != "builtin.roast") {
-                // 继续等待
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectPipeline(VoicePipeline.NATIVE_REALTIME)
+            runCurrent()
+            val state = expectMostRecentItem()
+            assertFalse(state.draft.isDirty)
+            assertEquals("Qwen Realtime", state.modelName)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(VoicePipeline.NATIVE_REALTIME, overrides.storage["conversation"]?.pipeline?.orElse(null))
+    }
+
+    @Test
+    fun selectingVoiceDuringCallLeavesSavedConfigurationUntouched() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val overrides = FakeOverridesRepository()
+        val viewModel = viewModel(controller = controller, overrides = overrides)
+        viewModel.prepare("conversation", null, "当前聊天")
+
+        viewModel.openVoiceSettings()
+        viewModel.selectPipelineVoice(VoicePipeline.CASCADED, "voice-1")
+        runCurrent()
+
+        assertTrue(overrides.storage.isEmpty())
+    }
+
+    @Test
+    fun draftFieldModelChangeRestoresInheritWhenCleared() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture())
+        val overrides = FakeOverridesRepository()
+        val viewModel = viewModel(defaults = defaults, overrides = overrides)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+
+        viewModel.prepare("conversation", selection, "当前聊天")
+        viewModel.uiState.test {
+            awaitItem()
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectFieldModel(VoiceConfigField.CASCADED_SYNTHESIS_MODEL, ModelSelection("i", "c", "m"))
+            var draft = awaitItem().draft
+            while (draft.cascadedSynthesisModel.value != ModelSelection("i", "c", "m")) {
+                draft = awaitItem().draft
             }
-            cancelAndIgnoreRemainingEvents()
-        }
-        assertEquals("builtin.roast", presets.selectedPresetId.value)
-    }
-
-    @Test
-    fun promptPresetSelectionIsBlockedWhileCallIsActive() = runTest {
-        val callState = MutableStateFlow(RealtimeVoiceCallState(active = true))
-        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
-            every { state } returns callState
-        }
-        val presets = FakePresetRepository()
-        val viewModel = viewModel(controller = controller, promptPresets = presets)
-
-        viewModel.settingsWriteBlockedRevision.test {
-            assertEquals(0L, awaitItem())
-            viewModel.selectPromptPreset("builtin.roast")
-            assertEquals(1L, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-        // 通话中被拒的写入不得穿透仓库。
-        assertNull(presets.selectedPresetId.value)
-    }
-
-    @Test
-    fun modeSelectionPersistsToModeRepositoryAndRestoresOnNextViewModel() = runTest {
-        val modeRepository = FakeModeRepository()
-        val viewModel = viewModel(modeRepository = modeRepository)
-
-        // 预选即写穿到模式仓库，供下次进入语音页恢复。
-        viewModel.selectMode(RealtimeVoiceMode.Realtime)
-        assertEquals(RealtimeVoiceMode.Realtime, modeRepository.lastMode.value)
-
-        // 新的 ViewModel（对应重新进入语音页）以上次使用的模式作为预选初值。
-        val restored = viewModel(modeRepository = modeRepository)
-        restored.uiState.test {
-            awaitItem() // stateIn 的初始空状态
-            assertEquals(RealtimeVoiceMode.Realtime, awaitItem().mode)
+            assertTrue(draft.cascadedSynthesisModel.overridden)
+            // null 选择表示恢复继承：覆盖移除，草稿相对已提交内容不再算覆盖。
+            viewModel.selectFieldModel(VoiceConfigField.CASCADED_SYNTHESIS_MODEL, null)
+            var restored = awaitItem().draft
+            // 覆盖状态与解析值分属两路流，重算有先后：两者同时到位才算恢复完成。
+            while (restored.cascadedSynthesisModel.overridden ||
+                restored.cascadedSynthesisModel.value != defaultsFixture().cascadedSynthesisModel
+            ) {
+                restored = awaitItem().draft
+            }
+            assertFalse(restored.cascadedSynthesisModel.overridden)
+            assertEquals(defaultsFixture().cascadedSynthesisModel, restored.cascadedSynthesisModel.value)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun modeSelectionBlockedByActiveCallDoesNotOverwriteModeRepository() = runTest {
-        val callState = MutableStateFlow(RealtimeVoiceCallState(active = true))
-        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
-            every { state } returns callState
-        }
-        val modeRepository = FakeModeRepository()
-        val viewModel = viewModel(controller = controller, modeRepository = modeRepository)
-
-        viewModel.selectMode(RealtimeVoiceMode.RealtimeAssistant)
-
-        assertEquals(RealtimeVoiceMode.Simple, modeRepository.lastMode.value)
-    }
-
-    @Test
-    fun newSessionInReadyStateRebindsTheFreshlyCreatedAssistantConversation() = runTest {
-        val selection = ModelSelection("qwen", "chat", "chat-model")
-        val newSelection = ModelSelection("qwen", "chat", "new-model")
-        val sessionResolver = mockk<ConversationSessionResolver> {
-            coEvery { createAndActivate() } returns ConversationSessionSnapshot(
-                "new-conversation", newSelection, ConversationToolConfiguration(),
-            )
-        }
-        val observeConversations = mockk<ObserveConversationsUseCase>()
-        every { observeConversations() } returns MutableStateFlow(
-            listOf(Conversation(id = "new-conversation", title = "新对话")),
-        )
+    fun callCannotStartUntilAutomaticSaveFinishes() = runTest {
+        val saveGate = CompletableDeferred<Unit>()
+        val overrides = FakeOverridesRepository().apply { beforeApply = { saveGate.await() } }
         val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
             every { state } returns MutableStateFlow(RealtimeVoiceCallState())
         }
-        val viewModel = viewModel(
-            controller = controller,
-            sessionResolver = sessionResolver,
-            observeConversations = observeConversations,
-        )
-        viewModel.selectMode(RealtimeVoiceMode.Chat)
-        viewModel.prepare("old-conversation", selection, "当前聊天")
-        viewModel.newSession()
+        val viewModel = viewModel(controller = controller, overrides = overrides)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+        viewModel.prepare("conversation", selection, "当前聊天")
+
+        viewModel.openVoiceSettings()
+        viewModel.selectPipeline(VoicePipeline.NATIVE_REALTIME)
+        viewModel.closeVoiceSettings()
+        runCurrent()
+        viewModel.startCall()
+        verify(exactly = 0) { controller.start(any(), any(), any(), any(), any()) }
+
+        saveGate.complete(Unit)
+        runCurrent()
+        viewModel.startCall()
+        verify(exactly = 1) {
+            controller.start("conversation", selection, "当前聊天", VoiceConversationStyle.ASSISTANT, VoicePipeline.NATIVE_REALTIME)
+        }
+    }
+
+    @Test
+    fun closingIncompletePipelineKeepsPreviousConfigurationForNextCall() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture().copy(realtimeModel = null))
+        val overrides = FakeOverridesRepository()
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val viewModel = viewModel(controller = controller, defaults = defaults, overrides = overrides)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+        viewModel.prepare("conversation", selection, "当前聊天")
 
         viewModel.uiState.test {
-            awaitItem() // stateIn 的初始空状态
-            // 换绑完成：待启动态展示的会话标题来自新建会话。
-            while (awaitItem().conversationTitle != "新对话") {
-                // 继续等待
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectPipeline(VoicePipeline.NATIVE_REALTIME)
+            runCurrent()
+            assertTrue(VoiceConfigField.REALTIME_MODEL in expectMostRecentItem().draft.missing)
+            assertTrue(overrides.storage.isEmpty())
+
+            viewModel.closeVoiceSettings()
+            viewModel.startCall()
+            verify(exactly = 1) {
+                controller.start("conversation", selection, "当前聊天", VoiceConversationStyle.ASSISTANT, VoicePipeline.CASCADED)
             }
             cancelAndIgnoreRemainingEvents()
         }
-
-        // 「开始通话」即绑定新会话：待启动参数的 id、模型、标题已被整体换绑。
-        viewModel.startCall()
-        verify { controller.start("new-conversation", newSelection, "新对话", RealtimeVoiceMode.Chat) }
     }
 
     @Test
-    fun newSessionIsBlockedWhileCallIsActive() = runTest {
-        val callState = MutableStateFlow(RealtimeVoiceCallState(active = true, mode = RealtimeVoiceMode.Chat))
-        val sessionResolver = mockk<ConversationSessionResolver>(relaxed = true)
-        val viewModel = viewModel(
-            controller = mockk(relaxed = true) { every { state } returns callState },
-            sessionResolver = sessionResolver,
+    fun fillingLastMissingModelSavesTheEntirePipeline() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture().copy(realtimeModel = null))
+        val overrides = FakeOverridesRepository()
+        val viewModel = viewModel(defaults = defaults, overrides = overrides)
+        val realtimeModel = defaultsFixture().realtimeModel
+        viewModel.prepare("conversation", null, "当前聊天")
+        viewModel.openVoiceSettings()
+        viewModel.selectPipeline(VoicePipeline.NATIVE_REALTIME)
+        runCurrent()
+        assertTrue(overrides.storage.isEmpty())
+
+        viewModel.selectFieldModel(VoiceConfigField.REALTIME_MODEL, realtimeModel)
+        viewModel.closeVoiceSettings()
+        runCurrent()
+
+        val saved = overrides.storage.getValue("conversation")
+        assertEquals(VoicePipeline.NATIVE_REALTIME, saved.pipeline.orElse(null))
+        assertEquals(realtimeModel, saved.realtimeModel.orElse(null))
+    }
+
+    @Test
+    fun voiceSelectionOnlyChangesTheCurrentConversation() = runTest {
+        val overrides = FakeOverridesRepository()
+        val memory = FakeVoiceMemoryRepository()
+        val synthesisModel = defaultsFixture().cascadedSynthesisModel!!
+        val lookup = FakeVoiceConfigLookup(memory).apply {
+            validModels += synthesisModel
+            validModels += defaultsFixture().cascadedRecognitionModel!!
+        }
+        val viewModel = viewModel(overrides = overrides, lookup = lookup)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+
+        viewModel.prepare("conversation", selection, "当前聊天")
+        viewModel.uiState.test {
+            awaitItem()
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectPipelineVoice(VoicePipeline.CASCADED, "voice-1")
+            viewModel.closeVoiceSettings()
+            runCurrent()
+            assertEquals("voice-1", overrides.current("conversation").cascadedVoice.orElse(null))
+
+            viewModel.prepare("other", selection, "另一个聊天")
+            runCurrent()
+            assertNull(expectMostRecentItem().draft.cascadedVoice.value)
+            assertFalse(overrides.current("other").hasAnyOverride)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertTrue(memory.remembered.isEmpty())
+    }
+
+    @Test
+    fun voiceSelectionReportsFailureWithoutPersistingTheNewVoice() = runTest {
+        val overrides = FakeOverridesRepository().apply { failApply = true }
+        val viewModel = viewModel(overrides = overrides)
+
+        viewModel.prepare("conversation", ModelSelection("instance-qwen", "chat", "chat-model"), "当前聊天")
+        viewModel.openVoiceSettings()
+        viewModel.selectPipelineVoice(VoicePipeline.CASCADED, "voice-1")
+        advanceUntilIdle()
+
+        assertTrue(overrides.storage.isEmpty())
+        assertEquals(
+            RealtimeVoiceViewModel.ConfigNotice.SaveFailed(setOf(VoiceConfigField.CASCADED_VOICE)),
+            viewModel.configNotices.value.second,
         )
-        viewModel.prepare("old-conversation", ModelSelection("qwen", "chat", "chat-model"), "当前聊天")
-
-        viewModel.newSession()
-
-        // 通话中不支持新建：重建会话会打断采集/播放，必须先结束通话（UI 置灰，这里是兜底）。
-        coVerify(exactly = 0) { sessionResolver.createAndActivate() }
     }
 
     @Test
-    fun newSessionIsNoOpForModesWithoutPersistence() = runTest {
-        val sessionResolver = mockk<ConversationSessionResolver>(relaxed = true)
-        val viewModel = viewModel(sessionResolver = sessionResolver)
-        viewModel.prepare("old-conversation", ModelSelection("qwen", "chat", "chat-model"), "当前聊天")
+    fun startCallValidatesCommittedConfigEvenWithoutAnOpenDraft() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture().copy(cascadedSynthesisModel = null))
+        val lookup = FakeVoiceConfigLookup().apply {
+            validModels += defaultsFixture().cascadedRecognitionModel!!
+        }
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val viewModel = viewModel(controller = controller, defaults = defaults, lookup = lookup)
 
-        // 默认预选轻聊：轻聊/实时/实时助手的内存会话随每次起呼新建，无持久化会话可换。
-        viewModel.newSession()
+        viewModel.prepare("conversation", ModelSelection("instance-qwen", "chat", "chat-model"), "当前聊天")
+        viewModel.uiState.test {
+            awaitItem()
+            awaitItem()
+            viewModel.startCall()
+            runCurrent()
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
 
-        coVerify(exactly = 0) { sessionResolver.createAndActivate() }
+        verify(exactly = 0) { controller.start(any(), any(), any(), any(), any()) }
+        assertEquals(
+            RealtimeVoiceViewModel.ConfigNotice.Problem.MissingRequired,
+            viewModel.configNotices.value.second,
+        )
+    }
+
+    @Test
+    fun editingPausesInputWithoutChangingUserMuteAndClosingRetainsDraft() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true, style = VoiceConversationStyle.ASSISTANT))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            assertTrue(awaitItem().composer.editing)
+            vm.updateDraft(MessageData("保留的草稿"))
+            assertEquals("保留的草稿", awaitItem().composer.draft.text)
+            vm.closeInput()
+            val closed = awaitItem().composer
+            assertFalse(closed.editing)
+            assertEquals("保留的草稿", closed.draft.text)
+            verify { controller.setInputPaused(true); controller.setInputPaused(false) }
+            verify(exactly = 0) { controller.toggleMute() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun inputBeforeCallShowsStartHintAndDoesNotPauseMicrophone() = runTest {
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            val composer = awaitItem().composer
+            assertFalse(composer.editing)
+            assertEquals(VoiceComposerError.StartCall, composer.error)
+            verify(exactly = 0) { controller.setInputPaused(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun microphoneBeforeCallShowsToastNoticeAndDuringCallTogglesMute() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState())
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val vm = viewModel(controller = controller)
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.toggleMute()
+            val notice = awaitItem().composer
+            assertEquals(VoiceComposerError.StartCall, notice.error)
+            verify(exactly = 0) { controller.toggleMute() }
+            vm.consumeInputNotice(notice.noticeRevision)
+            awaitItem()
+            call.value = RealtimeVoiceCallState(active = true)
+            awaitItem()
+            vm.toggleMute()
+            verify(exactly = 1) { controller.toggleMute() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun failedSubmissionKeepsDraftAndSuccessfulRetryClosesEditor() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true, callId = 5))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns call
+            coEvery { submit(any()) } returnsMany listOf(
+                VoiceInputResult.Failed,
+                VoiceInputResult.Accepted,
+            )
+        }
+        val vm = viewModel(controller = controller)
+        vm.prepare("conversation", ModelSelection("instance-qwen", "chat", "model"), "")
+        vm.uiState.test {
+            awaitItem()
+            awaitItem()
+            vm.editInput()
+            awaitItem()
+            val draft = MessageData("手动输入")
+            vm.updateDraft(draft)
+            awaitItem()
+            var result: ChatSubmissionResult? = null
+            vm.submitInput(draft) { result = it }
+            runCurrent()
+            val failed = expectMostRecentItem().composer
+            assertEquals(ChatSubmissionResult.REJECTED, result)
+            assertEquals(draft, failed.draft)
+            assertTrue(failed.editing)
+            vm.submitInput(draft) { result = it }
+            runCurrent()
+            val accepted = expectMostRecentItem().composer
+            assertEquals(ChatSubmissionResult.ACCEPTED, result)
+            assertEquals("", accepted.draft.text)
+            assertFalse(accepted.editing)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
+    @Test
+    fun navigationWaitsUntilCallCleanupFinishes() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns call
+            every { end() } answers { call.value = call.value.copy(active = false, ending = true) }
+        }
+        val viewModel = viewModel(controller = controller)
+        var navigated = false
+        viewModel.stopForNavigation { navigated = true }
+        runCurrent()
+        assertFalse(navigated)
+        call.value = RealtimeVoiceCallState()
+        runCurrent()
+        assertTrue(navigated)
+        verify(exactly = 1) { controller.end() }
+    }
+
+    @Test
+    fun chatbotModeIsTakenFromPreparedPageWhenStartingVoice() = runTest {
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val viewModel = viewModel(controller = controller)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+        viewModel.prepare("chatbot-session", selection, "Chatbot", VoiceConversationStyle.CHATBOT)
+        viewModel.startCall()
+        runCurrent()
+        verify { controller.start("chatbot-session", selection, "Chatbot", VoiceConversationStyle.CHATBOT, VoicePipeline.CASCADED) }
+    }
+
+
+    @Test
+    fun navigationClearsDraftWhileKeepingCurrentModelCapabilities() = runTest {
+        val vm = viewModel()
+        vm.prepare("conversation", ModelSelection("instance-qwen", "chat", "chat-model"), "当前会话")
+        vm.uiState.test {
+            awaitItem()
+            runCurrent()
+            val previous = vm.uiState.value.composer
+            assertEquals("qwen", previous.vendorTemplateId)
+            vm.updateDraft(MessageData("旧会话的输入草稿"))
+            vm.stopForNavigation { }
+            runCurrent()
+            val current = vm.uiState.value.composer
+            assertEquals("", current.draft.text)
+            assertEquals(previous.vendorTemplateId, current.vendorTemplateId)
+            assertEquals(previous.capabilities, current.capabilities)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun repeatedNavigationKeepsOnlyLatestPendingDestination() = runTest {
+        val call = MutableStateFlow(RealtimeVoiceCallState(ending = true))
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) { every { state } returns call }
+        val vm = viewModel(controller = controller)
+        val destinations = mutableListOf<String>()
+        vm.stopForNavigation { destinations += "first" }
+        runCurrent()
+        vm.stopForNavigation { destinations += "second" }
+        runCurrent()
+        call.value = RealtimeVoiceCallState()
+        runCurrent()
+        assertEquals(listOf("second"), destinations)
+    }
+
+
+    @Test
+    fun missingAssistantBindingDoesNotFallBackToChatbot() = runTest {
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val vm = viewModel(controller = controller)
+        vm.prepare("assistant-session", null, "助手", VoiceConversationStyle.ASSISTANT)
+        vm.startCall()
+        runCurrent()
+        verify(exactly = 0) { controller.start(any(), any(), any(), any(), any()) }
+        assertEquals(RealtimeVoiceViewModel.ConfigNotice.Problem.NoConversation, vm.configNotices.value.second)
     }
 
     private fun viewModel(
-        settings: DefaultModelSettings = configuredRealtimeSettings(),
+        settings: DefaultModelSettings = configuredSettings(),
         controller: RealtimeVoiceCallController = mockk(relaxed = true) {
             every { state } returns MutableStateFlow(RealtimeVoiceCallState())
         },
-        sessionResolver: ConversationSessionResolver = mockk(relaxed = true),
-        observeConversations: ObserveConversationsUseCase = mockk(relaxed = true),
-        promptPresets: SimpleChatPromptRepository = FakePresetRepository(),
-        modeRepository: RealtimeVoiceModeRepository = FakeModeRepository(),
+        defaults: VoiceGlobalDefaultsRepository = FakeDefaultsRepository(defaultsFixture()),
+        overrides: VoiceOverrideRepository = FakeOverridesRepository(),
+        lookup: VoiceConfigLookup = FakeVoiceConfigLookup().apply {
+            // 默认登记全局默认的全部模型；缺项用例自行构造并只登记应有效的部分。
+            validModels += defaultsFixture().cascadedRecognitionModel!!
+            validModels += defaultsFixture().cascadedSynthesisModel!!
+            validModels += defaultsFixture().realtimeModel!!
+        },
     ): RealtimeVoiceViewModel {
         val voiceCapabilities = mockk<VoiceCapabilityResolver>(relaxed = true) {
             every { isSupported(any(), ModelCapability.Realtime) } returns true
@@ -305,21 +558,32 @@ class RealtimeVoiceViewModelTest {
         every { observeSettings() } returns MutableStateFlow(settings)
         return RealtimeVoiceViewModel(
             controller = controller,
-            sessionResolver = sessionResolver,
-            observeConversations = observeConversations,
-            updateSettings = mockk<UpdateDefaultModelSettingsUseCase>(relaxed = true),
             runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
             ttsVoiceRepository = mockk<TtsVoiceRepository>(relaxed = true),
-            promptPresets = promptPresets,
-            modeRepository = modeRepository,
             voiceCapabilities = voiceCapabilities,
             voiceCatalog = mockk(relaxed = true),
+            defaultsRepository = defaults,
+            overridesRepository = overrides,
+            applyVoiceConfig = ApplyVoiceConfigUseCase(defaults, overrides, lookup),
+            lookup = lookup,
             observeSettings = observeSettings,
+            attachmentRepository = mockk(relaxed = true),
+            fileGateway = mockk(relaxed = true),
+            uploadedFileRegistry = mockk(relaxed = true),
+            validateAttachments = ValidateChatAttachmentsUseCase(),
         )
     }
 
-    /** 已配置 Realtime 默认模型的典型配置；其余默认模型留空以避开音色列表加载。 */
-    private fun configuredRealtimeSettings(): DefaultModelSettings = DefaultModelSettings(
+    /** 全局默认 fixture：三条链路的默认模型齐备且在 FakeVoiceConfigLookup 中登记为有效。 */
+    private fun defaultsFixture(): VoiceGlobalDefaults = VoiceGlobalDefaults(
+        pipeline = VoicePipeline.CASCADED,
+        cascadedRecognitionModel = ModelSelection("instance-qwen", "conn-speech", "speech-model"),
+        cascadedSynthesisModel = ModelSelection("instance-qwen", "conn-tts", "tts-model"),
+        realtimeModel = ModelSelection("instance-qwen", "conn-realtime", "qwen-realtime"),
+    )
+
+    /** 候选行 fixture：与 [defaultsFixture] 的模型选择对应，供设置抽屉展示。 */
+    private fun configuredSettings(): DefaultModelSettings = DefaultModelSettings(
         instances = listOf(
             ModelServiceInstance(
                 id = "instance-qwen",
@@ -330,7 +594,7 @@ class RealtimeVoiceViewModelTest {
                 sharedApiKey = "key",
                 connections = listOf(
                     ServiceConnection(
-                        id = "instance-qwen-realtime",
+                        id = "conn-realtime",
                         capability = ServiceCapability.Realtime,
                         protocol = ApiProtocol.OpenaiChatcompletions,
                         endpoint = "wss://example.com",
@@ -343,7 +607,7 @@ class RealtimeVoiceViewModelTest {
                         ),
                     ),
                     ServiceConnection(
-                        id = "instance-qwen-conversation",
+                        id = "chat",
                         capability = ServiceCapability.Conversation,
                         protocol = ApiProtocol.OpenaiChatcompletions,
                         endpoint = "https://example.com",
@@ -357,52 +621,130 @@ class RealtimeVoiceViewModelTest {
         speechSelection = null,
         ttsSelection = null,
         ttsVoiceId = "",
-        realtimeSelection = ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-realtime"),
+        realtimeSelection = ModelSelection("instance-qwen", "conn-realtime", "qwen-realtime"),
     )
 }
 
-/** 内存版语音模式仓库；写穿与回落语义与真实仓库一致。 */
-private class FakeModeRepository : RealtimeVoiceModeRepository {
-    override val lastMode = MutableStateFlow(RealtimeVoiceMode.Simple)
+/** 内存版全局默认仓库。 */
+private class FakeDefaultsRepository(
+    initial: VoiceGlobalDefaults,
+) : VoiceGlobalDefaultsRepository {
+    override val defaults = MutableStateFlow(initial)
 
-    override fun setLastMode(mode: RealtimeVoiceMode) {
-        lastMode.value = mode
+    override suspend fun update(transform: (VoiceGlobalPreference) -> VoiceGlobalPreference) {
+            val current = defaults.value
+            val updated = transform(
+                VoiceGlobalPreference(
+                    pipeline = current.pipeline,
+                    semiCascadedUnderstandingModel = current.semiCascadedUnderstandingModel,
+                    semiCascadedSynthesisModel = current.semiCascadedSynthesisModel,
+                ),
+            )
+            defaults.value = current.copy(
+                pipeline = updated.pipeline,
+                semiCascadedUnderstandingModel = updated.semiCascadedUnderstandingModel,
+                semiCascadedSynthesisModel = updated.semiCascadedSynthesisModel,
+            )
+        }
+}
+
+/** 内存版对话覆盖仓库；apply 的幂等语义与真实仓库一致。 */
+private class FakeOverridesRepository : VoiceOverrideRepository {
+    val storage = mutableMapOf<String, ConversationVoiceOverrides>()
+    private val flows = mutableMapOf<String, MutableStateFlow<ConversationVoiceOverrides>>()
+    /** 注入落盘失败，验证界面不会误显示已保存。 */
+    var failApply = false
+    var beforeApply: suspend () -> Unit = {}
+
+    override val rebuildCount = MutableStateFlow(0)
+    override suspend fun acknowledgeRebuilds() = Unit
+
+    private fun mutableFlow(conversationId: String): MutableStateFlow<ConversationVoiceOverrides> =
+        flows.getOrPut(conversationId) {
+            MutableStateFlow(storage[conversationId] ?: ConversationVoiceOverrides(conversationId))
+        }
+
+    override fun observe(conversationId: String): StateFlow<ConversationVoiceOverrides> =
+        mutableFlow(conversationId)
+
+    override fun current(conversationId: String): ConversationVoiceOverrides =
+        storage[conversationId] ?: ConversationVoiceOverrides(conversationId)
+
+    override suspend fun apply(draft: VoiceConfigDraft): VoiceApplyResult {
+        beforeApply()
+        if (failApply) throw java.io.IOException("disk full")
+        val id = draft.overrides.conversationId
+        if (storage[id] == draft.overrides) return VoiceApplyResult.Unchanged
+        storage[id] = draft.overrides
+        mutableFlow(id).value = draft.overrides
+        return VoiceApplyResult.Applied
+    }
+
+    override suspend fun resetFields(conversationId: String, fields: Set<VoiceConfigField>) {
+        val current = storage[conversationId] ?: return
+        val cleared = current.copy(
+            pipeline = if (VoiceConfigField.PIPELINE in fields) VoiceFieldOverride.Inherit else current.pipeline,
+            cascadedRecognitionModel = if (VoiceConfigField.CASCADED_RECOGNITION_MODEL in fields) {
+                VoiceFieldOverride.Inherit
+            } else {
+                current.cascadedRecognitionModel
+            },
+            cascadedSynthesisModel = if (VoiceConfigField.CASCADED_SYNTHESIS_MODEL in fields) {
+                VoiceFieldOverride.Inherit
+            } else {
+                current.cascadedSynthesisModel
+            },
+            cascadedVoice = if (VoiceConfigField.CASCADED_VOICE in fields) VoiceFieldOverride.Inherit else current.cascadedVoice,
+            semiCascadedUnderstandingModel = if (VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL in fields) {
+                VoiceFieldOverride.Inherit
+            } else {
+                current.semiCascadedUnderstandingModel
+            },
+            semiCascadedSynthesisModel = if (VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL in fields) {
+                VoiceFieldOverride.Inherit
+            } else {
+                current.semiCascadedSynthesisModel
+            },
+            semiCascadedVoice = if (VoiceConfigField.SEMI_CASCADED_VOICE in fields) {
+                VoiceFieldOverride.Inherit
+            } else {
+                current.semiCascadedVoice
+            },
+            realtimeModel = if (VoiceConfigField.REALTIME_MODEL in fields) VoiceFieldOverride.Inherit else current.realtimeModel,
+            realtimeVoice = if (VoiceConfigField.REALTIME_VOICE in fields) VoiceFieldOverride.Inherit else current.realtimeVoice,
+        )
+        storage[conversationId] = cleared
+        mutableFlow(conversationId).value = cleared
+    }
+
+    override suspend fun clear(conversationId: String) {
+        storage.remove(conversationId)
+        flows.remove(conversationId)
     }
 }
 
-/** 内存版轻聊预设仓库；选中归一化规则与真实仓库一致——无效 id 一律落空。 */
-private class FakePresetRepository : SimpleChatPromptRepository {
-    override val presets = MutableStateFlow(
-        listOf(SimpleChatPromptPreset(id = "p1", name = "简洁速答", content = "直接给结论")),
-    )
+/** 内存版模型音色记忆仓库。 */
+private class FakeVoiceMemoryRepository : VoiceMemoryRepository {
+    val remembered = mutableListOf<Triple<VoicePipeline, ModelSelection, String>>()
+    private val store = mutableMapOf<Pair<VoicePipeline, ModelSelection>, String>()
 
-    override val builtInPresets: List<SimpleChatPromptPreset> = listOf(
-        SimpleChatPromptPreset(id = "builtin.roast", name = "贴吧嘴臭老哥", content = "嘴臭人设"),
-        SimpleChatPromptPreset(id = "builtin.companion", name = "情感陪伴师", content = "陪伴人设"),
-    )
-
-    private val mutableSelectedId = MutableStateFlow<String?>(null)
-
-    override val selectedPresetId: StateFlow<String?> = mutableSelectedId
-
-    override fun upsertPreset(preset: SimpleChatPromptPreset) {
-        val existing = presets.value.indexOfFirst { it.id == preset.id }
-        presets.value = if (existing >= 0) {
-            presets.value.toMutableList().also { it[existing] = preset }
-        } else {
-            presets.value + preset
-        }
+    override suspend fun rememberVoice(pipeline: VoicePipeline, selection: ModelSelection, voiceId: String) {
+        remembered += Triple(pipeline, selection, voiceId)
+        store[pipeline to selection] = voiceId
     }
 
-    override fun deletePreset(presetId: String) {
-        if (mutableSelectedId.value == presetId) selectPreset(null)
-        presets.value = presets.value.filterNot { it.id == presetId }
-    }
+    override fun rememberedVoice(pipeline: VoicePipeline, selection: ModelSelection): String? =
+        store[pipeline to selection]
+}
 
-    override fun selectPreset(presetId: String?) {
-        val target = presetId?.takeIf { id ->
-            builtInPresets.any { it.id == id } || presets.value.any { it.id == id }
-        }
-        mutableSelectedId.value = target
-    }
+/** 内存版配置查询：只有显式登记的模型选择有效。 */
+private class FakeVoiceConfigLookup(private val memory: VoiceMemoryRepository? = null) : VoiceConfigLookup {
+    val validModels = mutableSetOf<ModelSelection>()
+
+    override fun isModelValid(selection: ModelSelection): Boolean = selection in validModels
+
+    override fun isVoiceValid(pipeline: VoicePipeline, selection: ModelSelection, voiceId: String): Boolean? = null
+
+    override fun rememberedVoice(pipeline: VoicePipeline, selection: ModelSelection): String? =
+        memory?.rememberedVoice(pipeline, selection)
 }

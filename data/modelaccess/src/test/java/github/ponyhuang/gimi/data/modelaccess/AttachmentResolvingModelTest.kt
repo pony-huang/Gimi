@@ -11,6 +11,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Part
 import java.nio.charset.StandardCharsets
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -39,7 +41,7 @@ class AttachmentResolvingModelTest {
         val request = LlmRequest(contents = listOf(Content(parts = listOf(Part(
             fileData = FileData(mimeType = "text/plain", fileUri = file.absolutePath),
         )))))
-        assertSame(connection, AttachmentResolvingModel(delegate).connect(request))
+        assertSame(connection, AttachmentResolvingModel(delegate = delegate).connect(request))
         assertArrayEquals("live".toByteArray(), delegate.request?.contents?.single()?.parts?.single()?.inlineData?.data)
         assertNotNull(request.contents.single().parts.single().fileData)
     }
@@ -59,7 +61,7 @@ class AttachmentResolvingModelTest {
         val request = LlmRequest(contents = listOf(Content(parts = listOf(originalPart))))
         val delegate = RecordingModel()
 
-        AttachmentResolvingModel(delegate).generateContent(request, stream = false).toList()
+        AttachmentResolvingModel(delegate = delegate).generateContent(request, stream = false).toList()
 
         val resolved = delegate.request!!.contents.single().parts.single()
         assertNull(resolved.fileData)
@@ -79,7 +81,7 @@ class AttachmentResolvingModelTest {
         )
         val delegate = RecordingModel()
 
-        AttachmentResolvingModel(delegate).generateContent(
+        AttachmentResolvingModel(delegate = delegate).generateContent(
             LlmRequest(contents = listOf(Content(parts = listOf(Part(fileData = remote))))),
             stream = false,
         ).toList()
@@ -93,7 +95,7 @@ class AttachmentResolvingModelTest {
         val file = temporaryFolder.newFile("photo.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
         val delegate = RecordingModel()
 
-        AttachmentResolvingModel(delegate).generateContent(
+        AttachmentResolvingModel(delegate = delegate).generateContent(
             LlmRequest(
                 contents = listOf(
                     Content(
@@ -122,7 +124,7 @@ class AttachmentResolvingModelTest {
     fun `missing local file degrades to text marker and request still proceeds`() = runTest {
         val delegate = RecordingModel()
 
-        AttachmentResolvingModel(delegate).generateContent(
+        AttachmentResolvingModel(delegate = delegate).generateContent(
             LlmRequest(
                 contents = listOf(
                     Content(
@@ -151,7 +153,7 @@ class AttachmentResolvingModelTest {
     fun `file data without URI degrades to text marker`() = runTest {
         val delegate = RecordingModel()
 
-        AttachmentResolvingModel(delegate).generateContent(
+        AttachmentResolvingModel(delegate = delegate).generateContent(
             LlmRequest(
                 contents = listOf(
                     Content(
@@ -173,6 +175,132 @@ class AttachmentResolvingModelTest {
         val resolved = delegate.request!!.contents.single().parts.single()
         assertNull(resolved.fileData)
         assertTrue(resolved.text!!.contains("broken.pdf"))
+    }
+
+    @Test
+    fun `path text mode delivers local document as path text`() = runTest {
+        val file = temporaryFolder.newFile("report.pdf").apply {
+            writeBytes("pdf".toByteArray(StandardCharsets.UTF_8))
+        }
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(
+            documentIngestMode = FileIngestMode.PATH_TEXT,
+            delegate = delegate,
+        ).generateContent(
+            LlmRequest(contents = listOf(Content(parts = listOf(Part(
+                fileData = FileData(
+                    mimeType = "application/pdf",
+                    displayName = "report.pdf",
+                    fileUri = file.absolutePath,
+                ),
+            ))))),
+            stream = false,
+        ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertNull(resolved.inlineData)
+        assertTrue(resolved.text!!.contains(file.absolutePath))
+        assertTrue(resolved.text!!.contains("report.pdf"))
+        assertTrue(resolved.text!!.contains("application/pdf"))
+    }
+
+    @Test
+    fun `path text mode keeps inlining images`() = runTest {
+        val file = temporaryFolder.newFile("photo.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(
+            documentIngestMode = FileIngestMode.PATH_TEXT,
+            delegate = delegate,
+        ).generateContent(
+            LlmRequest(contents = listOf(Content(parts = listOf(Part(
+                fileData = FileData(
+                    mimeType = "image/png",
+                    displayName = "photo.png",
+                    fileUri = file.absolutePath,
+                ),
+            ))))),
+            stream = false,
+        ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertArrayEquals(byteArrayOf(1, 2, 3), resolved.inlineData?.data)
+    }
+
+    @Test
+    fun `path text mode passes vendor references through`() = runTest {
+        val vendorUri = VendorFileReference.uri("deepseek", "file-1")
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(
+            documentIngestMode = FileIngestMode.PATH_TEXT,
+            delegate = delegate,
+        ).generateContent(
+            LlmRequest(contents = listOf(Content(parts = listOf(Part(
+                fileData = FileData(
+                    mimeType = "application/pdf",
+                    displayName = "vendor.pdf",
+                    fileUri = vendorUri,
+                ),
+            ))))),
+            stream = false,
+        ).toList()
+
+        assertEquals(vendorUri, delegate.request!!.contents.single().parts.single().fileData?.fileUri)
+        assertNull(delegate.request!!.contents.single().parts.single().text)
+    }
+
+    @Test
+    fun `path text mode degrades missing local document to placeholder`() = runTest {
+        val missing = temporaryFolder.root.resolve("missing.pdf").absolutePath
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(
+            documentIngestMode = FileIngestMode.PATH_TEXT,
+            delegate = delegate,
+        ).generateContent(
+            LlmRequest(contents = listOf(Content(parts = listOf(Part(
+                fileData = FileData(
+                    mimeType = "application/pdf",
+                    displayName = "missing.pdf",
+                    fileUri = missing,
+                ),
+            ))))),
+            stream = false,
+        ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertTrue(resolved.text!!.contains("missing.pdf"))
+        assertTrue(!resolved.text!!.contains(missing))
+    }
+
+    @Test
+    fun `file reference mode delivers existing local document as path text`() = runTest {
+        val file = temporaryFolder.newFile("legacy.pdf").apply { writeBytes("pdf".toByteArray()) }
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(
+            documentIngestMode = FileIngestMode.FILE_REFERENCE,
+            delegate = delegate,
+        ).generateContent(
+            LlmRequest(contents = listOf(Content(parts = listOf(Part(
+                fileData = FileData(
+                    mimeType = "application/pdf",
+                    displayName = "legacy.pdf",
+                    fileUri = file.absolutePath,
+                ),
+            ))))),
+            stream = false,
+        ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertNull(resolved.inlineData)
+        assertTrue(resolved.text!!.contains(file.absolutePath))
     }
 
     private class RecordingModel(private val connection: LiveConnection? = null) : Model {

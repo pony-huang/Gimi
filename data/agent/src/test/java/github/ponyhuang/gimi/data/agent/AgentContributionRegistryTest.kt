@@ -8,9 +8,11 @@ import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**
@@ -99,8 +101,50 @@ class AgentContributionRegistryTest {
         )
     }
 
+    @Test
+    fun toolCatalogIsolatingFailuresSkipsOnlyTheBrokenContributor() = runTest {
+        val registry = registry(
+            fakeContribution(
+                id = "local",
+                revision = null,
+                catalog = listOf(AgentToolCatalogEntry("local", listOf(declarationTool("tool-a")))),
+            ),
+            failingContribution(id = "environment"),
+            fakeContribution(
+                id = "plugin",
+                revision = null,
+                catalog = listOf(AgentToolCatalogEntry("plugin", listOf(declarationTool("tool-b")))),
+            ),
+        )
+
+        assertEquals(
+            listOf("local", "plugin"),
+            registry.toolCatalogIsolatingFailures(AgentToolCatalogContext(modelRuntime = null)).map { it.source },
+        )
+    }
+
+    @Test
+    fun toolCatalogIsolatingFailuresPropagatesCancellation() = runTest {
+        val registry = registry(failingContribution(id = "cancelled", error = CancellationException("cancelled")))
+
+        try {
+            registry.toolCatalogIsolatingFailures(AgentToolCatalogContext(modelRuntime = null))
+            fail("Cancellation must not be swallowed as a contributor failure.")
+        } catch (_: CancellationException) {
+        }
+    }
+
     private fun registry(vararg contributions: AgentContribution) =
         AgentContributionRegistry(contributions.toSet())
+
+    private fun failingContribution(
+        id: String,
+        error: Exception = IllegalStateException("environment-runtime.apk"),
+    ): AgentContribution = object : AgentContribution {
+        override val id: String = id
+        override fun revision(): Any? = null
+        override suspend fun toolCatalog(context: AgentToolCatalogContext): List<AgentToolCatalogEntry> = throw error
+    }
 
     private fun fakeContribution(
         id: String,

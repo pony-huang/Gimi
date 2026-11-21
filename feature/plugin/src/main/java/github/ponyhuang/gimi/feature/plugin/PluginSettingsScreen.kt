@@ -328,7 +328,7 @@ private fun PluginRowCard(
 ) {
     Surface(
         onClick = if (item.isInstalled) onConfigure else onOpenDetail,
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         color = preferenceGroupCardColor(),
         modifier = Modifier.fillMaxWidth(),
     ) {

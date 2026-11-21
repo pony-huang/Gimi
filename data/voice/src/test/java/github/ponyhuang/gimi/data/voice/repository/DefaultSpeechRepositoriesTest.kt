@@ -81,6 +81,31 @@ class DefaultSpeechRepositoriesTest {
     }
 
     @Test
+    fun synthesisUsesSelectedModelInsteadOfGlobalModelAndVoice() = runTest {
+        val global = ModelSelection("instance", "connection", "tts")
+        val selected = ModelSelection("instance", "connection", "call-tts")
+        val instance = instance()
+        val connection = instance.connections.single()
+        val callModel = Model("call-tts", "Call TTS", capabilities = setOf(ModelCapability.TTS))
+        val catalog = catalog(instance.copy(connections = listOf(
+            connection.copy(models = connection.models + callModel),
+        )), null, global)
+        every { catalog.currentTtsVoice() } returns "global-voice"
+        val request = slot<SynthesisRequest>()
+        val synthesizer = mockk<SpeechSynthesizer> {
+            every { serviceIds } returns setOf("openai")
+            every { synthesize(capture(request)) } returns flowOf(byteArrayOf(7))
+        }
+        val repository = DefaultSpeechSynthesisRepository(catalog, registry(synthesizer = synthesizer), voiceCatalog())
+
+        assertTrue(repository.isAvailable(selected))
+        repository.synthesize("hello", selection = selected).first()
+
+        assertEquals("call-tts", request.captured.modelId)
+        assertEquals("v-first", request.captured.voiceId)
+    }
+
+    @Test
     fun synthesis_blankVoiceFallsBackToFirstBuiltInVoice() = runTest {
         val selection = ModelSelection("instance", "connection", "tts")
         val catalog = catalog(instance(), null, selection)

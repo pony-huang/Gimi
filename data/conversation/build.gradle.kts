@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:toolauthorization"))
+    implementation(project(":domain:voice"))
+    implementation(libs.gson)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)

@@ -2,19 +2,19 @@ English · [简体中文](../../zh/ui/preview-first-design-review.md)
 
 # Preview-first UI design review
 
-Reviewed: 2026-11-07. Audience: agents and developers changing Compose UI.
+Audience: agents and developers changing Compose UI.
 
-This document owns the preview design and approval workflow linked from `AGENTS.md`. Apply [Gimi brand styling](brand-styling.md) when preparing drafts. This workflow applies to UI changes; editing these specifications alone does not require a Compose draft.
+This document owns the preview design and approval workflow linked from `AGENTS.md`. Apply [Gimi brand styling](brand-styling.md) when preparing drafts. This workflow applies to UI changes; editing these specifications alone does not require a draft.
 
 ## Workflow
 
 - Small, localized UI adjustments (such as spacing, alignment, theme colors, or repositioning an existing button) may be implemented directly without a separate design draft, an image-delivery preference question, or design approval. If the scope or intended appearance is unclear, the agent may consult the developer about proceeding directly; this consultation is optional, not a mandatory approval gate. Existing preview maintenance and proportional verification requirements still apply.
-- For UI changes beyond these small adjustments, begin with a preview design draft before implementation: a `@Preview @Composable`-based draft (using fake/fixture data, themable for light and dark) that renders the proposed layout, new states, and interaction entry points.
+- For UI changes beyond these small adjustments, begin with a design draft before implementation: invoke the `/prototype` skill (`.agents/skills/prototype/`) and default to building the prototype in HTML (a self-contained, lightweight HTML file under `temp/` that models the mobile viewport frame, component hierarchy, light and dark themes, and switchable interaction variants for rapid browser inspection and review). An isolated `@Preview @Composable`-based draft may also be used when explicitly preferred or requested.
 - At the start of a UI task requiring a design draft, ask whether the user wants rendered design images for remote review, unless they have already stated a preference for that task. Wait for the answer before choosing the image-delivery branch; draft preparation may continue meanwhile.
-- If requested, render the actual Compose draft, visually inspect the captures, and return viewable images in the conversation before asking for design approval. Include light/dark themes and the relevant changed states; keep image artifacts under `temp/`. Source files, file links, and compilation success alone do not fulfill image delivery. If rendering is unavailable, explain the specific blocker and agree on an alternative with the user.
-- If declined, skip image rendering and delivery and present the draft with a concise description. Declining images does not waive the design approval below unless the user explicitly says so.
+- If requested, render the actual draft (capturing the HTML prototype in browser or Compose preview), visually inspect the captures, and return viewable images in the conversation before asking for design approval. Include light/dark themes and the relevant changed states; keep image artifacts under `temp/`. Source files, file links, and compilation success alone do not fulfill image delivery. If rendering is unavailable, explain the specific blocker and agree on an alternative with the user.
+- If declined, skip image rendering and delivery and present the prototype draft (e.g., file link to the HTML prototype) with a concise description. Declining images does not waive the design approval below unless the user explicitly says so.
 - For changes requiring a design draft, present it to the user for review; implementation work may start only after the user explicitly confirms the design, unless the user explicitly waives this step.
-- Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, merge it into the real screens, wire up state, and delete the draft file and any preview-only dependencies it required.
+- Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, implement and merge the validated design into real Compose screens, wire up state, delete the throwaway HTML/draft files under `temp/` and any prototype-only scratch dependencies, and maintain production `@Preview` fixtures.
 
 ## Interaction continuity and motion
 

@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.agent.tools
 
 import com.google.adk.kt.agents.ReadonlyContext
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 

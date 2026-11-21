@@ -6,9 +6,12 @@ import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.DeletionImpact
+import github.ponyhuang.gimi.domain.modelcatalog.model.FILE_UPLOAD_TEMPLATE_IDS
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelRole
 import github.ponyhuang.gimi.domain.modelcatalog.model.EndpointPolicy
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
@@ -17,12 +20,15 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceDraft
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceTemplate
+import github.ponyhuang.gimi.domain.modelcatalog.model.withDerivedUploadCapabilities
 import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
+import github.ponyhuang.gimi.domain.modelcatalog.model.TemplateConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
+import java.net.URI
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.hasValidConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.toConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
@@ -152,17 +158,18 @@ class ModelServiceConfigurationStore @Inject constructor(
         _templates.value.firstOrNull { it.id == templateId } ?: ModelServiceTemplates.fromId(templateId)
 
     override fun observeInstances() = _instances
-        .map { instances -> instances.sortedBy { it.name } }
+        .map { instances -> instances.map { it.withDerivedUploadCapabilities() }.sortedBy { it.name } }
         .distinctUntilChanged()
 
     override fun observeInstance(instanceId: String) = _instances
-        .map { instances -> instances.firstOrNull { it.id == instanceId } }
+        .map { instances -> instances.firstOrNull { it.id == instanceId }?.withDerivedUploadCapabilities() }
         .distinctUntilChanged()
 
-    override fun currentInstances(): List<ModelServiceInstance> = _instances.value
+    override fun currentInstances(): List<ModelServiceInstance> =
+        _instances.value.map { it.withDerivedUploadCapabilities() }
 
     override fun currentInstance(instanceId: String): ModelServiceInstance? =
-        _instances.value.firstOrNull { it.id == instanceId }
+        _instances.value.firstOrNull { it.id == instanceId }?.withDerivedUploadCapabilities()
 
     override fun observeAssistantSelection() = defaultAssistantSelection
 
@@ -207,6 +214,7 @@ class ModelServiceConfigurationStore @Inject constructor(
                 templateId = draft.templateId,
                 isEnabled = true,
                 isOfficialToolsEnabled = draft.isOfficialToolsEnabled,
+                isFileUploadEnabled = draft.isFileUploadEnabled && draft.templateId in FILE_UPLOAD_TEMPLATE_IDS,
                 sharedApiKey = draft.sharedApiKey.trim(),
                 connections = normalizedConnections(draft.connections, template),
             )
@@ -227,6 +235,11 @@ class ModelServiceConfigurationStore @Inject constructor(
             val updated = current.copy(
                 name = draft.name.trim(),
                 isOfficialToolsEnabled = draft.isOfficialToolsEnabled,
+                isFileUploadEnabled = if (current.templateId in FILE_UPLOAD_TEMPLATE_IDS) {
+                    draft.isFileUploadEnabled
+                } else {
+                    false
+                },
                 sharedApiKey = draft.sharedApiKey.trim(),
                 connections = normalizedConnections(draft.connections, template),
             )
@@ -248,6 +261,21 @@ class ModelServiceConfigurationStore @Inject constructor(
                 }
                 commitConfiguration(
                     _instances.value.map { if (it.id == instanceId) current.copy(isEnabled = enabled) else it },
+                ) != null
+            }
+        }
+
+    override suspend fun setFileUploadEnabled(instanceId: String, enabled: Boolean): Boolean =
+        withContext(Dispatchers.IO) {
+            awaitReady()
+            synchronized(settingsMutationLock) {
+                val current = _instances.value.firstOrNull { it.id == instanceId } ?: return@synchronized false
+                // 开关只对该厂商实例有意义；其他模板保持关闭并拒绝写入，避免出现无效开关状态。
+                if (current.templateId !in FILE_UPLOAD_TEMPLATE_IDS) return@synchronized false
+                commitConfiguration(
+                    _instances.value.map {
+                        if (it.id == instanceId) current.copy(isFileUploadEnabled = enabled) else it
+                    },
                 ) != null
             }
         }
@@ -302,16 +330,47 @@ class ModelServiceConfigurationStore @Inject constructor(
         resolveConnection(selection)?.takeIf { resolved ->
             ModelCapability.LLM in resolved.model.capabilities
         }?.let { resolved ->
+            // 对话协议以模板约束为最后一道锁：模板收紧后，即使旧快照尚未回写，
+            // 也绝不把已禁用的协议（如 DeepSeek / MiniMax 的 OpenAI 兼容协议）交给聊天分派。
+            val effective = resolved.templateId
+                ?.let { template(it) }
+                ?.connection(resolved.capability)
+                ?.takeUnless { it.supports(resolved.protocol) }
+                ?.let { templateConnection ->
+                    val protocol = templateConnection.protocols.first()
+                    resolved.copy(
+                        protocol = protocol,
+                        endpoint = templateConnection.reconciledEndpoint(resolved.endpoint, protocol),
+                    )
+                } ?: resolved
             ResolvedAgentModel(
-                serviceId = resolved.instanceId,
-                templateId = resolved.templateId,
-                protocol = resolved.protocol,
-                modelId = resolved.modelId,
-                apiKey = resolved.apiKey,
-                modelBaseUrl = resolved.endpoint.trimEnd('/'),
-                supportsImages = resolved.model.multimodal.supportsImages,
+                serviceId = effective.instanceId,
+                templateId = effective.templateId,
+                protocol = effective.protocol,
+                modelId = effective.modelId,
+                apiKey = effective.apiKey,
+                modelBaseUrl = effective.endpoint.trimEnd('/'),
+                supportsImages = effective.model.multimodal.supportsImages,
+                documentIngestMode = derivedDocumentIngestMode(effective),
             )
         }
+
+    /**
+     * 文档进入方式按实例级开关推导：开启且走 OpenAI 兼容协议时为厂商 file 引用，
+     * 协议适配器据此分派支持 file 块的实现；支持上传的模板在开关关闭时降为路径文本
+     * （不传输内容，agent 自行决定是否用环境工具读取）；其余情况维持内联语义。
+     */
+    private fun derivedDocumentIngestMode(resolved: ResolvedServiceConnection): FileIngestMode {
+        if (resolved.templateId !in FILE_UPLOAD_TEMPLATE_IDS) return FileIngestMode.INLINE
+        val uploadEnabled = resolved.instanceId.let { instanceId ->
+            _instances.value.firstOrNull { it.id == instanceId }?.isFileUploadEnabled == true
+        }
+        return when {
+            !uploadEnabled -> FileIngestMode.PATH_TEXT
+            resolved.protocol == ApiProtocol.OpenaiChatcompletions -> FileIngestMode.FILE_REFERENCE
+            else -> FileIngestMode.INLINE
+        }
+    }
 
     /**
      * Resolves the default assistant model, falling back to the first usable model when the
@@ -491,15 +550,18 @@ class ModelServiceConfigurationStore @Inject constructor(
         template: ModelServiceTemplate?,
     ): List<ServiceConnection> = connections.map { connection ->
         val templateConnection = template?.connection(connection.capability)
+        val protocolFallback = templateConnection != null && !templateConnection.supports(connection.protocol)
         val protocol = when {
             templateConnection == null -> connection.protocol
-            templateConnection.supports(connection.protocol) -> connection.protocol
+            !protocolFallback -> connection.protocol
             else -> templateConnection.protocols.first()
         }
-        val endpoint = if (templateConnection?.endpointPolicy == EndpointPolicy.VendorManaged) {
-            templateConnection.defaultEndpoint(protocol)
-        } else {
-            connection.endpoint.trim().trimEnd('/')
+        val endpoint = when {
+            templateConnection?.endpointPolicy == EndpointPolicy.VendorManaged ->
+                templateConnection.defaultEndpoint(protocol)
+            // 协议被纠正时，官方旧地址一并回贴到新协议端点；用户自建中转地址保持不动。
+            protocolFallback -> templateConnection.reconciledEndpoint(connection.endpoint, protocol)
+            else -> connection.endpoint.trim().trimEnd('/')
         }
         connection.copy(
             protocol = protocol,
@@ -520,13 +582,14 @@ class ModelServiceConfigurationStore @Inject constructor(
     }
 
     /**
-     * 启动对账：把内置模板新增的能力连接补进已建实例。
+     * 启动对账：把内置模板新增的能力连接补进已建实例，并纠正不再被模板允许的协议。
      *
      * 模板升级（[seedTemplates]）只写 Room 模板行，而实例连接存在加密快照里：不在加载时
-     * 对齐，应用更新带来的新能力连接（如厂商新增语音端点）对已建实例永远不可见。
-     * 只增不改——既有连接、已选模型、凭据与默认分配一律不动；新连接按模板首选项派生
-     * （空模型、共享凭据），是否选用模型由用户在模型管理页决定。对账用内置清单而非
-     * Room 行，不依赖模板装载时序；无变化不写盘，幂等。
+     * 对齐，应用更新带来的新能力连接（如厂商新增语音端点）或收紧后的协议约束
+     * （如 DeepSeek / MiniMax 对话固定 Messages）对已建实例永远不生效。
+     * 能力连接只增不改——已选模型、凭据与默认分配一律不动；新连接按模板首选项派生
+     * （空模型、共享凭据）。协议纠正是唯一的例外：被禁用的协议必须立即回落到模板
+     * 允许值。对账用内置清单而非 Room 行，不依赖模板装载时序；无变化不写盘，幂等。
      */
     private fun reconcileTemplateConnections(
         instances: List<ModelServiceInstance>,
@@ -535,12 +598,46 @@ class ModelServiceConfigurationStore @Inject constructor(
         val missing = template.connections
             .filter { instance.connection(it.capability) == null }
             .map { it.toConnection() }
-        if (missing.isEmpty()) instance else instance.copy(connections = instance.connections + missing)
+        val withMissing = if (missing.isEmpty()) instance
+            else instance.copy(connections = instance.connections + missing)
+        val connections = withMissing.connections.map { connection ->
+            val templateConnection = template.connection(connection.capability) ?: return@map connection
+            if (templateConnection.supports(connection.protocol)) return@map connection
+            val protocol = templateConnection.protocols.first()
+            connection.copy(
+                protocol = protocol,
+                endpoint = templateConnection.reconciledEndpoint(connection.endpoint, protocol),
+            )
+        }
+        if (connections == withMissing.connections) withMissing else withMissing.copy(connections = connections)
+    }
+
+    /**
+     * 协议被模板强制纠正时的端点处理：官方旧地址（含 `/v1` 一类同主机路径变体）回贴为
+     * 新协议的模板默认端点；用户自建中转地址的主机不在模板默认端点中，保持不动。
+     */
+    private fun TemplateConnection.reconciledEndpoint(endpoint: String, protocol: ApiProtocol): String {
+        val normalized = endpoint.trim().trimEnd('/')
+        val target = defaultEndpoint(protocol).trim().trimEnd('/')
+        if (normalized == target) return target
+        // 模板可为收紧前的协议保留一个"迁移识别用"的默认端点（不在 protocols 中）：
+        // 当前端点与这些旧官方地址同主机时视为旧协议地址，回贴到新协议端点。
+        val legacyHosts = defaultEndpoints
+            .filterKeys { it != protocol }
+            .values
+            .mapNotNull { value -> runCatching { URI(value.trim().trimEnd('/')).host }.getOrNull() }
+            .toSet()
+        val host = runCatching { URI(normalized).host }.getOrNull()
+        return if (host != null && host in legacyHosts) target else normalized
     }
 
     private fun templateFromEntity(entity: ModelTemplateEntity): ModelServiceTemplate? {
-        val connections = decodeTemplateConnections(entity.connectionsJson)
-        if (connections.isEmpty()) return null
+        val stored = decodeTemplateConnections(entity.connectionsJson)
+        if (stored.isEmpty()) return null
+        // 模板定义始终以内置清单为准，Room 行只贡献合并后的候选目录：旧缓存行
+        // 不能绕过收紧后的协议约束（见 mergeTemplateCatalogs）。
+        val builtIn = ModelServiceTemplates.fromId(entity.templateId)
+        val connections = builtIn?.let { mergeTemplateCatalogs(stored, it.connections) } ?: stored
         return ModelServiceTemplate(
             id = entity.templateId,
             name = entity.displayName,
@@ -639,6 +736,8 @@ internal data class StoredInstance(
     val templateId: String? = null,
     val isEnabled: Boolean = false,
     val isOfficialToolsEnabled: Boolean = false,
+    /** 实例级"文件上传"开关；对该厂商实例下全部对话模型生效，默认关。 */
+    val isFileUploadEnabled: Boolean = false,
     val sharedApiKey: String = "",
     val connections: List<StoredConnection> = emptyList(),
 ) {
@@ -648,6 +747,7 @@ internal data class StoredInstance(
         templateId = instance.templateId,
         isEnabled = instance.isEnabled,
         isOfficialToolsEnabled = instance.isOfficialToolsEnabled,
+        isFileUploadEnabled = instance.isFileUploadEnabled,
         sharedApiKey = instance.sharedApiKey,
         connections = instance.connections.map(::StoredConnection),
     )
@@ -658,6 +758,7 @@ internal data class StoredInstance(
         templateId = templateId,
         isEnabled = isEnabled,
         isOfficialToolsEnabled = isOfficialToolsEnabled,
+        isFileUploadEnabled = isFileUploadEnabled,
         sharedApiKey = sharedApiKey,
         // 损坏的连接按缺失处理，不让单条坏数据拖垮整个实例。
         connections = connections.mapNotNull { it.toDomain() },

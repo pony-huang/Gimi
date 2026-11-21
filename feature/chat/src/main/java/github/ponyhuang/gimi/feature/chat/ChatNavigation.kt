@@ -44,10 +44,10 @@ class ChatNavigationCallbacks(
     val onReturnToChat: () -> Unit,
     val onOpenSettings: () -> Unit,
     val onOpenPersonalization: () -> Unit,
-    val onOpenRuntimeEnvironment: () -> Unit,
     val onConfigureModels: () -> Unit,
     val sharedMediaUris: List<Uri>,
     val onSharedMediaConsumed: () -> Unit,
+    val chatLaunchRequest: github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest? = null,
 )
 
 /** Resolves chat-owned destinations without exposing Route composables to `:app`. */
@@ -61,10 +61,10 @@ fun ChatEntryProvider(
             onReturnToChat = callbacks.onReturnToChat,
             onOpenSettings = callbacks.onOpenSettings,
             onOpenPersonalization = callbacks.onOpenPersonalization,
-            onOpenRuntimeEnvironment = callbacks.onOpenRuntimeEnvironment,
             onConfigureModels = callbacks.onConfigureModels,
             sharedMediaUris = callbacks.sharedMediaUris,
             onSharedMediaConsumed = callbacks.onSharedMediaConsumed,
+            chatLaunchRequest = callbacks.chatLaunchRequest,
         )
         true
     }

@@ -1,11 +1,13 @@
 package github.ponyhuang.gimi.data.agent
 
+import android.util.Log
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 
 /**
  * [AgentContribution] 注册表门面。
@@ -60,4 +62,24 @@ class AgentContributionRegistry @Inject constructor(
     /** 聚合各贡献方的扁平工具目录（旁路聚合用）。 */
     suspend fun toolCatalog(context: AgentToolCatalogContext): List<AgentToolCatalogEntry> =
         sortedContributions.flatMap { contribution -> contribution.toolCatalog(context) }
+
+    /**
+     * 旁路聚合的容错版本：单个贡献方失败只丢弃该来源，不打断推荐生成、能力目录等
+     * 不影响主流程的调用。取消必须原样传播，避免把协程取消当成贡献方失败吞掉。
+     */
+    suspend fun toolCatalogIsolatingFailures(context: AgentToolCatalogContext): List<AgentToolCatalogEntry> =
+        sortedContributions.flatMap { contribution ->
+            try {
+                contribution.toolCatalog(context)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(TAG, "Tool catalog contributor ${contribution.id} failed", error)
+                emptyList()
+            }
+        }
+
+    private companion object {
+        const val TAG: String = "AgentContributionRegistry"
+    }
 }

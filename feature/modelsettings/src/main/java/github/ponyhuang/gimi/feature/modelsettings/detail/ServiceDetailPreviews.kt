@@ -52,13 +52,14 @@ internal object PreviewDrafts {
         ),
     )
 
+    /** 与内置模板一致：MiniMax 对话固定 Messages，旧 /v1 地址只用于迁移识别。 */
     fun minimaxTemplate(): ModelServiceTemplate = ModelServiceTemplate(
         id = "minimax",
         name = "MiniMax",
         connections = listOf(
             TemplateConnection(
                 capability = ServiceCapability.Conversation,
-                protocols = listOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
+                protocols = listOf(ApiProtocol.Anthropic),
                 defaultEndpoints = mapOf(
                     ApiProtocol.OpenaiChatcompletions to "https://api.minimaxi.com/v1",
                     ApiProtocol.Anthropic to "https://api.minimaxi.com/anthropic",
@@ -128,6 +129,24 @@ internal object PreviewDrafts {
             )
         }
     }
+
+    /** 固定 Messages 的厂商（DeepSeek / MiniMax）：接口页的协议项只读，不提供切换入口。 */
+    fun lockedMessagesConnectionEditors(): List<ConnectionEditor> = listOf(
+        ConnectionEditor(
+            connection = ServiceConnection(
+                id = "conn-locked-conversation",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.Anthropic,
+                endpoint = "https://api.minimaxi.com/anthropic",
+                models = listOf(Model("MiniMax-M2.7", "MiniMax-M2.7")),
+            ),
+            endpointPolicy = EndpointPolicy.UserConfigured,
+            endpointSchemes = setOf("http", "https"),
+            supportsWorkspace = false,
+            protocols = listOf(ApiProtocol.Anthropic),
+            test = ConnectionTestState(),
+        ),
+    )
 
     fun toolRows(): List<OfficialToolRow> {
         val support = github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport()

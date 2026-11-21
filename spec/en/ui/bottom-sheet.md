@@ -3,8 +3,8 @@
 [简体中文](../../zh/ui/bottom-sheet.md) · English
 
 > The shared bottom-sheet components in `:core:designsystem`: the height model,
-> the gesture rules, the slot skeleton, and the migration checklist for the sheets
-> that already exist in the app.
+> the gesture rules, the slot skeleton, picker entry and in-sheet paging rules,
+> and the migration checklist for the sheets that already exist in the app.
 
 ## Why a shared component
 
@@ -102,6 +102,16 @@ same family:
 └─────────────────────────────┘
 ```
 
+The body's scroll container must cap itself with
+`heightIn(max = LocalGimiSheetBodyMaxHeight.current)`. `GimiSheetBase`'s
+`heightIn` bounds the body `Box` only: a scroll container nested inside a
+`Column` or `AnimatedContent` can still receive an unbounded height, making its
+viewport as tall as its content — nothing scrolls and the extra rows are clipped.
+The local carries the body bound left after measuring the handle, title and
+footer (`Dp.Unspecified` outside a sheet means "no cap"); short content still
+hugs its own height. The voice settings page uses it to keep the Apply row
+reachable.
+
 The title row is centered like the conversation drawer: the title is centered
 across the full row width, with an optional leading icon (back) at the start and
 a trailing slot at the end that accepts either `GimiSheetTextAction` or
@@ -117,6 +127,29 @@ title stays centered when only one side has a slot.
 Insets are the component's business: the sheet consumes `safeDrawing`, and
 callers must not add `navigationBarsPadding()` or `imePadding()` themselves.
 
+## Picker entries and in-sheet pages
+
+A picker sheet (model picker, voice sheet, role presets) is one shell with
+pages inside, not a stack of separate sheets.
+
+- **Entries are card rows.** An entry that opens a sub-list uses the same
+  `GimiPickerItemRow` card style as the selectable rows below it — leading
+  icon, title, trailing chevron — so the whole sheet reads as one list family.
+- **Sub-lists are pages in the same sheet.** Opening a sub-list switches an
+  in-sheet page: the shell (scrim, handle, height) stays put while title and
+  body slide with the sheet's existing `AnimatedContent` page transition, and
+  `BackHandler` returns one level. Canonical patterns:
+  `ChatModelPickerSheet` (`ModelPickerPage`: providers → service / roles) and
+  `RealtimeVoiceScreen` (`VoiceSheetPage` hierarchy). Dismissing and reopening
+  a sheet, or jumping to a route, reads as a brand-new surface and breaks that
+  continuity.
+- **Picker pages only select.** Create/edit/delete lives in the management
+  screen reached from settings (e.g. `SimpleChatPromptSettingsScreen`); the
+  in-sheet page lists options and commits a selection.
+- **One shared page body per picker.** When two hosts offer the same picker
+  (text chat and realtime voice), both embed the same selection-only
+  composable (`ChatbotRolesPage`) instead of growing parallel copies.
+
 ## Callers
 
 | Sheet | Where | Initial / max |
@@ -126,7 +159,7 @@ callers must not add `navigationBarsPadding()` or `imePadding()` themselves.
 | Add-to-chat | `feature/chat` `ChatAddToChatSheet` | 45 % home page, 90 % list pages |
 | Permission mode | `feature/chat` `ChatPermissionModeSheet` | 28 % |
 | Chat model picker | `feature/chat` `ChatModelPickerSheet` | 60 % / 90 % |
-| Realtime preset / details | `feature/chat` `RealtimeVoiceScreen` | 40–50 % / 90 % |
+| Realtime preset / details | `feature/chat` `RealtimeVoiceScreen` | 50 % for entry, 90 % for sub-pages (caps; short content hugs its height) |
 | A2UI detail sheet | `feature/chat` `ChatA2uiContainers` | 65 % / 90 % |
 
 The assistant panel and the collapsed capsule in `feature/assistant` are **not**

@@ -7,7 +7,7 @@ import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol

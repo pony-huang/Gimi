@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.agent.di
 
+import github.ponyhuang.gimi.domain.conversation.repository.contentFor
+
 import android.content.Context
 import android.util.Log
 import com.google.adk.kt.artifacts.ArtifactService
@@ -22,7 +24,7 @@ import github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot
 import github.ponyhuang.gimi.data.agent.AgentStorage
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentFactory
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
 import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin
@@ -36,6 +38,7 @@ import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentConnectionTester
@@ -169,12 +172,13 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideAgentChatRunner(
+        chatbotRoles: github.ponyhuang.gimi.domain.conversation.repository.ChatbotRoleRepository,
         sessionService: SessionService,
         artifactService: ArtifactService,
         memoryService: MemoryService,
         agentFactory: AgentFactory,
         modelServices: AgentModelConfigurationSource,
-        agentLLMModelFactory: AgentLLMModelFactory,
+        agentModelRuntime: AgentModelRuntime,
         contributionRegistry: AgentContributionRegistry,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
         toolAccessRepository: ToolAccessRepository,
@@ -194,16 +198,25 @@ object AgentModule {
                 pluginRuntime = pluginRuntime,
             )
         },
-        plugins = { pluginRuntime ->
+        plugins = { pluginRuntime, profile ->
             buildList<Plugin> {
-                add(ConversationGenerateTitlePlugin(agentLLMModelFactory))
-                add(MemoryPersistencePlugin())
-                add(AgentToolRetryPolicy.plugin())
-                addAll(pluginRuntime.enabledPlugins)
+                when (profile) {
+                    AgentProfile.ASSISTANT -> {
+                        add(ConversationGenerateTitlePlugin(agentModelRuntime))
+                        add(MemoryPersistencePlugin())
+                        add(AgentToolRetryPolicy.plugin())
+                        addAll(pluginRuntime.enabledPlugins)
+                    }
+                    // Chatbot 与助手共用标题生成插件：厂商内联标题命中即完成（DeepSeek），
+                    // 其余厂商走快模型总结，失败回落首条消息。记忆与第三方插件运行时
+                    // 仍不挂载，保持形态最小。
+                    AgentProfile.CHATBOT -> add(ConversationGenerateTitlePlugin(agentModelRuntime))
+                }
             }
         },
         toolAccessRepository = toolAccessRepository,
         mobileUseController = mobileUseController,
+        chatbotRoleContent = { id -> chatbotRoles.contentFor(id) },
     )
 
 }

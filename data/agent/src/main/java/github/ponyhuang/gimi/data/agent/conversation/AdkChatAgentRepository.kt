@@ -1,8 +1,12 @@
 package github.ponyhuang.gimi.data.agent.conversation
 
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.types.FinishReason
 import com.google.adk.kt.types.FunctionResponse
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
+import github.ponyhuang.gimi.domain.conversation.model.ChatFinishReason
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 import com.google.adk.kt.types.FunctionCall
 import android.util.Log
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
@@ -46,13 +50,16 @@ class AdkChatAgentRepository @Inject constructor(
         selection: ModelSelection,
         toolConfiguration: ConversationToolConfiguration?,
         a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+        profile: AgentProfile,
     ): ChatAgentExecution {
         val execution = runner.createExecution(
-            userId = USER_ID,
+            // Chatbot 形态用独立用户 id：会话存储按用户 id 分区，助手聊天看不到这些会话。
+            userId = if (profile == AgentProfile.CHATBOT) AgentSessionIdentity.CHATBOT_USER_ID else USER_ID,
             sessionId = sessionId,
             selection = selection,
             toolConfiguration = toolConfiguration,
             a2uiCapabilities = a2uiCapabilities,
+            profile = profile,
         )
         return object : ChatAgentExecution {
             override suspend fun sendInteraction(
@@ -176,7 +183,18 @@ class AdkChatAgentRepository @Inject constructor(
         errorCode = errorCode,
         errorMessage = errorMessage,
         timestamp = timestamp,
+        finishReason = finishReason.toChatFinishReason(),
+        conversationTitle = customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) as? String,
     )
+
+    /** ADK 的停止原因归一到 domain 自己的枚举；未知取值一律按 OTHER 处理。 */
+    private fun FinishReason?.toChatFinishReason(): ChatFinishReason? = when (this) {
+        null -> null
+        FinishReason.STOP -> ChatFinishReason.STOP
+        FinishReason.MAX_TOKENS -> ChatFinishReason.MAX_TOKENS
+        FinishReason.SAFETY -> ChatFinishReason.SAFETY
+        else -> ChatFinishReason.OTHER
+    }
 
     private fun FunctionCall.toDomain(): ChatFunctionCall {
         val rawArgs = args.mapKeys { it.key }

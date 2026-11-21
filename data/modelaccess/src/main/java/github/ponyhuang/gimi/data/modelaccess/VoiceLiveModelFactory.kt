@@ -32,7 +32,7 @@ import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeProt
  *   工厂不再按厂商硬编码差异。
  */
 class VoiceLiveModelFactory @Inject constructor(
-    private val models: AgentLLMModelFactory,
+    private val models: DefaultAgentLLMModelFactory,
     private val configuration: AgentModelConfigurationSource,
     private val modelCatalog: ModelCatalogRepository,
     private val recognition: SpeechRecognitionRepository,
@@ -67,13 +67,27 @@ class VoiceLiveModelFactory @Inject constructor(
             synthesis.isAvailable() && recognition.availability.first()
     }
 
+    suspend fun isSemiCascadedAvailable(
+        selection: ModelSelection?,
+        synthesisModel: ModelSelection?,
+    ): Boolean {
+        configuration.awaitReady()
+        return (selection == null || configuration.resolveChatModel(selection) != null) &&
+            synthesis.isAvailable(synthesisModel)
+    }
+
     /**
      * 装配语音模型。
      *
      * @param selection 模型选择；null 表示用当前配置里的默认聊天模型。
      * @param voice Realtime 会话音色的自定义覆盖；null 表示使用所选模型在该厂商下的缺省音色。
+     * @param synthesisVoice 级联链路的合成音色覆盖；null 表示沿用全局合成音色。
      */
-    suspend fun create(selection: ModelSelection? = null, voice: String? = null): Model {
+    suspend fun create(
+        selection: ModelSelection? = null,
+        voice: String? = null,
+        synthesisVoice: String? = null,
+    ): Model {
         configuration.awaitReady()
         val connection = realtimeConnectionFor(selection)
         if (connection != null) {
@@ -100,10 +114,10 @@ class VoiceLiveModelFactory @Inject constructor(
                 )
                 // 未知厂商的实时模型无原生适配器；防御性回落级联（其模型未声明
                 // STT/TTS 能力，实际会话会在级联可用性检查处失败并暴露配置问题）。
-                else -> cascadedModel(selection)
+                else -> cascadedModel(selection, synthesisVoice)
             }
         }
-        return cascadedModel(selection)
+        return cascadedModel(selection, synthesisVoice)
     }
 
     /**
@@ -121,8 +135,28 @@ class VoiceLiveModelFactory @Inject constructor(
         ?: support?.builtInVoices?.firstOrNull()?.id
         ?: error("Realtime 模板未声明会话音色：$modelId")
 
-    private suspend fun cascadedModel(selection: ModelSelection?): Model {
+    suspend fun createSemiCascaded(
+        selection: ModelSelection?,
+        synthesisVoice: String?,
+        synthesisModel: ModelSelection?,
+    ): Model {
+        configuration.awaitReady()
         check(selection == null || configuration.resolveChatModel(selection) != null) { "Chat model unavailable" }
-        return CascadedVoiceModel(models.createModel(models.selectModelConfig(selection)), recognition, synthesis)
+        return SemiCascadedVoiceModel(
+            models.createSemiCascadedModel(models.selectModelConfig(selection)),
+            synthesis,
+            synthesisVoice,
+            synthesisModel,
+        )
+    }
+
+    private suspend fun cascadedModel(selection: ModelSelection?, synthesisVoice: String? = null): Model {
+        check(selection == null || configuration.resolveChatModel(selection) != null) { "Chat model unavailable" }
+        return CascadedVoiceModel(
+            models.createModel(models.selectModelConfig(selection)),
+            recognition,
+            synthesis,
+            synthesisVoice,
+        )
     }
 }

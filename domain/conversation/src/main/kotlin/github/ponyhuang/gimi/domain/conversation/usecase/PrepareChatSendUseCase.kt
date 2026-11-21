@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import javax.inject.Inject
@@ -40,7 +41,7 @@ data class PreparedChatSend(
 /** 在调用方持有会话运行锁时准备发送；不启动模型流、不发布状态或管理 lease。 */
 class PrepareChatSendUseCase @Inject constructor(
     private val sessionResolver: ConversationSessionResolver,
-    private val repository: ConversationRepository,
+    @AssistantConversationPartition private val repository: ConversationRepository,
     private val prepareTurn: PrepareChatTurnUseCase,
     private val agent: ChatAgentRepository,
 ) {

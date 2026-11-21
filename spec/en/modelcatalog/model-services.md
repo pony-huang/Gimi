@@ -2,7 +2,7 @@ English · [简体中文](../../zh/modelcatalog/model-services.md)
 
 # Model configuration constraints
 
-Reviewed on 2026-11-14 for developers.
+Audience: developers.
 
 This document holds the **operational constraints and recipes** for the unified model service configuration rebuild (implemented 2026-11-14): terminology and scope, domain model rules, storage rules, adapter dispatch rules, and the mandatory steps when adding a vendor, provider tool, or speech adapter. Follow this document for future development.
 
@@ -31,7 +31,8 @@ This document holds the **operational constraints and recipes** for the unified 
 
 - One `ServiceConnection` maps to exactly one `ServiceCapability` (Conversation / Recognition / Synthesis / Realtime). Never merge them.
 - A recognition connection hosts both dedicated transcription (STT) and audio understanding (ASR) models; protocol dispatch follows each model's declared capabilities, never a blanket per-instance check.
-- Dual-protocol vendors (OpenAI-compatible + Anthropic-compatible) must declare **both protocols' default endpoints** in their template connection (MiniMax / MiMo once missed the Anthropic path, breaking the protocol-switch endpoint reset).
+- Vendors that still allow both protocols (MiMo / Kimi / GLM, OpenAI-compatible + Anthropic-compatible) must declare **both protocols' default endpoints** in their template connection (MiniMax / MiMo once missed the Anthropic path, breaking the protocol-switch endpoint reset).
+- **DeepSeek / MiniMax conversations are locked to Anthropic Messages**: the template's `protocols` contains only `ApiProtocol.Anthropic`, with the official `https://api.deepseek.com/anthropic` and `https://api.minimaxi.com/anthropic` endpoints respectively. The connections page shows the protocol as a read-only value with no switch. The legacy OpenAI-compatible addresses (`https://api.deepseek.com`, `https://api.minimaxi.com/v1`) are kept only as migration markers in `defaultEndpoints` (not in `protocols`, so they are not selectable). Speech connections use vendor-owned endpoints, are outside the chat protocol constraint, and are unaffected. The constraint is enforced in four places: the template, Room template-row merging (`mergeTemplateCatalogs` treats the built-in list as authoritative), startup reconciliation / save normalization (legacy snapshots fall back to Messages and snap official endpoints back, while user-hosted relay endpoints are preserved), and the `resolveChatModel` runtime guard. Note that addresses outside the template's default host (self-hosted relays, MiniMax's international `api.minimax.io`, etc.) are not snapped back: once the protocol is forced, the endpoint must be changed to the matching `/anthropic` path, or Messages requests will still hit `/v1`.
 
 ### Credential convergence
 
@@ -59,6 +60,7 @@ This document holds the **operational constraints and recipes** for the unified 
 - Speech adapters register by **template ID** (`CapabilityAdapter.serviceIds`); an unresolvable `VoiceCapabilityRegistry` lookup is an explicit failure and must never fall back to another vendor's protocol. Connection tests: conversation connections probe the model catalog; speech connections probe a template handshake (unimplemented probes report Unsupported).
 - Realtime assembly dispatches by `templateId` (current branches: qwen / openai); templates without a native adapter must not appear as Realtime candidates.
 - The vendor tool matrix lives in `OfficialToolSupport.all`, matched by `templateId + protocol + model family`; `ModelConfig` / `ModelRuntimeMetadata` carry `templateId` and round-trip through RunConfig metadata (`gimi.model.template_id`); the DeepSeek Anthropic reference tool-loading mode keys on template identity plus the official endpoint.
+- Files requests use the conversation connection's explicit `ApiProtocol`, endpoint, and effective credential. `VendorFileGateway` selects the matching Files protocol client. Anthropic clients append `/v1/files` to the configured base, including relay prefixes. Provider identity controls provider-specific fields only. DeepSeek uses `purpose` before `file`, the `files-api-2025-04-14` beta header, and `after_id` / `has_more` / `last_id` pagination. Its Anthropic file metadata uses `size_bytes` and RFC 3339 timestamps. New compatible providers declare their connection protocol and file-upload capability.
 - Endpoint strategy: `VendorManaged` endpoints (Bailian WebSocket, OpenAI Realtime) come from the template; everything else uses the configured endpoint. Speech request base URLs converge in `speechRequestBaseUrl` (Bailian workspace IDs rewrite to workspace-specific domains).
 
 ## Recipes

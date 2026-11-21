@@ -2,12 +2,12 @@ package github.ponyhuang.gimi.ui.settings.llmmodel
 
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
@@ -21,19 +21,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.core.designsystem.R
 import github.ponyhuang.gimi.ui.theme.GimiTheme
+import github.ponyhuang.gimi.ui.theme.LocalGimiDarkTheme
 
 /**
- * Consistent, brand-faithful icon treatment for model service surfaces.
+ * 服务商品牌图标：容器完全透明，标识直接落在页面背景上，不铺任何底色块。
  *
- * 图标资源来自 lobe-icons（SVG 转 vector drawable），按可辨性分三类：
- * - 有 `-color` 彩色版且深浅色背景均可辨的服务（DeepSeek / MiniMax / ChatGLM / Gemini）
- *   统一使用彩色版，深浅色模式通用，只放 `res/drawable/`；
- * - 彩色版在浅色背景下可辨、但在深色背景下不可辨（Qwen 深蓝主体）：
- *   `res/drawable/` 放彩色版，`res/drawable-night/` 放深色模式用的浅色渐变版；
- * - 其余服务（OpenAI / Anthropic / XiaomiMiMo / Kimi）保留单色：
- *   lobe-icons 无其彩色版，或彩色版为白色主体（Kimi 白 K）在浅色背景下不可见；
- *   `res/drawable/` 为浅色模式用，`res/drawable-night/` 为深色模式反白/彩色版。
- * 系统按夜间模式自动切换资源，调用点无需关心主题。
+ * 深浅可读性靠「换标识资源」而不是「换底板」：
+ * - 彩色 logo（DeepSeek / MiniMax / GLM / Gemini）两种主题共用品牌原色资源；
+ * - Qwen 品牌深蓝对深色背景对比度不足，深色时用 `*_night` 浅蓝渐变版；
+ * - 黑色单色 logo（OpenAI / Anthropic / XiaomiMiMo）深色时用 `*_night` 反白纯色版，
+ *   Kimi 深色时用品牌彩色版（蓝点 + 白 K），浅色时用全黑单色版。
+ * 反白／彩色版都是纯色，不加渐变、描边或白底，保持 lobe-icons 原始图案与比例。
+ *
+ * 为什么不用 `res/drawable-night/`：应用内主题只在 Compose 层覆盖
+ * （`GimiTheme(darkTheme = ...)`），而 `-night` 限定符按系统 `uiMode` 解析。
+ * 用户手动锁定夜间、系统处于白天时夜间资源不命中，黑色 logo 会消失在深色卡片上。
+ * 因此这里读 [LocalGimiDarkTheme]（应用内真实主题）显式选择 `*_night` 资源。
  */
 @Composable
 fun LLMModelServiceIcon(
@@ -41,14 +44,9 @@ fun LLMModelServiceIcon(
     modifier: Modifier = Modifier,
     contentPadding: Dp = 10.dp,
 ) {
-    val icon = modelServiceIconFor(serviceId)
+    val icon = modelServiceIconFor(serviceId, LocalGimiDarkTheme.current)
     Box(
-        modifier = modifier
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(16.dp),
-            )
-            .padding(contentPadding),
+        modifier = modifier.padding(contentPadding),
         contentAlignment = Alignment.Center,
     ) {
         if (icon != null) {
@@ -72,18 +70,46 @@ fun LLMModelServiceIcon(
  * 服务模板标识 → 图标资源映射；core 模块不能反向依赖 data 模块，故以字面量维护。
  * 新增厂商模板时，须同步此处与 `data/modelcatalog` 的 ModelServiceTemplates 清单，
  * 否则将静默回退到 SmartToy 占位图标。
+ *
+ * 只有黑色单色标识与对比度不足的彩色标识需要深色变体；其余彩色标识在任何主题下
+ * 共用同一份品牌原色资源。
  */
-private fun modelServiceIconFor(serviceId: String): Int? = when (serviceId) {
-    "deepseek" -> R.drawable.ic_model_provider_deepseek
-    "minimax" -> R.drawable.ic_model_provider_minimax
-    "mimo" -> R.drawable.ic_model_provider_xiaomimimo
-    "openai" -> R.drawable.ic_model_provider_openai
-    "anthropic" -> R.drawable.ic_model_provider_anthropic
-    "gemini" -> R.drawable.ic_model_provider_gemini
-    "kimi" -> R.drawable.ic_model_provider_kimi
-    "glm" -> R.drawable.ic_model_provider_chatglm
-    "qwen" -> R.drawable.ic_model_provider_qwen
-    else -> null
+private fun modelServiceIconFor(serviceId: String, darkTheme: Boolean): Int? {
+    val lightIcon = when (serviceId) {
+        "deepseek" -> R.drawable.ic_model_provider_deepseek
+        "minimax" -> R.drawable.ic_model_provider_minimax
+        "mimo" -> R.drawable.ic_model_provider_xiaomimimo
+        "openai" -> R.drawable.ic_model_provider_openai
+        "anthropic" -> R.drawable.ic_model_provider_anthropic
+        "gemini" -> R.drawable.ic_model_provider_gemini
+        "kimi" -> R.drawable.ic_model_provider_kimi
+        "glm" -> R.drawable.ic_model_provider_chatglm
+        "qwen" -> R.drawable.ic_model_provider_qwen
+        else -> return null
+    }
+    if (!darkTheme) return lightIcon
+    return when (serviceId) {
+        "openai" -> R.drawable.ic_model_provider_openai_night
+        "anthropic" -> R.drawable.ic_model_provider_anthropic_night
+        "kimi" -> R.drawable.ic_model_provider_kimi_night
+        "mimo" -> R.drawable.ic_model_provider_xiaomimimo_night
+        // 品牌深蓝 #082DFF 对深色背景对比度约 2.8:1，深色改用浅蓝渐变单色。
+        "qwen" -> R.drawable.ic_model_provider_qwen_night
+        else -> lightIcon
+    }
+}
+
+@Preview(name = "单色品牌 · 浅色", showBackground = true)
+@Preview(name = "单色品牌 · 深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun LLMModelServiceIconThemePreview() {
+    GimiTheme {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("openai", "anthropic", "kimi", "mimo", "qwen").forEach { serviceId ->
+                LLMModelServiceIcon(serviceId = serviceId, modifier = Modifier.size(48.dp))
+            }
+        }
+    }
 }
 
 @Preview(showBackground = true)
@@ -99,14 +125,5 @@ private fun LLMModelServiceIconKnownServicePreview() {
 private fun LLMModelServiceIconFallbackPreview() {
     GimiTheme {
         LLMModelServiceIcon(serviceId = "unknown", modifier = Modifier.size(48.dp))
-    }
-}
-
-@Preview(showBackground = true)
-@Preview(name = "深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun LLMModelServiceIconQwenPreview() {
-    GimiTheme {
-        LLMModelServiceIcon(serviceId = "qwen", modifier = Modifier.size(48.dp))
     }
 }

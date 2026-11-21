@@ -27,6 +27,13 @@ import github.ponyhuang.gimi.data.modelaccess.shared.qwenFunctionToolArray
  */
 internal object QwenRealtimeProtocol {
 
+    /** 角色切换只更新指令，保留音色、音频配置与服务端上下文。 */
+    fun instructionsUpdate(instructions: String): JsonObject = JsonObject().apply {
+        addProperty("type", "session.update")
+        add("session", JsonObject().apply { addProperty("instructions", instructions) })
+    }
+
+
     // —— 客户端事件类型 ——
 
     private const val CLIENT_SESSION_UPDATE = "session.update"

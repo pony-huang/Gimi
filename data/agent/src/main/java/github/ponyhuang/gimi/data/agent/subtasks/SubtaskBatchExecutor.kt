@@ -7,6 +7,7 @@ import com.google.adk.kt.agents.Context
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.agents.RunConfig
+import com.google.adk.kt.agents.ToolExecutionMode
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.runners.InMemoryRunner
@@ -19,8 +20,8 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.workflow.DynamicNodeFailedException
 import com.google.adk.kt.workflow.Node
 import com.google.adk.kt.workflow.parallelNode
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskRun
@@ -40,6 +41,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 隔离的单轮工作流执行器；并发额度跨批次共享，防止主助手同时委派多批绕过上限。
@@ -108,7 +110,7 @@ class SubtaskBatchExecutor(
                             instruction = Instruction(WORKER_INSTRUCTION),
                             toolsets = listOf(toolset),
                         )
-                        val output = withTimeoutOrNull(timeoutMillis) {
+                        val output = withTimeoutOrNull(timeoutMillis.milliseconds) {
                             context.runNode(
                                 worker,
                                 "Task: ${request.instruction}\n\nExplicit materials:\n${request.materials}",
@@ -153,7 +155,11 @@ class SubtaskBatchExecutor(
             runner.runAsync(
                 userId = userId, sessionId = id,
                 newMessage = Content(role = Role.USER, parts = listOf(Part(text = "Execute the explicitly delegated analysis tasks."))),
-                runConfig = RunConfig(customMetadata = metadata, maxLlmCalls = 48),
+                runConfig = RunConfig(
+                    customMetadata = metadata,
+                    maxLlmCalls = 48,
+                    toolExecutionMode = ToolExecutionMode.SEQUENTIAL,
+                ),
             ).collect { event ->
                 val path = event.nodeInfo?.path ?: return@collect
                 val calls = event.functionCalls()
@@ -185,6 +191,11 @@ class SubtaskBatchExecutor(
                 withContext(NonCancellable) { terminatePending(id, SubtaskStatus.INTERRUPTED) }
             } finally {
                 store.finished(id)
+                try {
+                    // 与 terminatePending/Runner 一致：取消时快照也必须落盘，否则断点丢失。
+                withContext(NonCancellable) { sessions.flush(key) }
+                } catch (_: Throwable) {
+                }
                 runner.close()
             }
         }

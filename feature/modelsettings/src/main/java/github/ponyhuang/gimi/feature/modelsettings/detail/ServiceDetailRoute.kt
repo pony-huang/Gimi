@@ -1,25 +1,16 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelRole
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
-import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import androidx.compose.ui.unit.dp
 
 /**
  * 服务详情编辑器入口：加载实例或模板草稿，承接反馈与导航副作用。
@@ -43,6 +34,15 @@ fun ServiceDetailRoute(
     val context = LocalContext.current
     LaunchedEffect(instanceId, templateId, origin) {
         viewModel.onAction(ModelServiceDetailAction.Load(instanceId, templateId, origin))
+    }
+    // 子页（模型 / 接口设置 / 官方工具 / 保存建议）与未保存草稿都属于编辑器内部层级：
+    // 系统返回键与返回手势必须先交回编辑器处理。否则 NavDisplay 会把整个详情弹栈，
+    // 用户在「接口设置」按返回会直接回到模型服务列表，跳过详情页并丢掉子页上下文。
+    BackHandler(
+        enabled = !state.isDiscardDialogVisible &&
+            (state.page != ServiceEditorPage.Detail || state.hasUnsavedChanges),
+    ) {
+        viewModel.onAction(ModelServiceDetailAction.Back)
     }
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
@@ -80,85 +80,10 @@ fun ServiceDetailRoute(
             }
         }
     }
-    PreferenceScaffold(
+    ServiceDetailScreen(
+        state = state,
+        onAction = viewModel::onAction,
+        onOpenUrl = onOpenUrl,
         modifier = modifier,
-        style = PreferenceStyle.Compact,
-        title = state.draft?.name?.ifBlank {
-            stringResource(
-                if (state.isNewInstance) R.string.modelsettings_add_service else R.string.modelsettings_list_title,
-            )
-        } ?: stringResource(R.string.modelsettings_list_title),
-        onBack = { viewModel.onAction(ModelServiceDetailAction.Back) },
-        actions = {
-            if (state.page == ServiceEditorPage.Models && state.template?.supportsConversation != false) {
-                FetchModelsAction(
-                    isRefreshing = state.isRefreshing,
-                    onClick = { viewModel.onAction(ModelServiceDetailAction.FetchModels) },
-                )
-            }
-        },
-        bottomBar = {
-            val saveLabel = when {
-                state.page == ServiceEditorPage.Models ->
-                    stringResource(R.string.modelsettings_confirm_models, state.pendingSelectionCount)
-                state.page == ServiceEditorPage.Suggestions ->
-                    stringResource(R.string.modelsettings_save_with_defaults)
-                state.isNewInstance -> stringResource(R.string.modelsettings_save_new_service)
-                else -> stringResource(R.string.modelsettings_save_changes)
-            }
-            val showSaveBar = state.page != ServiceEditorPage.Connections &&
-                state.page != ServiceEditorPage.OfficialTools
-            if (showSaveBar) {
-                PreferenceSaveBarHost(
-                    label = saveLabel,
-                    enabled = state.canEdit &&
-                        (state.page != ServiceEditorPage.Models || state.pendingSelectionCount > 0),
-                    enabledState = state,
-                    onSave = {
-                        when (state.page) {
-                            ServiceEditorPage.Models -> viewModel.onAction(ModelServiceDetailAction.ConfirmModels)
-                            ServiceEditorPage.Suggestions ->
-                                viewModel.onAction(ModelServiceDetailAction.ConfirmSuggestions)
-                            else -> viewModel.onAction(ModelServiceDetailAction.Save)
-                        }
-                    },
-                )
-            }
-        },
-    ) { scaffoldModifier ->
-        ServiceDetailScreen(state, viewModel::onAction, onOpenUrl, scaffoldModifier)
-    }
-}
-
-@Composable
-private fun FetchModelsAction(isRefreshing: Boolean, onClick: () -> Unit) {
-    androidx.compose.material3.IconButton(onClick = onClick) {
-        if (isRefreshing) {
-            androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp))
-        } else {
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Outlined.Refresh,
-                contentDescription = stringResource(R.string.modelsettings_fetch_models),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PreferenceSaveBarHost(
-    label: String,
-    enabled: Boolean,
-    enabledState: ModelServiceDetailUiState,
-    onSave: () -> Unit,
-) {
-    github.ponyhuang.gimi.ui.preference.PreferenceSaveBar(
-        label = label,
-        onSave = onSave,
-        enabled = enabled,
-        notice = if (!enabledState.isEnabled) {
-            stringResource(R.string.modelsettings_save_notice_paused)
-        } else {
-            null
-        },
     )
 }

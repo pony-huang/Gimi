@@ -6,7 +6,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.*
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
 import github.ponyhuang.gimi.domain.a2ui.*
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationRepository
 import java.util.UUID
@@ -21,7 +21,7 @@ import kotlinx.coroutines.currentCoroutineContext
  * 也收不到 A2UI 指令；同时开关进入 revision，使已缓存的运行时在下次发送时重建。
  */
 class A2uiToolContribution @Inject constructor(
-    private val models: AgentLLMModelFactory,
+    private val models: AgentModelRuntime,
     private val protocol: A2uiProtocol,
     private val settings: RecommendationRepository,
 ) : AgentContribution {

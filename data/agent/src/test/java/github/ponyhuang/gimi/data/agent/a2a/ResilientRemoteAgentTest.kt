@@ -40,6 +40,22 @@ class ResilientRemoteAgentTest {
     }
 
     @Test
+    fun a2aMetadataErrorEventBecomesLocalResult() = runBlocking {
+        val remote = ResilientRemoteAgent(object : BaseAgent("remote") {
+            override fun runAsyncImpl(context: InvocationContext): Flow<Event> = flow {
+                emit(Event(author = name, customMetadata = mapOf("a2a:error" to "A2A request failed (IOException, HTTP 500)")))
+            }
+        })
+
+        val events = remote.runAsync(context(remote)).toList()
+
+        assertFalse(events.last().isFinalResponse)
+        assertTrue(events.none { it.errorCode != null || it.errorMessage != null })
+        assertEquals(events.first().functionCalls().single().id, events.last().functionResponses().single().id)
+        assertEquals("unknown", events.last().functionResponses().single().response["execution_status"])
+    }
+
+    @Test
     fun userCancellationDoesNotBecomeRemoteFailure() = runBlocking {
         val remote = ResilientRemoteAgent(object : BaseAgent("remote") {
             override fun runAsyncImpl(context: InvocationContext): Flow<Event> = flow {

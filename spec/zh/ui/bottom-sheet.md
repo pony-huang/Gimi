@@ -2,8 +2,8 @@
 
 [English](../../en/ui/bottom-sheet.md) · 简体中文
 
-> `:core:designsystem` 里的公共底部抽屉组件：高度模型、手势规则、插槽骨架，
-> 以及存量抽屉的迁移清单。
+> `:core:designsystem` 里的公共底部抽屉组件：高度模型、手势规则、插槽骨架、
+> 选择器入口与抽屉内分页规则，以及存量抽屉的迁移清单。
 
 ## 为什么要有公共组件
 
@@ -85,6 +85,12 @@ GimiSheet(
 └─────────────────────────────┘
 ```
 
+主体的滚动容器要自己设 `heightIn(max = LocalGimiSheetBodyMaxHeight.current)`。
+`GimiSheetBase` 的 `heightIn` 只收住主体 `Box`：`Column`／`AnimatedContent` 里的滚动容器
+仍可能拿到无界高度，viewport 和内容一样高就滚不动，多出来的设置行被抽屉裁掉。
+这个 Local 是实测横杆、标题与底部区之后剩下的主体上限（抽屉外为 `Dp.Unspecified`，按不限高
+处理），短内容仍贴自身高度长。语音设置页就是这样把「应用」按钮留在可视区里的。
+
 标题行与会话抽屉一样居中：标题相对整行宽度居中，左侧是可选图标（返回），右侧是操作位，
 可以用 `GimiSheetTextAction` 或 `GimiSheetIconAction`；关闭一律放右侧，于是抽屉读起来是
 "返回在左、关闭或操作在右"。
@@ -96,6 +102,22 @@ GimiSheet(
 inset 由组件负责：抽屉吃掉 `safeDrawing`，调用方不要再自己加
 `navigationBarsPadding()` 或 `imePadding()`。
 
+## 选择器入口与抽屉内分页
+
+选择器抽屉（模型选择、语音抽屉、角色预设）是"一个外壳、内部多页"，不是一叠独立抽屉。
+
+- **入口即卡片行。** 打开子列表的入口与下方可选行共用 `GimiPickerItemRow` 卡片样式——
+  左侧图标、标题、右侧箭头——整张抽屉读起来是同一套列表。
+- **子列表是同一抽屉内的页面。** 打开子列表时切换抽屉内页：外壳（遮罩、横杆、高度）
+  保持不动，标题与主体沿用该抽屉现有的 `AnimatedContent` 分页过渡滑动，`BackHandler`
+  逐级返回。现成范式：`ChatModelPickerSheet`（`ModelPickerPage`：服务商 → 服务／角色）
+  与 `RealtimeVoiceScreen`（`VoiceSheetPage` 层级）。关闭再重开抽屉、或路由跳转，
+  都会读成一个全新界面，破坏这种连贯性。
+- **选择页只负责选择。** 创建／编辑／删除留在从设置进入的管理页
+  （如 `SimpleChatPromptSettingsScreen`）；抽屉内页只列选项、提交选择。
+- **同一选择器共用一份页面主体。** 文字聊天与实时语音两个宿主提供同一选择器时，
+  内嵌同一个纯选择 composable（`ChatbotRolesPage`），不各长一份副本。
+
 ## 存量抽屉
 
 | 抽屉 | 位置 | 初始／最大高度 |
@@ -105,7 +127,7 @@ inset 由组件负责：抽屉吃掉 `safeDrawing`，调用方不要再自己加
 | 添加到对话 | `feature/chat` `ChatAddToChatSheet` | 首页 45%，列表页 90% |
 | 权限模式 | `feature/chat` `ChatPermissionModeSheet` | 28% |
 | 聊天模型选择 | `feature/chat` `ChatModelPickerSheet` | 60%／90% |
-| Realtime 预设／详情 | `feature/chat` `RealtimeVoiceScreen` | 40–50%／90% |
+| Realtime 预设／详情 | `feature/chat` `RealtimeVoiceScreen` | 一级 50%，二/三级 90%（上限，短内容贴内容长） |
 | A2UI 详情抽屉 | `feature/chat` `ChatA2uiContainers` | 65%／90% |
 
 `feature/assistant` 的助手面板与折叠胶囊**没有**迁移：它们是 `Popup` 宿主而不是模态抽屉，

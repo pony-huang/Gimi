@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.usecase.RefreshModelCatalogUseC
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SaveModelInstanceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SaveNewModelInstanceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SetModelInstanceEnabledUseCase
+import github.ponyhuang.gimi.domain.modelcatalog.usecase.SetModelInstanceFileUploadUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.TestModelServiceConnectionUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelServiceRemoteGateway
@@ -81,6 +82,65 @@ class ModelServiceDetailViewModelTest {
     }
 
     @Test
+    fun deepSeekConversationProtocolStaysLockedToMessages() = runTest {
+        val repository = repository(instances = listOf(deepSeekInstance()))
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-deepseek", null, null))
+        advanceUntilIdle()
+
+        // 接口页只收到一种协议，因此渲染为只读项、没有切换入口
+        val editor = viewModel.uiState.value.connections
+            .first { it.connection.capability == ServiceCapability.Conversation }
+        assertEquals(listOf(ApiProtocol.Anthropic), editor.protocols)
+        assertEquals(ApiProtocol.Anthropic, editor.connection.protocol)
+
+        // 即使外部仍发出旧版切换动作，也必须被模板约束挡住
+        viewModel.onAction(
+            ModelServiceDetailAction.ConnectionProtocolChanged(
+                editor.connection.id,
+                ApiProtocol.OpenaiChatcompletions,
+            ),
+        )
+        advanceUntilIdle()
+        val after = viewModel.uiState.value.connections.first { it.connection.id == editor.connection.id }
+        assertEquals(ApiProtocol.Anthropic, after.connection.protocol)
+        assertEquals("https://api.deepseek.com/anthropic", after.connection.endpoint)
+    }
+
+    @Test
+    fun miniMaxConversationProtocolStaysLockedToMessages() = runTest {
+        val repository = repository(instances = listOf(miniMaxInstance()))
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-minimax", null, null))
+        advanceUntilIdle()
+
+        // 接口页只收到一种协议，因此渲染为只读项、没有切换入口
+        val editor = viewModel.uiState.value.connections
+            .first { it.connection.capability == ServiceCapability.Conversation }
+        assertEquals(listOf(ApiProtocol.Anthropic), editor.protocols)
+        assertEquals(ApiProtocol.Anthropic, editor.connection.protocol)
+
+        // 即使外部仍发出旧版切换动作，也必须被模板约束挡住
+        viewModel.onAction(
+            ModelServiceDetailAction.ConnectionProtocolChanged(
+                editor.connection.id,
+                ApiProtocol.OpenaiChatcompletions,
+            ),
+        )
+        advanceUntilIdle()
+        val after = viewModel.uiState.value.connections.first { it.connection.id == editor.connection.id }
+        assertEquals(ApiProtocol.Anthropic, after.connection.protocol)
+        assertEquals("https://api.minimaxi.com/anthropic", after.connection.endpoint)
+        // 语音连接仍是厂商自有端点，未受对话协议收紧影响
+        assertEquals(
+            ApiProtocol.OpenaiChatcompletions,
+            viewModel.uiState.value.connections
+                .first { it.connection.capability == ServiceCapability.Recognition }
+                .connection.protocol,
+        )
+    }
+
+    @Test
     fun externalEnableChangesSyncWithoutClobberingDirtyDrafts() = runTest {
         val instancesFlow = MutableStateFlow(listOf(openAiInstance()))
         val repository = repository(instances = emptyList(), instancesFlow = instancesFlow)
@@ -124,6 +184,28 @@ class ModelServiceDetailViewModelTest {
             state.draft?.conversationConnection?.models?.map { it.id },
         )
         assertTrue(state.isDirty)
+    }
+
+    @Test
+    fun backFromSubPageReturnsToDetailInsteadOfClosingEditor() = runTest {
+        val repository = repository(instances = listOf(openAiInstance()))
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-openai", null, null))
+        advanceUntilIdle()
+
+        // 子页返回是编辑器内部层级：停在详情页，不得发 Close 让宿主把详情弹栈回服务列表。
+        listOf(
+            ServiceEditorPage.Connections,
+            ServiceEditorPage.Models,
+            ServiceEditorPage.OfficialTools,
+        ).forEach { page ->
+            viewModel.onAction(ModelServiceDetailAction.OpenPage(page))
+            assertEquals(page, viewModel.uiState.value.page)
+            viewModel.onAction(ModelServiceDetailAction.Back)
+            advanceUntilIdle()
+            assertEquals(ServiceEditorPage.Detail, viewModel.uiState.value.page)
+            assertFalse(viewModel.uiState.value.isClosing)
+        }
     }
 
     @Test
@@ -288,6 +370,86 @@ class ModelServiceDetailViewModelTest {
     }
 
     @Test
+    fun fileUploadChangeWritesThroughInstanceRepository() = runTest {
+        val repository = repository(instances = listOf(deepSeekInstance()))
+        coEvery { repository.setFileUploadEnabled(any(), any()) } returns true
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-deepseek", null, null))
+        advanceUntilIdle()
+
+        viewModel.onAction(ModelServiceDetailAction.FileUploadChanged(true))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.setFileUploadEnabled("instance-deepseek", true) }
+        assertNull(viewModel.uiState.value.errorRes)
+    }
+
+    @Test
+    fun fileUploadChangeFailureSurfacesWriteFailed() = runTest {
+        val repository = repository(instances = listOf(deepSeekInstance()))
+        coEvery { repository.setFileUploadEnabled(any(), any()) } throws java.io.IOException("disk full")
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-deepseek", null, null))
+        advanceUntilIdle()
+
+        viewModel.onAction(ModelServiceDetailAction.FileUploadChanged(true))
+        advanceUntilIdle()
+
+        // 写盘失败上抛被 VM 捕获：反馈「操作失败」而不是让异常穿出协程。
+        assertEquals(github.ponyhuang.gimi.feature.modelsettings.R.string.modelsettings_write_failed, viewModel.uiState.value.errorRes)
+    }
+
+    @Test
+    fun newDraftFileUploadChangeUpdatesDraftAndPersistsOnSave() = runTest {
+        val repository = repository(instances = emptyList())
+        coEvery { repository.saveNewInstance(any()) } answers {
+            val draft = firstArg<ModelServiceDraft>()
+            ModelServiceInstance(
+                id = "instance-deepseek-new",
+                name = draft.name,
+                templateId = draft.templateId,
+                isEnabled = true,
+                isOfficialToolsEnabled = draft.isOfficialToolsEnabled,
+                isFileUploadEnabled = draft.isFileUploadEnabled,
+                sharedApiKey = draft.sharedApiKey,
+                connections = draft.connections,
+            )
+        }
+        val viewModel = createViewModel(repository)
+        viewModel.onAction(ModelServiceDetailAction.Load(null, "deepseek", null))
+        advanceUntilIdle()
+
+        // 新建草稿初始关
+        assertFalse(viewModel.uiState.value.isFileUploadEnabled)
+        assertFalse(viewModel.uiState.value.draft?.isFileUploadEnabled == true)
+
+        viewModel.onAction(ModelServiceDetailAction.SharedApiKeyChanged("sk-deepseek-key"))
+        viewModel.onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.Models))
+        viewModel.onAction(ModelServiceDetailAction.ConfirmModels)
+
+        // 切换开启：不直接写仓库（无实例 ID），仅更新草稿与 UI 状态
+        viewModel.onAction(ModelServiceDetailAction.FileUploadChanged(true))
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { repository.setFileUploadEnabled(any(), any()) }
+        assertTrue(viewModel.uiState.value.isFileUploadEnabled)
+        assertTrue(viewModel.uiState.value.draft?.isFileUploadEnabled == true)
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        // 提交保存：草稿携带 isFileUploadEnabled = true 落盘
+        viewModel.onAction(ModelServiceDetailAction.Save)
+        advanceUntilIdle()
+        assertEquals(ServiceEditorPage.Suggestions, viewModel.uiState.value.page)
+        viewModel.onAction(ModelServiceDetailAction.ConfirmSuggestions)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            repository.saveNewInstance(match { it.templateId == "deepseek" && it.isFileUploadEnabled })
+        }
+        assertTrue(viewModel.uiState.value.isFileUploadEnabled)
+    }
+
+    @Test
     fun independentEnableCommitDoesNotWaitForDraftSave() = runTest {
         val repository = repository(instances = listOf(openAiInstance()))
         val viewModel = createViewModel(repository)
@@ -367,6 +529,7 @@ class ModelServiceDetailViewModelTest {
             saveNewInstance = SaveNewModelInstanceUseCase(repository),
             saveInstance = SaveModelInstanceUseCase(repository),
             setInstanceEnabled = SetModelInstanceEnabledUseCase(repository),
+            setFileUploadEnabled = SetModelInstanceFileUploadUseCase(repository),
             deleteInstance = DeleteModelInstanceUseCase(repository),
             deletionImpact = DeletionImpactUseCase(repository),
             updateDefaults = UpdateDefaultModelSettingsUseCase(repository),
@@ -393,8 +556,12 @@ class ModelServiceDetailViewModelTest {
             every { observeLoadState() } returns MutableStateFlow(
                 github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState.Ready,
             )
-            every { observeTemplates() } returns MutableStateFlow(listOf(template()))
+            every { observeTemplates() } returns MutableStateFlow(
+                listOf(template(), deepSeekTemplate(), miniMaxTemplate()),
+            )
             every { template("openai") } returns template()
+            every { template("deepseek") } returns deepSeekTemplate()
+            every { template("minimax") } returns miniMaxTemplate()
             every { currentInstances() } returns flow.value
             every { currentInstance(any()) } answers {
                 flow.value.firstOrNull { it.id == firstArg<String>() }
@@ -491,6 +658,90 @@ class ModelServiceDetailViewModelTest {
                 capability = ServiceCapability.Realtime,
                 protocol = ApiProtocol.OpenaiChatcompletions,
                 endpoint = "wss://api.openai.com/v1/realtime",
+            ),
+        ),
+    )
+
+    /** 对话只开放 Anthropic Messages 协议的厂商模板（DeepSeek / MiniMax）。 */
+    private fun deepSeekTemplate() = ModelServiceTemplate(
+        id = "deepseek",
+        name = "DeepSeek",
+        connections = listOf(
+            TemplateConnection(
+                capability = ServiceCapability.Conversation,
+                protocols = listOf(ApiProtocol.Anthropic),
+                defaultEndpoints = mapOf(ApiProtocol.Anthropic to "https://api.deepseek.com/anthropic"),
+                endpointPolicy = EndpointPolicy.UserConfigured,
+                endpointSchemes = setOf("http", "https"),
+                catalog = listOf(Model("deepseek-chat", "deepseek-chat")),
+            ),
+        ),
+    )
+
+    private fun deepSeekInstance() = ModelServiceInstance(
+        id = "instance-deepseek",
+        name = "DeepSeek",
+        templateId = "deepseek",
+        isEnabled = true,
+        isOfficialToolsEnabled = true,
+        sharedApiKey = "sk-key",
+        connections = listOf(
+            ServiceConnection(
+                id = "conn-deepseek-conversation",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.Anthropic,
+                endpoint = "https://api.deepseek.com/anthropic",
+                models = listOf(Model("deepseek-chat", "deepseek-chat")),
+            ),
+        ),
+    )
+
+    /** MiniMax 模板：对话固定 Messages，语音仍是厂商自有的 OpenAI 兼容端点。 */
+    private fun miniMaxTemplate() = ModelServiceTemplate(
+        id = "minimax",
+        name = "MiniMax",
+        connections = listOf(
+            TemplateConnection(
+                capability = ServiceCapability.Conversation,
+                protocols = listOf(ApiProtocol.Anthropic),
+                defaultEndpoints = mapOf(
+                    ApiProtocol.OpenaiChatcompletions to "https://api.minimaxi.com/v1",
+                    ApiProtocol.Anthropic to "https://api.minimaxi.com/anthropic",
+                ),
+                endpointPolicy = EndpointPolicy.UserConfigured,
+                endpointSchemes = setOf("http", "https"),
+                catalog = listOf(Model("MiniMax-M2.7", "MiniMax-M2.7")),
+            ),
+            TemplateConnection(
+                capability = ServiceCapability.Recognition,
+                protocols = listOf(ApiProtocol.OpenaiChatcompletions),
+                defaultEndpoints = mapOf(ApiProtocol.OpenaiChatcompletions to "https://api.minimaxi.com/v1"),
+                endpointPolicy = EndpointPolicy.VendorManaged,
+                endpointSchemes = setOf("http", "https"),
+            ),
+        ),
+    )
+
+    private fun miniMaxInstance() = ModelServiceInstance(
+        id = "instance-minimax",
+        name = "MiniMax",
+        templateId = "minimax",
+        isEnabled = true,
+        isOfficialToolsEnabled = true,
+        sharedApiKey = "sk-key",
+        connections = listOf(
+            ServiceConnection(
+                id = "conn-minimax-conversation",
+                capability = ServiceCapability.Conversation,
+                protocol = ApiProtocol.Anthropic,
+                endpoint = "https://api.minimaxi.com/anthropic",
+                models = listOf(Model("MiniMax-M2.7", "MiniMax-M2.7")),
+            ),
+            ServiceConnection(
+                id = "conn-minimax-recognition",
+                capability = ServiceCapability.Recognition,
+                protocol = ApiProtocol.OpenaiChatcompletions,
+                endpoint = "https://api.minimaxi.com/v1",
             ),
         ),
     )

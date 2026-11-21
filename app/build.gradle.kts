@@ -1,7 +1,10 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("gimi.android.application")
     id("gimi.android.compose")
     id("gimi.android.hilt")
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // 配套 APK 随主 App 交付，按构建类型独立生成，安装后使用独立 UID 执行代码。
@@ -15,9 +18,13 @@ listOf("debug", "release").forEach { buildType ->
         }
         into(layout.buildDirectory.dir("generated/environmentAssets/$buildType"))
     }
-    android.sourceSets.getByName(buildType).assets.srcDir(
-        layout.buildDirectory.dir("generated/environmentAssets/$buildType").get().asFile,
-    )
+    // 惰性匹配源集：benchmark 等自定义 buildType 的 SourceSet 在下方 android{} 块才注册，
+    // 顶层脚本执行到此处时尚不存在，getByName 会直接失败。
+    android.sourceSets.matching { it.name == buildType }.configureEach {
+        assets.srcDir(
+            layout.buildDirectory.dir("generated/environmentAssets/$buildType").get().asFile,
+        )
+    }
     // 资产源集的直读消费方（资产合并、lint 分析与模型生成）都需先拷贝配套 APK，
     // 否则 Gradle 隐式依赖校验会构建失败；lintVital 仅 release 存在，lint 分析按变体命名。
     tasks.matching {
@@ -29,6 +36,32 @@ listOf("debug", "release").forEach { buildType ->
             "generate${capitalized}LintModel",
         )
     }.configureEach { dependsOn(packageRuntime) }
+
+    // 产物级防呆：配置缓存/增量状态异常时曾出现“构建成功但 APK 缺配套运行组件”，
+    // 因此绕过中间产物，直接校验最终 APK 的 assets；缺失立即让构建失败。
+    val verifyRuntimeAsset = tasks.register("verify${capitalized}RuntimeAsset") {
+        group = "verification"
+        description = "Verifies assembled $buildType APKs bundle assets/environment-runtime.apk."
+        dependsOn("package$capitalized")
+        val apkDir = layout.buildDirectory.dir("outputs/apk/$buildType")
+        doLast {
+            val apks = apkDir.get().asFile
+                .listFiles { file -> file.isFile && file.extension == "apk" }
+                .orEmpty()
+                .sortedBy { it.name }
+            check(apks.isNotEmpty()) { "No $buildType APK found under ${apkDir.get().asFile.path}." }
+            apks.forEach { apk ->
+                ZipFile(apk).use { zip ->
+                    check(zip.getEntry("assets/environment-runtime.apk") != null) {
+                        "${apk.name} is missing assets/environment-runtime.apk; " +
+                            "the bundled runtime was not packaged, refusing to produce an incomplete APK."
+                    }
+                }
+            }
+        }
+    }
+    tasks.matching { it.name in setOf("assemble$capitalized", "install$capitalized") }
+        .configureEach { dependsOn(verifyRuntimeAsset) }
 }
 
 android {
@@ -190,6 +223,13 @@ dependencies {
         "releaseRuntimeClasspath",
         "releaseCompileClasspath",
         "releaseRuntimeOnly",
+        // baselineprofile 插件自建的基准变体同样跑 R8，需一并排除。
+        "benchmarkReleaseRuntimeClasspath",
+        "benchmarkReleaseCompileClasspath",
+        "benchmarkReleaseRuntimeOnly",
+        "nonMinifiedReleaseRuntimeClasspath",
+        "nonMinifiedReleaseCompileClasspath",
+        "nonMinifiedReleaseRuntimeOnly",
     )
     configurations.configureEach {
         if (name in kxml2ExcludedConfigurations) {
@@ -220,6 +260,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.profileinstaller)
+    // 基线配置生产者：生成任务经 :baselineprofile 连接运行后回写 app/src/main/baseline-prof.txt。
+    baselineProfile(project(":baselineprofile"))
     testImplementation(libs.gson)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -227,6 +270,19 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    // compose 测试构件无版本号，跟随 BOM 对齐。
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    kspAndroidTest(libs.hilt.android.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
 
+// androidx.test 系（junit 1.3.0）传递 concurrent-futures 1.2.0，与主图 androidx.core
+// 钉住的 1.1.0 在 AGP 9 的一致性解析下互相冲突；统一对齐到主图已解析的 1.1.0。
+configurations.configureEach {
+    resolutionStrategy {
+        force("androidx.concurrent:concurrent-futures:1.1.0")
+        force("androidx.concurrent:concurrent-futures-ktx:1.1.0")
+    }
 }

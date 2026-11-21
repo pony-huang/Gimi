@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.ui.components
 
 import android.content.res.Configuration
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -14,12 +15,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
-/** 紧凑开关：36×22dp 轨道保留 48dp 触控区域；整行处理点击时传入空回调，避免重复语义。 */
+/**
+ * M3 规范化的紧凑开关：44×26dp 轨道保留 48dp 触控区域；整行处理点击时传入空回调，避免重复语义。
+ *
+ * - 未选中态：`surfaceContainerHighest` 轨道 + `1.5dp outline` 描边（>= 3:1 对比度）+ `14dp outline` 拇指；
+ * - 选中态：`primary` 轨道（无外描边）+ `18dp onPrimary` 拇指（带 M3 拇指尺寸缩放过渡）。
+ */
 @Composable
 fun GimiSwitch(
     checked: Boolean,
@@ -28,15 +37,34 @@ fun GimiSwitch(
     enabled: Boolean = true,
 ) {
     val position by animateFloatAsState(if (checked) 1f else 0f, label = "switchPosition")
-    val track by animateColorAsState(
-        (if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-            .copy(alpha = if (enabled) 1f else 0.38f),
+    val thumbRadiusDp by animateDpAsState(if (checked) 9.dp else 7.dp, label = "switchThumbRadius")
+    val scheme = MaterialTheme.colorScheme
+    val trackColor by animateColorAsState(
+        targetValue = when {
+            !enabled && checked -> scheme.onSurface.copy(alpha = 0.12f)
+            !enabled -> scheme.surfaceContainerHighest.copy(alpha = 0.12f)
+            checked -> scheme.primary
+            else -> scheme.surfaceContainerHighest
+        },
         label = "switchTrack",
     )
-    // 选中态拇指用 onPrimary（与 primary 轨道成对）；未选中态轨道是中性描边色，
-    // 拇指必须换用中性文字色，否则深色主题下会变成深蓝压深灰、几乎看不见。
-    val thumbColor = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    val thumb = thumbColor.copy(alpha = if (enabled) 1f else 0.38f)
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            checked -> Color.Transparent
+            !enabled -> scheme.onSurface.copy(alpha = 0.12f)
+            else -> scheme.outline
+        },
+        label = "switchBorder",
+    )
+    val thumbColor by animateColorAsState(
+        targetValue = when {
+            !enabled && checked -> scheme.surface
+            !enabled -> scheme.onSurface.copy(alpha = 0.38f)
+            checked -> scheme.onPrimary
+            else -> scheme.outline
+        },
+        label = "switchThumb",
+    )
     Box(
         modifier = modifier.size(48.dp).then(
             if (onCheckedChange == null) Modifier else Modifier.toggleable(
@@ -45,10 +73,24 @@ fun GimiSwitch(
         ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(36.dp, 22.dp)) {
-            drawRoundRect(track, cornerRadius = CornerRadius(size.height / 2))
-            val progress = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) 1f - position else position
-            drawCircle(thumb, radius = 8.dp.toPx(), center = Offset(11.dp.toPx() + 14.dp.toPx() * progress, size.height / 2))
+        Canvas(Modifier.size(44.dp, 26.dp)) {
+            val radius = CornerRadius(size.height / 2)
+            drawRoundRect(trackColor, cornerRadius = radius)
+            if (borderColor.alpha > 0f) {
+                drawRoundRect(
+                    color = borderColor,
+                    cornerRadius = radius,
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+            }
+            val progress = if (layoutDirection == LayoutDirection.Rtl) 1f - position else position
+            val startX = 13.dp.toPx()
+            val endX = size.width - 13.dp.toPx()
+            drawCircle(
+                color = thumbColor,
+                radius = thumbRadiusDp.toPx(),
+                center = Offset(startX + (endX - startX) * progress, size.height / 2),
+            )
         }
     }
 }

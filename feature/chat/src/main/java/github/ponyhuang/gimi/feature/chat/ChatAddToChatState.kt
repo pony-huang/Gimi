@@ -32,6 +32,10 @@ data class ChatAddToChatState(
     /** Full access 全局开关：开启后所有需要确认的工具调用自动放行。 */
     val fullAccess: Boolean = false,
     val errorMessage: String? = null,
+    /** 当前选择实例的厂商模板 ID；抽屉"文件"行据此展示厂商图标。 */
+    val vendorTemplateId: String? = null,
+    /** Chatbot 仅开放本模型的联网工具，附件抽屉按此参数控制 MCP 入口。 */
+    val allowMcp: Boolean = true,
 ) {
     val enabledMcpServerCount: Int
         get() = configuration?.enabledMcpServerIds.orEmpty().count { enabledId ->

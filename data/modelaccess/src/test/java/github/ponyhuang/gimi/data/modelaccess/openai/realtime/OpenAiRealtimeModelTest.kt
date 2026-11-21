@@ -33,8 +33,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /**
  * OpenAI Realtime 模型的 WebSocket 边界：握手后第一帧是 session.update、
@@ -339,6 +339,56 @@ class OpenAiRealtimeModelTest {
         assertTrue(responses!!.all { it.content?.parts.orEmpty().none { part -> part.functionCall != null } })
         assertTrue(responses.all { it.turnComplete == true })
         connection.closeSession()
+    }
+
+    @Test
+    fun manualSubmissionCancelsAndSuppressesOldResponseUntilNextCreated() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val transcripts = java.util.concurrent.CopyOnWriteArrayList<String>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = JsonParser.parseString(text).asJsonObject.get("type").asString
+                controls += type
+                when (type) {
+                    "session.update" -> {
+                        webSocket.send("""{"type":"session.updated"}""")
+                        webSocket.send("""{"type":"response.created"}""")
+                        webSocket.send("""{"type":"response.output_item.added","item":{"type":"message","role":"assistant","id":"old-answer"}}""")
+                        webSocket.send("""{"type":"response.output_audio_transcript.delta","delta":"旧回答"}""")
+                    }
+                    "response.cancel" -> {
+                        webSocket.send("""{"type":"response.output_audio_transcript.delta","delta":"旧尾音"}""")
+                        webSocket.send("""{"type":"response.done","response":{"status":"cancelled"}}""")
+                    }
+                    "response.create" -> {
+                        webSocket.send("""{"type":"response.created"}""")
+                        webSocket.send("""{"type":"response.output_audio_transcript.delta","delta":"新回答"}""")
+                    }
+                }
+            }
+        }))
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) {
+            runCatching { connection.receive().collect { it.outputTranscription?.text?.let(transcripts::add) } }
+        }
+        try {
+            val ready = withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("旧回答" !in transcripts) delay(10); true }
+            }
+            assertEquals(true, ready)
+            val sink = connection as github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
+            sink.submitUserContent(Content.fromText(Role.USER, "改成一句话"))
+            val answered = withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("新回答" !in transcripts) delay(10); true }
+            }
+            assertEquals(true, answered)
+            assertEquals(listOf("旧回答", "新回答"), transcripts.toList())
+            assertEquals(listOf("response.cancel", "conversation.item.truncate", "input_audio_buffer.clear",
+                "conversation.item.create", "response.create"), controls.drop(1))
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
     }
 
     private companion object {

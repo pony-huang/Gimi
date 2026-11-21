@@ -3,6 +3,8 @@ package github.ponyhuang.gimi.data.modelcatalog.remote
 import github.ponyhuang.gimi.core.common.coroutine.IoDispatcher
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.OmniModels
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
@@ -45,7 +47,15 @@ class OpenAiCompatibleModelServiceGateway @Inject constructor(
             executeWithCatalogFallback(connection).use { response ->
                 check(response.isSuccessful) { "Model list request failed with HTTP ${response.code}" }
                 json.decodeFromString<OpenAiModelsResponse>(response.body.string()).data
-                    .filter { it.id.isNotBlank() }.distinctBy { it.id }.map { Model(it.id, it.id) }
+                    .filter { it.id.isNotBlank() }.distinctBy { it.id }.map { item ->
+                        val isOmni = OmniModels.isOmniModel(item.id)
+                        val capabilities = if (isOmni) {
+                            setOf(ModelCapability.LLM, ModelCapability.Omni)
+                        } else {
+                            setOf(ModelCapability.LLM)
+                        }
+                        Model(id = item.id, name = item.id, capabilities = capabilities)
+                    }
             }
         }
 

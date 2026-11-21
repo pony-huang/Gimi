@@ -87,6 +87,7 @@ class EventMapperUserInputResponseTest {
         every { errorCode } returns null
         every { errorMessage } returns null
         every { timestamp } returns 123L
+        every { customMetadata } returns null
     }
 
     private fun assistantCallEvent(call: FunctionCall): Event = mockk {
@@ -101,5 +102,6 @@ class EventMapperUserInputResponseTest {
         every { errorCode } returns null
         every { errorMessage } returns null
         every { timestamp } returns 100L
+        every { customMetadata } returns null
     }
 }

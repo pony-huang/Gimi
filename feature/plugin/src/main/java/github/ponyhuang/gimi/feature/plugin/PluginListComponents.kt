@@ -33,13 +33,17 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
 import github.ponyhuang.gimi.ui.theme.GimiTheme
+import github.ponyhuang.gimi.ui.theme.LocalGimiDarkTheme
 
-/** 目录 iconKey 到宿主内置矢量图的映射；未知 key 回退通用插件图标。 */
-internal fun pluginStoreIconResource(iconKey: String): Int = when (iconKey) {
+/** 目录 iconKey 到宿主内置矢量图的映射；未知 key 回退通用插件图标。
+ * 深色变体由调用方按应用内主题显式选择（与 LLMModelServiceIcon 同一约定），
+ * 不用 `res/drawable-night/` 限定符：手动锁定夜间时系统 uiMode 不命中。
+ */
+internal fun pluginStoreIconResource(iconKey: String, darkTheme: Boolean): Int = when (iconKey) {
     "netease" -> R.drawable.ic_plugin_netease
     "spotify" -> R.drawable.ic_plugin_spotify
     "zhihu" -> R.drawable.ic_plugin_zhihu
-    "v2ex" -> R.drawable.ic_plugin_v2ex
+    "v2ex" -> if (darkTheme) R.drawable.ic_plugin_v2ex_night else R.drawable.ic_plugin_v2ex
     "weibo" -> R.drawable.ic_plugin_weibo
     "xiaohongshu" -> R.drawable.ic_plugin_xiaohongshu
     else -> R.drawable.ic_plugin_default
@@ -77,7 +81,7 @@ internal fun PluginIcon(
                 contentScale = ContentScale.Fit,
             )
         } else {
-            val iconRes = pluginStoreIconResource(iconKey)
+            val iconRes = pluginStoreIconResource(iconKey, LocalGimiDarkTheme.current)
             Image(
                 painter = painterResource(iconRes),
                 contentDescription = null,

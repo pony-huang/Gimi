@@ -4,6 +4,7 @@ import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -25,6 +26,7 @@ import kotlinx.coroutines.launch
 internal class ChatToolConfigurationCoordinator(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val scope: CoroutineScope,
+    @AssistantConversationPartition
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,

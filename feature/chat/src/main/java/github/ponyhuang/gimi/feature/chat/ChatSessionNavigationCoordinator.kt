@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import kotlinx.coroutines.CancellationException
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 internal class ChatSessionNavigationCoordinator(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val scope: CoroutineScope,
+    @AssistantConversationPartition
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val runtimeFor: (String) -> ChatSessionRuntime,
@@ -111,6 +113,20 @@ internal class ChatSessionNavigationCoordinator(
 
     /** 新建会话后仅在导航版本未变化时切入；旧会话执行仍可在后台继续。 */
     fun newConversation() {
+        val currentSessionId = uiState.value.sessionId
+        val currentRuntime = runtimeOrNull(currentSessionId)
+        val isCurrentNew = currentSessionId.isNotBlank() &&
+            !uiState.value.isInitializing &&
+            loadingSessionId == null &&
+            uiState.value.messages.isEmpty() &&
+            !uiState.value.isAgentRunning &&
+            (currentRuntime == null || (!currentRuntime.isActive && currentRuntime.messages.isEmpty()))
+
+        if (isCurrentNew) {
+            emitNotice(ChatNotice.AlreadyNewConversation)
+            return
+        }
+
         navigationVersion++
         val navigationAtReset = navigationVersion
         scope.launch {

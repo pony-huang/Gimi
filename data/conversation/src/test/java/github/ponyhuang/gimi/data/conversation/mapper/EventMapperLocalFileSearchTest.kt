@@ -46,6 +46,7 @@ class EventMapperLocalFileSearchTest {
             every { errorCode } returns null
             every { errorMessage } returns null
             every { timestamp } returns 123L
+            every { customMetadata } returns null
         }
 
         val result = EventMapper.fromEvent(event)

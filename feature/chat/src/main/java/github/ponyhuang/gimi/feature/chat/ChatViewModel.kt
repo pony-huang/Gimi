@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
@@ -13,6 +19,7 @@ import github.ponyhuang.gimi.domain.conversation.usecase.ChatHistorySnapshot
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -39,7 +46,6 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.voice.usecase.markdownToSpeechText
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
-import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
@@ -75,6 +81,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     agentRuntimeGate: AgentRuntimeGate,
+    @AssistantConversationPartition
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,
@@ -87,6 +94,8 @@ class ChatViewModel @Inject constructor(
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val speechSettings: SpeechSettingsRepository,
     private val attachments: ChatAttachmentRepository,
+    private val fileUploadGateway: github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway,
+    private val fileUploadRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
     private val prepareChatSend: PrepareChatSendUseCase,
     private val validateChatAttachments: ValidateChatAttachmentsUseCase,
     officialFunctionCatalog: OfficialToolFunctionCatalog,
@@ -99,6 +108,18 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val fileUploads = ChatFileUploadCoordinator(
+        scope = viewModelScope,
+        gateway = fileUploadGateway,
+        registry = fileUploadRegistry,
+        resolveConnection = { selection -> modelServices.resolveConnection(selection) },
+        isFileUploadEnabled = { selection ->
+            modelServices.currentInstances().firstOrNull { it.id == selection.instanceId }
+                ?.findModel(selection)?.multimodal?.documentInput?.ingestMode ==
+                github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE
+        },
+    )
 
     private val voiceDictation = VoiceDictationCoordinator(
         scope = viewModelScope,
@@ -182,7 +203,7 @@ class ChatViewModel @Inject constructor(
         emitNotice = ::emitNotice,
     )
 
-    /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
+    /** 命令式副作用通道（打开外部 URL），由 Route 消费；见 [ChatEffect]。 */
     val effects = _effects.asSharedFlow()
 
     /**
@@ -213,6 +234,7 @@ class ChatViewModel @Inject constructor(
             is ChatAction.SwitchSession -> sessionNavigationCoordinator.switchSession(action.sessionId)
             ChatAction.RefreshConversations -> refreshConversations()
             is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
+            is ChatAction.DeleteUploadedFile -> deleteUploadedFile(action.entry)
             is ChatAction.RecentConversations -> {
                 if (action.action == RecentConversationsAction.ConfirmDeletion) {
                     deleteSelectedConversations()
@@ -233,12 +255,13 @@ class ChatViewModel @Inject constructor(
             )
             is ChatAction.LoadOfficialToolFunctions -> toolConfigurationCoordinator.loadFunctions(action.toolId)
             ChatAction.ClearToolConfigurationError -> toolConfigurationCoordinator.clearError()
+            ChatAction.ConsumeNotice -> _uiState.update { it.copy(notice = null) }
         }
     }
 
-    /** 向 [effects] 通道发射一条一次性提示，由 Route 消费（Toast 等）。 */
+    /** 一次性提示以 UiState 承载：呈现前不丢失，呈现后由 Route 经 ConsumeNotice 清除。 */
     private fun emitNotice(notice: ChatNotice) {
-        _effects.tryEmit(ChatEffect.ShowNotice(notice))
+        _uiState.update { it.copy(notice = notice) }
     }
 
     fun transcribeVoice(
@@ -267,6 +290,12 @@ class ChatViewModel @Inject constructor(
      * 字段；UI 只订阅 `uiState` 一条流即可同时拿到消息、streaming 标志、会话 id 与会话列表。
      */
     init {
+        viewModelScope.launch {
+            fileUploads.states.collect { states ->
+                _uiState.update { it.copy(draftUploadStates = states) }
+            }
+        }
+
         viewModelScope.launch {
             repository.conversations.collect { convs ->
                 _uiState.update { state ->
@@ -528,6 +557,75 @@ class ChatViewModel @Inject constructor(
 
     private var resolvingSubmission = false
 
+    /** 触发文档草稿的厂商上传（chip 阶段预热）；重试复用同一路径。 */
+    fun uploadDocumentDraft(draft: DraftAttachment) {
+        val selection = _uiState.value.currentModelSelection ?: return
+        fileUploads.upload(draft, selection)
+    }
+
+    /** 清理上传状态：附件移除或发送完成后调用。 */
+    fun clearDocumentUploads(references: Collection<String>) {
+        fileUploads.clear(references)
+    }
+
+    /** 当前厂商已上传文件的注册记录；抽屉"上传的文件"列表数据源（按当前厂商过滤）。 */
+    val uploadedFiles: StateFlow<List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry>> =
+        _uiState
+            .map { state ->
+                val selection = state.currentModelSelection
+                state.availableLLMModelSettings
+                    .firstOrNull { it.id == selection?.instanceId }?.templateId
+            }
+            .distinctUntilChanged()
+            .flatMapLatest { vendor ->
+                if (vendor == null) {
+                    flowOf(emptyList())
+                } else {
+                    fileUploadRegistry.entriesFor(vendor)
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _attachFileRequests =
+        kotlinx.coroutines.flow.MutableSharedFlow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry>(
+            extraBufferCapacity = 4,
+        )
+
+    /** 抽屉点击"上传的文件"后的回填请求；聊天页据此把 file 引用草稿插入输入框。 */
+    val attachFileRequests: kotlinx.coroutines.flow.SharedFlow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> =
+        _attachFileRequests
+
+    /** 抽屉复用：请求把已上传文件回填为输入框 chip（同厂商 file_id 即就绪态）。 */
+    fun requestAttachVendorFile(entry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) {
+        _attachFileRequests.tryEmit(entry)
+    }
+
+    /** 删除已上传文件：厂商侧删除成功后本地注册表由网关同步移除，失败仅提示保留条目。 */
+    private fun deleteUploadedFile(entry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) {
+        val resolved = modelServices.resolveConnection(_uiState.value.currentModelSelection)
+        // 列表按当前厂商过滤；厂商不一致或无法解析连接时直接视为失败，不发请求。
+        if (resolved == null || resolved.templateId != entry.vendor) {
+            emitNotice(ChatNotice.UploadedFileDeleteFailed)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val result = fileUploadGateway.deleteFile(
+                    entry.vendor, resolved.protocol, resolved.endpoint, resolved.apiKey, entry.fileId,
+                )
+                if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
+                    Log.w(TAG, "Vendor file delete failed: ${result.reason}")
+                    emitNotice(ChatNotice.UploadedFileDeleteFailed)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.w(TAG, "Vendor file delete crashed", failure)
+                emitNotice(ChatNotice.UploadedFileDeleteFailed)
+            }
+        }
+    }
+
     /** 发送只回报真实接管结果；准备过程属于 ViewModel，不依赖输入框协程的生命周期。 */
     fun send(
         text: String,
@@ -537,6 +635,10 @@ class ChatViewModel @Inject constructor(
         var ownsResolution = false
         val submission = ChatSubmission { result ->
             if (ownsResolution) resolvingSubmission = false
+            // 发送被接受即本轮附件已消费：清理对应上传状态，不让 Failed/Ready 跨轮残留。
+            if (result == ChatSubmissionResult.ACCEPTED && draftAttachments.isNotEmpty()) {
+                fileUploads.clear(draftAttachments.map(DraftAttachment::reference))
+            }
             onResult(result)
         }
         val state = _uiState.value

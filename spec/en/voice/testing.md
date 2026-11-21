@@ -38,12 +38,12 @@ in `data:modelcatalog` (covering both Realtime templates):
 | `VoiceCapabilityRegistryTest` | Resolution by `(serviceId, capability)`, unregistered capabilities fail explicitly, Realtime availability follows the native adapter declaration |
 | `DefaultSpeechRepositoriesTest` | Recognition requires a configured STT model, results trimmed, synthesis takes the first key |
 | `DefaultTtsVoiceRepositoryTest` | Routing by serviceId, cache key includes modelId |
-| `SimpleChatPromptPreferencesTest` | Preset CRUD, corrupt data discarded, official presets are selectable but not deletable, description round-trip |
+| `data:conversation` / `ChatbotRolePreferencesTest` | Role CRUD, corrupt data discarded, built-in roles read-only, per-conversation selection isolation, reset after role deletion, description round-trip |
 | `SpeechSettingsPreferencesTest` | Auto-playback off by default and preserved across instances |
 | `VoiceAudioDeviceSelectionTest` | Connect order beats platform order, manual choice not overridden, stepwise fallback on disconnect |
 | `VoiceAudioRoutingControllerTest` | Manual selection persists, disconnect clears preference, rejection keeps the actual device, `close()` restores |
 | `VoiceSessionLifecycleTest` | Concurrent `close()` releases once and both callers await completion |
-| `InMemoryRealtimeVoiceCallControllerTest` | Re-entry waits for old resources, mode switch waits for flush/close, `Persistence` blocks switching, both entries idempotent, Realtime mode adopts the configured default selection and voice, no session is created without one |
+| `InMemoryRealtimeVoiceCallControllerTest` | Re-entry waits for old resources, configuration switching waits for flush/close, `Persistence` blocks switching, both entries idempotent, native realtime resolves model and voice from the effective configuration, no session is created without one |
 | `RealtimeVoiceCallNotificationContentTest` | Snapshot collapse priority, high-frequency voice updates do not change the snapshot, state reset drives service exit |
 
 Related tests outside `data:voice`: `core:audio`'s `VoiceActivitySegmenterTest` /
@@ -56,18 +56,20 @@ Prompt presets:
 
 | File | Contract verified |
 |---|---|
-| `domain:voice`'s `BuiltInVoicePresetsTest` | The official catalog ships unique, non-blank presets whose bodies keep the realtime section skeleton (Role … Escalation) |
+| `domain:conversation`'s `BuiltInChatbotRolesTest` | The official catalog ships unique, non-blank presets whose bodies keep the realtime section skeleton (Role … Escalation) |
 | `feature:chat`'s `SimpleChatPromptViewModelTest` | A new preset is stored with a generated id, blank input is dropped, editing keeps the id, official presets are listed and viewable without entering the editor |
 
-Tests for the default Realtime selection:
+Tests for the default Realtime model and the voice-conversation global defaults:
 
 | File | Contract verified |
 |---|---|
 | `:data:modelaccess`'s `VoiceLiveModelFactoryTest` | Realtime/cascade dispatch by capability marker, uplink contract from the adapter declaration, session voice defaults per model generation, custom voice overrides the default |
-| `data:modelcatalog`'s `ModelServiceConfigurationPersistenceTest` | Default Realtime model and voice override survive a restart and can be cleared; the service-level voice field is gone |
-| `feature:modelsettings`'s `DefaultModelSettingsRealtimeTest` | Candidates only cover services declaring a native adapter, voice options follow the selected model, a custom voice is bound to its model, clearing model and clearing voice are separate writes |
-| `feature:modelsettings`'s `DefaultModelSettingsViewModelCharacterizationTest` | The existing capability grouping and TTS voice fallback are unaffected by the Realtime defaults |
+| `data:modelcatalog`'s `ModelServiceConfigurationPersistenceTest` | Default Realtime model and the catalog-level voice override survive a restart and can be cleared; the service-level voice field is gone (runtime voice resolution now goes conversation override → per-model memory → vendor default and no longer reads the catalog-level override) |
+| `feature:modelsettings`'s `DefaultModelSettingsRealtimeTest` | Candidates only cover services declaring a native adapter; clearing the Realtime model writes no selection; pipeline starts from the global defaults and selecting it updates them; semi-cascaded selection is rejected |
+| `feature:modelsettings`'s `DefaultModelSettingsViewModelCharacterizationTest` | The existing capability grouping and TTS voice fallback are unaffected by the voice-conversation defaults |
 
 Both `data:voice` and `core:audio` have a `test` source set and **no
 `androidTest`**. Microphone, AEC, Bluetooth routing, and `AudioTrack` can
 therefore only be verified on hardware; CI cannot catch them.
+
+Chatbot role and navigation coverage also includes `SimpleChatPromptViewModelTest` for per-conversation selection, unbound management and built-in role copying; `RealtimeVoiceViewModelTest` for waiting for call cleanup, latest navigation intent, retained model capabilities and mode-safe startup; `AgentChatRunnerCacheTest` for per-role runtime reuse; and both vendor protocol tests for instruction-only session updates. `AdkVoiceAudioBackendTest` verifies explicit conversation binding for cascaded and native Chatbot calls.

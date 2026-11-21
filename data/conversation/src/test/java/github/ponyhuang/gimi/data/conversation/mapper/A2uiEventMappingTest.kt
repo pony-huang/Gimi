@@ -61,5 +61,6 @@ class A2uiEventMappingTest {
         every { errorCode } returns null
         every { errorMessage } returns null
         every { timestamp } returns 1L
+        every { customMetadata } returns null
     }
 }

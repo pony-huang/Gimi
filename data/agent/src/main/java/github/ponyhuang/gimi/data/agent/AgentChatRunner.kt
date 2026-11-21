@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.ResumabilityConfig
+import com.google.adk.kt.agents.ToolExecutionMode
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.memory.MemoryService
@@ -15,6 +16,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
@@ -23,7 +25,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 
 /**
  * 共享 Agent/Runner 的构建与缓存入口，为每轮聊天创建独立的执行句柄。
@@ -58,9 +60,10 @@ class AgentChatRunner(
             pluginRuntime = PluginRuntimeSnapshot(0L, emptyList()),
         )
     },
-    private val plugins: (PluginRuntimeSnapshot<AgentPlugin>) -> List<Plugin> = { emptyList() },
+    private val plugins: (PluginRuntimeSnapshot<AgentPlugin>, AgentProfile) -> List<Plugin> = { _, _ -> emptyList() },
     private val toolAccessRepository: ToolAccessRepository,
     private val mobileUseController: MobileUseController? = null,
+    private val chatbotRoleContent: (String) -> String? = { null },
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -70,6 +73,7 @@ class AgentChatRunner(
      * @property thinkingEnabled 是否开启思考，防止复用开关状态不同的 Agent。
      * @property reasoningEffort 当前会话的推理强度。
      * @property voiceResponse 是否使用语音表达契约，防止与文字格式的运行时混用。
+     * @property profile Agent 形态；助手形态与 Chatbot 形态是两个不同的 Agent，不互相复用。
      * @property revision 构建时的外部配置版本（各贡献方 revision 的组合，
      *   含工具授权/MCP/模型目录/插件运行时）。
      */
@@ -81,6 +85,7 @@ class AgentChatRunner(
         val instructionSuffix: String,
         val voiceResponse: Boolean,
         val a2uiSupported: Boolean,
+        val profile: AgentProfile,
         val revision: Any,
     )
 
@@ -101,10 +106,11 @@ class AgentChatRunner(
     private fun buildRunner(
         agent: BaseAgent,
         pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+        profile: AgentProfile,
     ): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
-            plugins = plugins(pluginRuntime),
+            plugins = plugins(pluginRuntime, profile),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
             // 对话摘要压缩
@@ -125,14 +131,21 @@ class AgentChatRunner(
         a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
         instructionSuffix: String = "",
         voiceResponse: Boolean = false,
+        profile: AgentProfile = AgentProfile.ASSISTANT,
+        toolExecutionMode: ToolExecutionMode = ToolExecutionMode.PARALLEL,
     ): AgentChatExecution {
-        val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
+        // Chatbot 形态固定直接声明工具：它只挂联网检索工具，不需要检索网关来按需加载。
+        val toolAccessMode = when (profile) {
+            AgentProfile.ASSISTANT -> toolAccessRepository.defaultToolAccessMode.value
+            AgentProfile.CHATBOT -> ToolAccessMode.ALWAYS_AVAILABLE
+        }
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
         val thinkingEnabled = toolConfiguration?.thinkingEnabled ?: true
         val buildConfiguration = configuration()
         // 无 capabilities 的执行端（如实时语音）不声明 generate_a2ui；构建产物按此分键缓存。
         val a2uiSupported = a2uiCapabilities != null
-        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, voiceResponse, a2uiSupported, buildConfiguration.revision)
+        val resolvedInstruction = if (profile == AgentProfile.CHATBOT) chatbotRoleContent(sessionId).orEmpty() else instructionSuffix
+        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, resolvedInstruction, voiceResponse, a2uiSupported, profile, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
                 AgentBuildSpec(
@@ -141,14 +154,15 @@ class AgentChatRunner(
                     reasoningEffort = reasoningEffort,
                     thinkingEnabled = thinkingEnabled,
                     pluginRuntime = buildConfiguration.pluginRuntime,
-                    instructionSuffix = instructionSuffix,
+                    instructionSuffix = resolvedInstruction,
                     voiceResponse = voiceResponse,
                     a2uiSupported = a2uiSupported,
+                    profile = profile,
                 ),
             ).let { agentRuntime ->
                 SharedRuntime(
                     modelRuntime = agentRuntime.modelRuntime,
-                    runner = buildRunner(agentRuntime.agent, buildConfiguration.pluginRuntime),
+                    runner = buildRunner(agentRuntime.agent, buildConfiguration.pluginRuntime, profile),
                 ).also { runtimes[key] = it }
             }
             while (runtimes.size > MAX_CACHED_RUNTIMES) {
@@ -160,11 +174,19 @@ class AgentChatRunner(
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
                 mobileUseOwner = UUID.randomUUID().toString(),
             )
-            AgentChatExecution(userId, sessionId, runtime.runner, metadata + buildMap {
-                a2uiCapabilities?.let {
-                    put(github.ponyhuang.gimi.data.agent.a2ui.GenerateA2uiTool.CAPABILITIES_KEY, kotlinx.serialization.json.Json.encodeToString(it))
-                }
-            }, mobileUseController)
+            AgentChatExecution(
+                userId = userId,
+                sessionId = sessionId,
+                runner = runtime.runner,
+                customMetadata = metadata + buildMap {
+                    a2uiCapabilities?.let {
+                        put(github.ponyhuang.gimi.data.agent.a2ui.GenerateA2uiTool.CAPABILITIES_KEY, kotlinx.serialization.json.Json.encodeToString(it))
+                    }
+                },
+                mobileUseController = mobileUseController,
+                emitSessionTitle = profile == AgentProfile.CHATBOT,
+                toolExecutionMode = toolExecutionMode,
+            )
         }
     }
 

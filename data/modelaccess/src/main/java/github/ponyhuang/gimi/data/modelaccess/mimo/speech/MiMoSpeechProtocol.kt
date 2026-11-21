@@ -25,7 +25,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.ByteString.Companion.decodeBase64
 import okio.ByteString.Companion.toByteString
-import github.ponyhuang.gimi.data.modelaccess.shared.encodePcm16Wav
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
 import github.ponyhuang.gimi.data.modelaccess.shared.awaitSpeechRecognitionBody
 
 /** MiMo 语音服务标识；与模型目录中的服务 ID 一致。 */

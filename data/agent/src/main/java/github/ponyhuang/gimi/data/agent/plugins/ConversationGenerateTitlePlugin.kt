@@ -13,7 +13,9 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
+import github.ponyhuang.gimi.domain.conversation.model.CONVERSATION_TITLE_STATE_KEY
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.ConversationTitle
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
@@ -25,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
  * @author pony
  */
 class ConversationGenerateTitlePlugin(
-    private val agentLLMModelFactory: AgentLLMModelFactory,
+    private val agentLLMModelFactory: AgentModelRuntime,
     override val name: String = "conversation_plugin"
 ) : Plugin {
 
@@ -96,16 +98,15 @@ class ConversationGenerateTitlePlugin(
 
     private fun isTitleFlowCompleted(context: CallbackContext): Boolean =
         context.state[STATE_TITLE_FLOW_COMPLETED] == true ||
-                !((context.state[STATE_TITLE] as? String).isNullOrBlank())
+                !((context.state[CONVERSATION_TITLE_STATE_KEY] as? String).isNullOrBlank())
 
     private fun completeTitleFlow(context: CallbackContext, title: String) {
-        context.updateState(STATE_TITLE, title)
+        context.updateState(CONVERSATION_TITLE_STATE_KEY, title)
         context.updateState(STATE_TITLE_FLOW_COMPLETED, true)
     }
 
     private companion object {
         const val TAG = "conversation.plugin"
-        const val STATE_TITLE = "conversation.title"
         const val STATE_TITLE_FLOW_COMPLETED = "conversation.title.completed"
         const val MAX_PROMPT_TEXT_LENGTH = 2_000
         const val PENDING_TITLE_TTL_MILLIS = 5 * 60 * 1_000L
@@ -162,6 +163,16 @@ class ConversationGenerateTitlePlugin(
         // 获取最终结果
         val pending = pendingTitles[context.invocationId]
         if (pending != null && !response.partial) {
+            // 厂商适配器开启会话标题时（如 DeepSeek Chatbot 场景），首轮响应顺带返回标题；
+            // 命中即完成标题流，省掉独立的标题模型请求。
+            val inlineTitle = (response.customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) as? String)
+                ?.let(ConversationTitle::generated)
+            if (inlineTitle != null) {
+                pendingTitles.remove(context.invocationId)
+                completeTitleFlow(context, inlineTitle)
+                Log.i(TAG, "Inline conversation title captured for ${context.invocationId}: $inlineTitle")
+                return response
+            }
             response.content?.parts
                 ?.filter { it.thought != true }
                 ?.mapNotNull { it.text }

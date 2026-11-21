@@ -8,8 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
-import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
-import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -18,19 +16,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -41,17 +40,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -61,11 +59,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
+import github.ponyhuang.gimi.feature.chat.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.delay
@@ -124,6 +126,7 @@ public fun ChatComposer(
     retainExpanded: Boolean = false,
     onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
+    onOpenVoice: (() -> Unit)? = null,
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onFullAccessChange: (Boolean) -> Unit = { _ -> },
@@ -131,10 +134,26 @@ public fun ChatComposer(
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
     onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
+    /** 文档草稿的厂商上传状态（键为草稿 reference）；chip 三态与发送门控的数据源。 */
+    uploadedFiles: List<UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (UploadedFileEntry) -> Unit = {},
+    onUploadedFileDelete: (UploadedFileEntry) -> Unit = {},
+    attachmentUploadStates: Map<String, DraftUploadState> = emptyMap(),
+    /** 当前选择是否启用厂商文件上传；决定文档草稿是否需要预热上传与发送门控。 */
+    isFileUploadEnabled: Boolean = false,
+    /** 上传失败的 chip 原地重试。 */
+    onRetryAttachmentUpload: (DraftAttachment) -> Unit = {},
+    /** 新导入的文档草稿触发厂商上传（仅启用上传链路时实际生效）。 */
+    onDocumentDraftImported: (DraftAttachment) -> Unit = {},
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
     attachmentsEnabled: Boolean = true,
+    /** 控制会话权限入口；Chatbot 使用固定的联网工具白名单。 */
+    showPermissionOption: Boolean = true,
     headerContent: @Composable () -> Unit = {},
+    /** 实时通话嵌入同一胶囊时由外层处理 IME、安全区与容器。 */
+    embedded: Boolean = false,
+    inputContent: (@Composable (ComposerInputContentParams) -> Unit)? = null,
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
     val onDraftChange by rememberUpdatedState(onMessageDataChange)
@@ -143,7 +162,12 @@ public fun ChatComposer(
     val onCancelTranscription by rememberUpdatedState(onCancelVoiceTranscription)
     val currentIsGenerating by rememberUpdatedState(isGenerating)
     val currentTranscriptionMode by rememberUpdatedState(voiceTranscriptionMode)
+    val currentOnRetryUpload by rememberUpdatedState(onRetryAttachmentUpload)
+    val currentOnDocumentDraftImported by rememberUpdatedState(onDocumentDraftImported)
     var isSubmitting by remember { mutableStateOf(false) }
+
+    // 上传链路启用时，未拿到 file 引用的文档草稿阻塞发送：消灭"传完/没传完"混合态，
+    // 保证消息形态唯一（发送时 file_id 必然就绪）。门控实现在 submitMessage 内联。
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var showPermissionMode by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -178,6 +202,16 @@ public fun ChatComposer(
                         attachmentCapabilities.documentInput?.supportedMimeTypes
                 }.orEmpty()
                 require(attachment.mimeType in supported) { attachmentUnsupportedMessage }
+                if (attachment.category == AttachmentCategory.DOCUMENT) {
+                    // 上传链路的文档在选择入口就拒绝超限文件，避免导入归档后才失败。
+                    val documentInput = attachmentCapabilities.documentInput
+                    if (documentInput?.ingestMode == FileIngestMode.FILE_REFERENCE &&
+                        attachment.sizeBytes > documentInput.maxUploadBytes
+                    ) {
+                        val limitMb = documentInput.maxUploadBytes / (1024 * 1024)
+                        require(false) { context.getString(R.string.chat_attachment_too_large, limitMb) }
+                    }
+                }
                 imported += attachment
             }
             mergeAttachmentSelection(messageData.attachments, imported)
@@ -199,6 +233,10 @@ public fun ChatComposer(
                 deleteManagedDrafts(context, result.replaced)
                 deleteManagedDrafts(context, imported.filterNot { it in result.attachments })
                 onDraftChange(currentMessageData.copy(attachments = result.attachments))
+                // chip 阶段预热上传：选完即传，发送时 file_id 必然就绪。
+                imported.filter {
+                    it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+                }.forEach { currentOnDocumentDraftImported(it) }
             }
         }
     }
@@ -257,7 +295,13 @@ public fun ChatComposer(
 
     fun submitMessage(submitted: MessageData) {
         if (isSubmitting || currentIsGenerating || (submitted.text.isBlank() && submitted.attachments.isEmpty())) return
-        keyboardController?.hide()
+        if (isFileUploadEnabled && submitted.attachments.any {
+                it.category == AttachmentCategory.DOCUMENT && !it.isVendorUploaded
+            }
+        ) {
+            return
+        }
+        if (!embedded) keyboardController?.hide()
         isSubmitting = true
         onSubmit(submitted) { isSubmitting = false }
     }
@@ -406,10 +450,10 @@ public fun ChatComposer(
     }
 
     Column(
-        modifier = modifier
+        modifier = modifier.then(if (embedded) Modifier else Modifier
             .imePadding()
             .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp))
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -418,11 +462,11 @@ public fun ChatComposer(
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
-            color = chatCapsuleColor(),
-            border = chatCapsuleBorder(),
+            color = if (embedded) Color.Transparent else chatCapsuleColor(),
+            border = if (embedded) null else chatCapsuleBorder(),
             tonalElevation = 0.dp,
             // 仅保留轻微悬浮感，避免底边形成厚重阴影。
-            shadowElevation = 0.5.dp,
+            shadowElevation = if (embedded) 0.dp else 0.5.dp,
         ) {
             Column {
                 headerContent()
@@ -440,8 +484,9 @@ public fun ChatComposer(
                     }
                 } else {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        with(componentFactory) {
-                            ComposerInputContent(
+                        val renderInput: @Composable (ComposerInputContentParams) -> Unit = inputContent
+                            ?: { params -> with(componentFactory) { ComposerInputContent(params) } }
+                        renderInput(
                                 ComposerInputContentParams(
                                     messageData = messageData,
                                     isGenerating = isGenerating || isSubmitting,
@@ -468,15 +513,17 @@ public fun ChatComposer(
                                     onExpandedChange = onExpandedChange,
                                     onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
                                     modelSelectorContent = modelSelectorContent,
+                                    onOpenVoice = onOpenVoice,
                                     onPermissionModeClick = { if (!isSubmitting) showPermissionMode = true },
                                     // 权限图标直接打开模式抽屉；
                                     // 临时内容请求没有会话配置，不显示 chip。
-                                    showToolChip = addToChatState.configuration != null,
+                                    showToolChip = showPermissionOption && addToChatState.configuration != null,
                                     fullAccess = addToChatState.fullAccess,
                                     attachmentsEnabled = attachmentsEnabled,
+                                    attachmentUploadStates = attachmentUploadStates,
+                                    onRetryAttachmentUpload = { currentOnRetryUpload(it) },
                                 ),
-                            )
-                        }
+                        )
                     }
                 }
             }
@@ -494,6 +541,13 @@ public fun ChatComposer(
     if (showAttachmentOptions && attachmentsEnabled) {
         ChatAddToChatSheet(
             state = addToChatState,
+            uploadedFiles = uploadedFiles,
+            uploadedFilesEnabled = isFileUploadEnabled,
+            onUploadedFileDelete = onUploadedFileDelete,
+            onAttachUploadedFile = { entry ->
+                onAttachUploadedFile(entry)
+                showAttachmentOptions = false
+            },
             onDismiss = { showAttachmentOptions = false },
             onTakePhoto = {
                 showAttachmentOptions = false
@@ -540,7 +594,6 @@ internal fun appendTranscript(draft: String, transcript: String): String {
     if (draft.isBlank()) return recognized
     return "${draft.trimEnd()} $recognized"
 }
-
 
 /** 胶囊横向内缩。大胶囊样式下无横向内缩（0.dp），保留常量保证调用兼容。 */
 internal val ComposerCollapsedHorizontalInset = 0.dp

@@ -46,16 +46,15 @@ fun DefaultModelSettingsRoute(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                is DefaultModelSettingsEffect.ShowToast -> Toast.makeText(
-                    context,
-                    context.getString(effect.messageRes),
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
+    val noticeMessage = state.notice?.let { notice ->
+        when (notice) {
+            is DefaultModelSettingsNotice.ShowToast -> stringResource(notice.messageRes)
         }
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        val message = noticeMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.onAction(DefaultModelSettingsAction.ConsumeNotice)
     }
 
     PreferenceScaffold(
@@ -75,14 +74,14 @@ fun DefaultModelSettingsRoute(
     }
 }
 
-/** 用途选择器到默认角色的映射；音色选择器没有补配流程。 */
+/** 用途选择器到默认角色的映射；对话方式、链路与音色选择器没有补配流程。 */
 private fun DefaultModelDialog.toRole(): DefaultModelRole? = when (this) {
     DefaultModelDialog.Assistant -> DefaultModelRole.Assistant
     DefaultModelDialog.Fast -> DefaultModelRole.Fast
     DefaultModelDialog.Speech -> DefaultModelRole.SpeechRecognition
     DefaultModelDialog.Tts -> DefaultModelRole.SpeechSynthesis
     DefaultModelDialog.RealtimeModel -> DefaultModelRole.Realtime
-    DefaultModelDialog.TtsVoice, DefaultModelDialog.RealtimeVoice -> null
+    DefaultModelDialog.TtsVoice -> null
 }
 
 /** 打开外部链接；系统没有可用浏览器时用 Toast 说明，避免点击后毫无反馈。 */

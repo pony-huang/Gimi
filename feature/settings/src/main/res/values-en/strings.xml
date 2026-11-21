@@ -10,7 +10,7 @@
     <string name="settings_model_service_title">Models</string>
     <string name="settings_model_service_subtitle">Chat and speech services, keys and models</string>
 
-    <string name="settings_default_model_title">Defaults</string>
+    <string name="settings_default_model_title">Default models</string>
     <string name="settings_default_model_subtitle">Default model for each feature</string>
 
     <string name="settings_mcp_title">MCP</string>
@@ -90,13 +90,6 @@
     <string name="settings_group_about">About</string>
     <string name="settings_appfunction_title">AppFunction</string>
     <string name="settings_appfunction_subtitle">Features provided by apps</string>
-    <string name="session_export_all">Export all conversations</string>
-    <string name="session_export_subtitle">One JSONL per session, ZIP for many</string>
-    <string name="session_export_working">Exporting…</string>
-    <string name="session_export_empty">No conversations to export</string>
-    <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
-    <string name="session_export_succeeded">Conversations exported</string>
-    <string name="session_export_failed">Export failed. Please try again.</string>
     <string name="settings_speech_models_title">Speech models</string>
     <string name="settings_speech_models_subtitle">Recognition, audio understanding and synthesis</string>
 </resources>

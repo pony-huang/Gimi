@@ -17,6 +17,7 @@ dependencies {
     // Included build 隔离插件实现 classpath，并按 version catalog 锁定同一版本。
     implementation(pluginMarker(libs.plugins.android.application))
     implementation(pluginMarker(libs.plugins.android.library))
+    implementation(pluginMarker(libs.plugins.android.test))
     implementation(pluginMarker(libs.plugins.kotlin.jvm))
     implementation(pluginMarker(libs.plugins.kotlin.compose))
     implementation(pluginMarker(libs.plugins.ksp))
@@ -34,6 +35,11 @@ gradlePlugin {
             id = "gimi.android.library"
             implementationClass =
                 "github.ponyhuang.gimi.buildlogic.AndroidLibraryConventionPlugin"
+        }
+        create("androidTestConvention") {
+            id = "gimi.android.test"
+            implementationClass =
+                "github.ponyhuang.gimi.buildlogic.AndroidTestConventionPlugin"
         }
         create("kotlinJvmLibraryConvention") {
             id = "gimi.kotlin.jvm.library"

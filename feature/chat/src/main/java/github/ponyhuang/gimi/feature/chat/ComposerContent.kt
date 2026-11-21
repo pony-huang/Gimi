@@ -22,8 +22,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,10 +113,15 @@ internal fun DefaultComposerInputContent(
     val transcribing = params.voiceInputState as? VoiceInputUiState.Transcribing
     val isTranscribing = transcribing != null
 
+    // 上传中的文档草稿阻塞发送（Enter 与发送按钮一致），保证发送时 file_id 必然就绪。
+    val uploadBlocking = params.attachmentUploadStates.values.any {
+        it is DraftUploadState.Uploading || it is DraftUploadState.Failed
+    }
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
         isTranscribing -> null
-        params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty() ->
+        (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty()) &&
+            !uploadBlocking ->
             ComposerTrailingButton.Send
         else -> null
     }
@@ -146,6 +153,8 @@ internal fun DefaultComposerInputContent(
             AttachmentList(
                 attachments = params.messageData.attachments,
                 onRemoveAttachment = params.onRemoveAttachment,
+                uploadStates = params.attachmentUploadStates,
+                onRetryUpload = params.onRetryAttachmentUpload,
             )
             Box(modifier = Modifier.fillMaxWidth()) {
                 BasicTextField(
@@ -164,7 +173,7 @@ internal fun DefaultComposerInputContent(
                             val isBareEnter = event.type == KeyEventType.KeyDown &&
                                 (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
                                 !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed
-                            val canSend = !params.isGenerating &&
+                            val canSend = !params.isGenerating && !uploadBlocking &&
                                 (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty())
                             if (isBareEnter && canSend) {
                                 params.onSendClick()
@@ -236,11 +245,33 @@ internal fun DefaultComposerInputContent(
                         snackbarHostState = snackbarHostState,
                         onVoiceInputStart = params.onVoiceInputStart,
                     )
-                    TrailingButton(
-                        button = trailingButton,
-                        onSendClick = params.onSendClick,
-                        onStopClick = params.onStopClick,
-                    )
+                    if (trailingButton != null) {
+                        TrailingButton(
+                            button = trailingButton,
+                            onSendClick = params.onSendClick,
+                            onStopClick = params.onStopClick,
+                        )
+                    } else {
+                        params.onOpenVoice?.let { onOpenVoice ->
+                            // 实时语音入口紧邻麦克风录音按钮右侧：采用 MD3 FilledTonalIconButton 区分于语音转写与发送主按钮。
+                            FilledTonalIconButton(
+                                onClick = onOpenVoice,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .testTag("chat_composer_voice_call"),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.GraphicEq,
+                                    contentDescription = stringResource(R.string.voice_open_call),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
                     with(LocalChatAiComponentFactory.current) {
                         ComposerTrailingContent(
                             ComposerTrailingContentParams(isGenerating = params.isGenerating),
@@ -581,6 +612,7 @@ private fun DefaultComposerInputContentEmptyPreview() {
                 onSendClick = {},
                 onStopClick = {},
                 onVoiceInputStart = {},
+                onOpenVoice = {},
             ),
         )
     }
@@ -609,6 +641,7 @@ private fun DefaultComposerInputContentFilledPreview() {
                 onSendClick = {},
                 onStopClick = {},
                 onVoiceInputStart = {},
+                onOpenVoice = {},
             ),
         )
     }
@@ -632,6 +665,7 @@ private fun DefaultComposerInputContentTranscribingPreview() {
                 onSendClick = {},
                 onStopClick = {},
                 onVoiceInputStart = {},
+                onOpenVoice = {},
             ),
         )
     }

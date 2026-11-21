@@ -24,8 +24,8 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 
 /** 真实主 Runner → 委派工具 → 子工作流 → 领域进度 → 主回答的最小跨层接线回归。 */
 class SubtaskChatIntegrationTest {

@@ -1,49 +1,50 @@
 package github.ponyhuang.gimi.domain.voice.repository
 
-import kotlinx.coroutines.flow.StateFlow
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 语音模式。
- *
- * - [Simple]：简单聊天（对话模式），级联链路 + 内存上下文，无工具、无持久化。
- * - [Chat]：完整聊天，接入完整 chat agent（工具、持久化与文字聊天一致）。
- * - [Realtime]：原生全双工实时语音（实时轻聊），常驻会话、服务端判轮，仅支持 Realtime 类型服务；
- *   无工具、无持久化，转写只进字幕。
- * - [RealtimeAssistant]：实时助手，与 [Realtime] 同引擎，另接入可执行工具桥
- *   （本地/MCP/插件/应用函数等授权工具；确认类工具在语音通话中自动批准，与 Chat 模式一致）；
- *   无持久化，转写只进字幕。
- */
-enum class RealtimeVoiceMode { Simple, Chat, Realtime, RealtimeAssistant }
-
-/** 是否由 Realtime 引擎承载（原生全双工、仅支持 Realtime 类型服务）；实时轻聊与实时助手共用。 */
-val RealtimeVoiceMode.isRealtimeEngine: Boolean
-    get() = this == RealtimeVoiceMode.Realtime || this == RealtimeVoiceMode.RealtimeAssistant
-
-/**
- * 单次通话的固定配置；聊天模式必须显式绑定已有会话及其模型，不能隐式新建聊天。
- * @property conversationId 已打开的聊天 ID，简单聊天不使用它。
- * @property modelSelection 当前聊天的模型选择，通话期间保持不变。
- * @property realtimeVoice Realtime 模式的自定义会话音色；null 表示使用所选模型在该厂商下的缺省音色。
+ * 单次通话的固定配置；对话方式与语音处理链路两个正交维度分别表达。
+ * 级联助手必须显式绑定已有会话及其模型，不能隐式新建聊天；原生实时必须
+ * 显式选择 Realtime 服务模型；半级联已经接入 Chatbot 模式，必须显式绑定
+ * 全模态理解模型，并在通话中由配置补齐合成模型/音色。
+ * @property style 对话方式（聊天／助手）。
+ * @property pipeline 语音处理链路（级联／半级联／原生实时）。
+ * @property conversationId 已打开的聊天 ID，级联链路共用它，Chatbot 为空时解析当前会话。
+ * @property modelSelection 级联链路的对话模型（当前聊天的模型选择），通话期间保持不变；
+ *   原生实时链路为其实时模型。
+ * @property realtimeVoice 原生实时链路的自定义会话音色；null 表示使用所选模型在该厂商下的缺省音色。
  *   音色与模型强绑定（跨代际的音色集互不相同），因此覆盖值由调用方按当前模型解析后传入。
+ * @property synthesisVoice 级联链路的合成音色覆盖；null 表示沿用全局合成音色或厂商默认。
  */
 data class RealtimeVoiceConfiguration(
-    val mode: RealtimeVoiceMode = RealtimeVoiceMode.Simple,
+    val style: VoiceConversationStyle = VoiceConversationStyle.CHATBOT,
+    val pipeline: VoicePipeline = VoicePipeline.CASCADED,
     val conversationId: String? = null,
     val modelSelection: ModelSelection? = null,
     val realtimeVoice: String? = null,
+    val synthesisVoice: String? = null,
+    val synthesisModel: ModelSelection? = null,
 ) {
     init {
-        require(mode != RealtimeVoiceMode.Chat || (!conversationId.isNullOrBlank() && modelSelection != null))
-        require(!mode.isRealtimeEngine || modelSelection != null) {
-            "Realtime 模式必须显式选择 Realtime 服务模型"
+        require(style != VoiceConversationStyle.ASSISTANT || pipeline != VoicePipeline.CASCADED ||
+            (!conversationId.isNullOrBlank() && modelSelection != null)) {
+            "级联助手必须显式绑定会话与模型"
+        }
+        require(pipeline != VoicePipeline.NATIVE_REALTIME || modelSelection != null) {
+            "原生实时必须显式选择 Realtime 服务模型"
+        }
+        require(pipeline != VoicePipeline.SEMI_CASCADED || (modelSelection != null && style == VoiceConversationStyle.CHATBOT)) {
+            "半级联必须显式绑定模型且仅支持 Chatbot 模式"
         }
     }
 }
 
 /**
- * 创建实时语音会话。简单聊天无工具、无持久化；聊天模式直接接入完整 chat agent
- * （工具、技能与文字聊天一致），工具确认在语音通话中全部自动批准。
+ * 创建实时语音会话。级联聊天保存当前会话历史，无工具；级联助手直接接入完整
+ * chat agent（工具、技能与文字聊天一致），工具确认在语音通话中全部自动批准；
+ * 原生实时链路由全双工会话承载；半级联由理解模型生成文本、客户端合成播放。
  */
 interface RealtimeVoiceRepository {
     fun createSession(configuration: RealtimeVoiceConfiguration = RealtimeVoiceConfiguration()): RealtimeVoiceSession
@@ -59,8 +60,9 @@ interface RealtimeVoiceSession {
 
     suspend fun start()
     fun setMuted(muted: Boolean)
-    /** null 恢复自动路由，非空 id 仅对当前会话有效。 */
-    fun selectAudioDevice(deviceId: Int?)
+    /** 编辑暂停与用户静音独立，恢复编辑不会覆盖用户静音选择。 */
+    fun setInputPaused(paused: Boolean)
+    suspend fun submit(input: VoiceManualInput): VoiceInputResult
     suspend fun retry()
     /** 停止收音、生成及播放，并等待文字提交；失败时保留会话以供重试，禁止切换。 */
     suspend fun finishPendingTurn(): Boolean
@@ -76,18 +78,17 @@ enum class RealtimeVoiceFailure { Configuration, Microphone, AudioProcessing, Re
 /** 通话输出设备类别；输入设备由平台匹配，无麦耳机回退到手机麦克风。 */
 enum class VoiceAudioDeviceKind { Speaker, Earpiece, Bluetooth, Wired, Usb, Other }
 
-/** 可供当前会话选择的设备，id 仅在本次设备连接期间有效，name 为系统设备名称。 */
+/** 系统枚举出的通话输出设备，id 仅在本次设备连接期间有效，name 为系统设备名称。 */
 data class VoiceAudioDevice(val id: Int, val kind: VoiceAudioDeviceKind, val name: String)
 
 /**
- * 通话路由快照；currentDeviceId 是平台确认的实际输出，preferredDeviceId 为手动选择（null 表示自动）。
+ * 通话路由快照；通话设备固定自动路由，currentDeviceId 是平台确认的实际输出。
  * @property noticeRevision 每次断开或切换失败递增，避免同类连续通知丢失。
  * @property selectionFailed 最近一次通知是否为切换失败，否则为设备断开。
  */
 data class VoiceAudioRouting(
     val devices: List<VoiceAudioDevice> = emptyList(),
     val currentDeviceId: Int? = null,
-    val preferredDeviceId: Int? = null,
     val switching: Boolean = false,
     val noticeRevision: Long = 0,
     val selectionFailed: Boolean = false,
@@ -104,12 +105,16 @@ data class VoiceAudioRouting(
  * @property inputLevel 归一化后的麦克风电平，仅用于可视反馈。
  * @property outputLevel 正在输出的 PCM 音频电平，归一化后用于播放反馈。
  * @property revision 当前话轮代次，旧代次的异步结果必须丢弃。
- * @property audioRouting 实际通话设备、用户偏好与路由提示状态。
+ * @property audioRouting 实际通话设备与路由提示状态。
  */
 data class RealtimeVoiceState(
     val phase: RealtimeVoicePhase = RealtimeVoicePhase.Idle,
     val listening: Boolean = false,
     val muted: Boolean = false,
+    /** 编辑或选择附件期间临时阻止上行，保持当前播报。 */
+    val inputPaused: Boolean = false,
+    /** 最近一轮用户输入携带的已归档附件。 */
+    val inputAttachments: List<FileAttachment> = emptyList(),
     val inputText: String = "",
     val responseText: String = "",
     val spokenText: String = "",

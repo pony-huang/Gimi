@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.feature.memory
 
-import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.memory.model.MemoryConfiguration
 import github.ponyhuang.gimi.domain.memory.repository.MemorySettingsRepository
@@ -100,17 +99,18 @@ class MemorySettingsViewModelTest {
         val repository = FakeMemorySettingsRepository()
         val viewModel = MemorySettingsViewModel(repository)
 
-        viewModel.effects.test {
-            viewModel.onAction(MemorySettingsAction.SetToken(" token "))
-            viewModel.onAction(MemorySettingsAction.SetMem0Enabled(true))
-            viewModel.onAction(MemorySettingsAction.Save)
+        viewModel.onAction(MemorySettingsAction.SetToken(" token "))
+        viewModel.onAction(MemorySettingsAction.SetMem0Enabled(true))
+        viewModel.onAction(MemorySettingsAction.Save)
+        advanceUntilIdle()
 
-            assertEquals(MemorySettingsEffect.Saved, awaitItem())
-            assertEquals(MemoryConfiguration(mem0Enabled = true, apiKey = "token"), repository.configuration.value)
-            assertEquals("token", viewModel.uiState.value.token)
-            assertTrue(viewModel.uiState.value.hasStoredToken)
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertEquals(MemorySettingsNotice.Saved, viewModel.uiState.value.notice)
+        assertEquals(MemoryConfiguration(mem0Enabled = true, apiKey = "token"), repository.configuration.value)
+        assertEquals("token", viewModel.uiState.value.token)
+        assertTrue(viewModel.uiState.value.hasStoredToken)
+
+        viewModel.onAction(MemorySettingsAction.ConsumeNotice)
+        assertEquals(null, viewModel.uiState.value.notice)
     }
 }
 

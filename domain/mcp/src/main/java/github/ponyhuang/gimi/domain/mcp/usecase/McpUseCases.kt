@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.domain.mcp.usecase
 
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.mcp.model.McpConversationImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpCredentialUpdateResult
 import github.ponyhuang.gimi.domain.mcp.model.McpManualConfigurationResult
@@ -34,7 +35,7 @@ class ManageMcpServersUseCase @Inject constructor(
  */
 class ImportMcpServersForConversationUseCase @Inject constructor(
     private val mcpRepository: McpRepository,
-    private val conversationRepository: ConversationRepository,
+    @AssistantConversationPartition private val conversationRepository: ConversationRepository,
 ) {
     suspend operator fun invoke(
         sessionId: String,
@@ -75,7 +76,7 @@ class ImportMcpServersForConversationUseCase @Inject constructor(
  */
 class ConfigureMcpServerForConversationUseCase @Inject constructor(
     private val mcpRepository: McpRepository,
-    private val conversationRepository: ConversationRepository,
+    @AssistantConversationPartition private val conversationRepository: ConversationRepository,
 ) {
     suspend operator fun invoke(
         sessionId: String,
@@ -178,7 +179,7 @@ class ConfigureMcpServerForConversationUseCase @Inject constructor(
  */
 class UpdateMcpAuthorizationForConversationUseCase @Inject constructor(
     private val mcpRepository: McpRepository,
-    private val conversationRepository: ConversationRepository,
+    @AssistantConversationPartition private val conversationRepository: ConversationRepository,
 ) {
     suspend operator fun invoke(
         sessionId: String,

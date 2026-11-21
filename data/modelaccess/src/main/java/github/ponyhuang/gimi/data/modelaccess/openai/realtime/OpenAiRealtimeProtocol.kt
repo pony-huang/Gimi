@@ -3,11 +3,12 @@ package github.ponyhuang.gimi.data.modelaccess.openai.realtime
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import github.ponyhuang.gimi.core.audio.Pcm16Resampler
+import github.ponyhuang.gimi.data.modelaccess.shared.openAiFunctionToolArray
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import okio.ByteString.Companion.decodeBase64
 import okio.ByteString.Companion.toByteString
-import github.ponyhuang.gimi.data.modelaccess.shared.openAiFunctionToolArray
 
 /**
  * OpenAI Realtime（GA）的 WebSocket 事件协议。
@@ -17,7 +18,7 @@ import github.ponyhuang.gimi.data.modelaccess.shared.openAiFunctionToolArray
  * 嵌在 `session.audio.input` 下，输出模态默认只出音频（转写事件随之附送）。
  *
  * 上行音频固定 24 kHz 单声道 PCM16（服务端不收 16k pcm），由调用方先经
- * [github.ponyhuang.gimi.core.audio.Pcm16Resampler] 升采样；文本帧一律 base64。
+ * [Pcm16Resampler] 升采样；文本帧一律 base64。
  *
  * 工具（实时助手模式）：function 工具按 GA 的扁平结构下发（type/name/description/
  * parameters 顶层并列）；函数调用经 `response.output_item.added` 起始、
@@ -25,6 +26,44 @@ import github.ponyhuang.gimi.data.modelaccess.shared.openAiFunctionToolArray
  * [functionCallOutput] 写回后再以 [createResponse] 触发二轮推理。
  */
 internal object OpenAiRealtimeProtocol {
+
+    /** 角色切换只更新指令，保留音色、音频配置与服务端上下文。 */
+    fun instructionsUpdate(instructions: String): JsonObject = JsonObject().apply {
+        addProperty("type", "session.update")
+        add("session", JsonObject().apply {
+            addProperty("type", "realtime")
+            addProperty("instructions", instructions)
+        })
+    }
+
+
+    /** 一次手动消息的文字和图片必须属于同一个用户事件。 */
+    fun userMessage(content: com.google.adk.kt.types.Content, itemId: String): JsonObject {
+        require(content.role == com.google.adk.kt.types.Role.USER && content.parts.isNotEmpty())
+        val parts = JsonArray()
+        content.parts.forEach { part ->
+            parts.add(JsonObject().apply {
+                if (part.text != null) {
+                    addProperty("type", "input_text")
+                    addProperty("text", part.text)
+                } else {
+                    val blob = requireNotNull(part.inlineData)
+                    require(blob.mimeType in setOf("image/jpeg", "image/png", "image/webp", "image/gif"))
+                    addProperty("type", "input_image")
+                    addProperty("image_url", "data:${blob.mimeType};base64,${requireNotNull(blob.data).toByteString().base64()}")
+                }
+            })
+        }
+        return JsonObject().apply {
+            addProperty("type", "conversation.item.create")
+            add("item", JsonObject().apply {
+                addProperty("id", itemId)
+                addProperty("type", "message")
+                addProperty("role", "user")
+                add("content", parts)
+            })
+        }
+    }
 
     // —— 客户端事件类型 ——
 
@@ -174,6 +213,7 @@ internal object OpenAiRealtimeProtocol {
     fun parse(payload: JsonObject): OpenAiRealtimeEvent {
         val type = payload.get("type")?.asString ?: return OpenAiRealtimeEvent.Ignored
         return when (type) {
+            "response.created" -> OpenAiRealtimeEvent.ResponseStarted
             SERVER_SESSION_UPDATED -> OpenAiRealtimeEvent.SessionUpdated
             SERVER_SPEECH_STARTED -> OpenAiRealtimeEvent.SpeechStarted
             SERVER_BUFFER_COMMITTED -> OpenAiRealtimeEvent.TurnCommitted(payload.get("item_id")?.asString)
@@ -227,6 +267,9 @@ internal object OpenAiRealtimeProtocol {
 
 /** 服务端事件的内核映射；模型层据此驱动 [com.google.adk.kt.models.LlmResponse] 输出。 */
 internal sealed interface OpenAiRealtimeEvent {
+    /** 新响应开始，解除手动打断的旧增量抑制。 */
+    data object ResponseStarted : OpenAiRealtimeEvent
+
     /** 会话配置已生效；此后才允许上行音频。 */
     data object SessionUpdated : OpenAiRealtimeEvent
 

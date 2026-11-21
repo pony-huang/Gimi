@@ -2,6 +2,23 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
 
 import javax.inject.Inject
 
+/**
+ * Chatbot 形态放行的联网检索工具，按来源模板收口。
+ *
+ * Chatbot 形态只允许当前模型厂商自有的联网检索工具，按来源模板收口（`canBeUsedAcrossModels`
+ * 只表示同一工具可被其它厂商模型使用，不改变这里的按厂商白名单约束）；图像生成等
+ * 非检索能力一律不进入；没有声明的厂商（Qwen、MiMo、自定义服务）在 Chatbot 形态
+ * 就是无工具的普通 agent。Chatbot 唯一接入协议是 Anthropic Messages（message 模式），
+ * 目录声明的协议门控天然满足；OpenAI 没有 Messages 连接，不参与 Chatbot。
+ */
+val CHATBOT_WEB_SEARCH_TOOL_IDS: Map<String, Set<String>> = mapOf(
+    "deepseek" to setOf(OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.DEEPSEEK_WEB_FETCH),
+    "anthropic" to setOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH),
+    "minimax" to setOf(OfficialToolIds.MINIMAX_WEB_SEARCH),
+    "glm" to setOf(OfficialToolIds.GLM_WEB_SEARCH),
+    "kimi" to setOf(OfficialToolIds.KIMI_WEB_TOOLS),
+)
+
 /** 官方工具唯一的厂商支持矩阵与可用性规则；设置目录与 Agent 共用。 */
 class OfficialToolSupport @Inject constructor() {
     /**

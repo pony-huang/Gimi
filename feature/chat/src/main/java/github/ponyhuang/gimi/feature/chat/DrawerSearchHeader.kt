@@ -49,7 +49,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.BrandBlue
 
 /** 搜索图标原位扩展为输入容器；状态由调用方持有，聚焦和输入法由 Route 响应展开完成事件。 */
 @Composable
@@ -91,7 +90,7 @@ internal fun DrawerSearchHeader(
                 .then(
                     if (progress > 0f) Modifier.border(
                         width = if (hasFocus) 2.dp else 1.dp,
-                        color = if (hasFocus) BrandBlue else MaterialTheme.colorScheme.outline,
+                        color = if (hasFocus) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                         shape = CircleShape,
                     ) else Modifier,
                 ),

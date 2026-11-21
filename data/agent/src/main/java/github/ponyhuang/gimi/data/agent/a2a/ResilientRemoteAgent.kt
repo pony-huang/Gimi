@@ -10,6 +10,7 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
+import com.google.adk.kt.types.Role
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -29,8 +30,9 @@ internal class ResilientRemoteAgent(
             return@flow
         }
         emitAll(delegate.runAsync(context).transform { event ->
-            // SDK 既可能抛异常，也可能输出任务失败事件；不能让后者穿透到聊天级错误处理。
-            if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
+            // SDK 既可能抛异常，也可能输出任务失败事件（ADK 1.6.0 通过 errorMessage 或 a2a:error 元数据发出）；
+            // 不能让后者穿透到聊天级错误处理。
+            if (isRemoteFailureEvent(event)) {
                 throw RemoteAgentResponseException()
             }
             emit(event)
@@ -46,13 +48,16 @@ internal class ResilientRemoteAgent(
             invocationId = context.invocationId,
             author = name,
             branch = context.branch,
-            customMetadata = mapOf(REMOTE_FAILURE_KEY to name),
+            customMetadata = mapOf(
+                REMOTE_FAILURE_KEY to name,
+                A2A_ERROR_KEY to "remote_agent_unavailable",
+            ),
         )
         // 必须成对输出调用和结果：普通文本被 ADK 视为最终回答，会直接结束父模型循环。
-        emit(event.copy(content = Content(role = "model", parts = listOf(
+        emit(event.copy(content = Content(role = Role.MODEL, parts = listOf(
             Part(functionCall = FunctionCall(id = callId, name = REMOTE_FAILURE_RESULT, args = emptyMap())),
         ))))
-        emit(event.copy(content = Content(role = "user", parts = listOf(
+        emit(event.copy(content = Content(role = Role.USER, parts = listOf(
             Part(functionResponse = FunctionResponse(
                 id = callId,
                 name = REMOTE_FAILURE_RESULT,
@@ -68,9 +73,23 @@ private class RemoteAgentResponseException : Exception()
 private const val REMOTE_FAILURE_KEY = "gimi.remote_agent_failure"
 private const val REMOTE_FAILURE_RESULT = "remote_agent_unavailable"
 private const val TRANSFER_TOOL = "transfer_to_agent"
+private const val A2A_ERROR_KEY = "a2a:error"
+private const val A2A_REQUEST_ERROR_KEY = "a2a:request_serialization_error"
+private const val A2A_RESPONSE_ERROR_KEY = "a2a:response_serialization_error"
+
+private fun isRemoteFailureEvent(event: Event): Boolean {
+    if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) return true
+    val metadata = event.customMetadata ?: return false
+    return metadata.containsKey(A2A_ERROR_KEY) ||
+        metadata.containsKey(A2A_REQUEST_ERROR_KEY) ||
+        metadata.containsKey(A2A_RESPONSE_ERROR_KEY)
+}
 
 private fun List<Event>.failedRemoteNames(): Set<String> =
-    mapNotNull { it.customMetadata?.get(REMOTE_FAILURE_KEY) as? String }.toSet()
+    mapNotNull { event ->
+        (event.customMetadata?.get(REMOTE_FAILURE_KEY) as? String)
+            ?: if (isRemoteFailureEvent(event)) event.author else null
+    }.toSet()
 
 private fun remoteFailureResult(): Map<String, Any?> = mapOf(
     "status" to "remote_agent_unavailable",

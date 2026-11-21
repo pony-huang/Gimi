@@ -4,23 +4,27 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,10 +34,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -43,19 +49,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -63,23 +68,24 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -90,24 +96,31 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
-import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.voice.model.TtsVoice
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigField
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
 import github.ponyhuang.gimi.feature.chat.R
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.ui.components.GimiSheetBase
 import github.ponyhuang.gimi.ui.components.GimiSheetOptionRow
+import github.ponyhuang.gimi.ui.components.LocalGimiSheetBodyMaxHeight
 import github.ponyhuang.gimi.ui.components.GimiSheetTitleRow
 import github.ponyhuang.gimi.ui.components.SheetHeight
 import github.ponyhuang.gimi.ui.components.VoicePickerPage
@@ -116,49 +129,61 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.GimiTheme
+import kotlin.math.roundToInt
 
 /**
- * 语音抽屉的层级：一级「更多选项」入口 → 二级（模式 / 三组语音设置）→ 三级（模型 / 音色选择）。
+ * 语音抽屉的层级：一级「更多选项」入口 → 二级语音设置 → 三级模型 / 音色选择；角色管理共用 Chatbot 入口。
  *
  * 全部页面共用同一个 `GimiSheetBase`，只靠 `AnimatedContent` 翻页，不再叠加第二个模态抽屉。
  * [depth] 决定左右滑动方向；[parent] 让标题返回箭头与系统返回键走同一条回退路径。
+ * [hasOwnTitle] 标记页面主体自带标题行，外壳只为 false 的页面绘制 header 标题。
+ * 不能用 depth 推断：快捷入口的音色选择层级是 1，却复用了自带标题行的 [VoicePickerPage]。
  */
 private sealed interface VoiceSheetPage {
     val depth: Int
     val parent: VoiceSheetPage
+    val hasOwnTitle: Boolean
 
     object Entry : VoiceSheetPage {
         override val depth = 0
         override val parent get() = Entry
+        override val hasOwnTitle = false
     }
 
-    object Modes : VoiceSheetPage {
+    /** 语音设置页：链路切换 + 当前链路的模型与音色。 */
+    object Settings : VoiceSheetPage {
         override val depth = 1
         override val parent get() = Entry
+        override val hasOwnTitle = false
     }
 
-    /** 轻聊预设选择页：仅展示与选择，新增/编辑入口在个性化服务页的预设管理页。 */
-    object Presets : VoiceSheetPage {
-        override val depth = 1
-        override val parent get() = Entry
-    }
-
-    data class Settings(val kind: VoiceSettingsKind) : VoiceSheetPage {
-        override val depth = 1
-        override val parent get() = Entry
-    }
-
-    data class ModelPicker(val kind: VoiceSettingsKind) : VoiceSheetPage {
+    data class ModelPicker(val field: VoiceConfigField) : VoiceSheetPage {
         override val depth = 2
-        override val parent get() = Settings(kind)
+        override val parent get() = Settings
+        override val hasOwnTitle = true
     }
 
-    data class VoicePicker(val kind: VoiceSettingsKind) : VoiceSheetPage {
-        override val depth = 2
-        override val parent get() = Settings(kind)
+    /** 音色选择页；[quick] 为 true 时来自更多选项快捷入口，保存不经草稿。 */
+    data class VoicePicker(val pipeline: VoicePipeline, val quick: Boolean) : VoiceSheetPage {
+        override val depth = if (quick) 1 else 2
+        override val parent get() = if (quick) Entry else Settings
+        override val hasOwnTitle = true
     }
 }
+
+/** 标题与主体共用同一份翻页规格，左右滑动才会同步：进入下一级左滑、返回右滑。 */
+private val voiceSheetPageTransition:
+    AnimatedContentTransitionScope<VoiceSheetPage>.() -> ContentTransform = {
+        val towards = if (targetState.depth > initialState.depth) {
+            AnimatedContentTransitionScope.SlideDirection.Left
+        } else {
+            AnimatedContentTransitionScope.SlideDirection.Right
+        }
+        slideIntoContainer(towards = towards, animationSpec = tween(220)) + fadeIn(tween(160)) togetherWith
+            slideOutOfContainer(towards = towards, animationSpec = tween(220)) + fadeOut(tween(120))
+    }
 
 /**
  * 语音页场景配色：全部由主题语义角色派生，不再保留独立的场景色值。
@@ -221,32 +246,28 @@ internal fun Modifier.voiceSceneBackground(scene: VoiceSceneColors): Modifier = 
     drawRect(Brush.verticalGradient(*scene.sceneStops.toTypedArray()))
 }
 
-/** 语音页胶囊内竖分隔线：几何与聊天页 ChatHeaderDivider 一致，颜色跟随主题场景。 */
-@Composable
-private fun VoiceHeaderDivider(scene: VoiceSceneColors) {
-    Box(
-        modifier = Modifier
-            .padding(vertical = 13.dp)
-            .size(width = 1.dp, height = 22.dp)
-            .background(scene.divider),
-    )
+/** 语音处理链路显示名。 */
+@StringRes
+private fun pipelineTitleRes(pipeline: VoicePipeline): Int = when (pipeline) {
+    VoicePipeline.CASCADED -> R.string.voice_pipeline_cascaded
+    VoicePipeline.SEMI_CASCADED -> R.string.voice_pipeline_semi_cascaded
+    VoicePipeline.NATIVE_REALTIME -> R.string.voice_pipeline_native_realtime
 }
 
-/** 模式显示名：模式抽屉两级页面共用同一份文案映射。 */
-@StringRes
-private fun modeTitleRes(mode: RealtimeVoiceMode): Int = when (mode) {
-    RealtimeVoiceMode.Simple -> R.string.voice_mode_simple
-    RealtimeVoiceMode.Chat -> R.string.voice_mode_chat
-    RealtimeVoiceMode.Realtime -> R.string.voice_mode_realtime
-    RealtimeVoiceMode.RealtimeAssistant -> R.string.voice_mode_realtime_assistant
+/** 链路语义图标，与抽屉里其它菜单行共用图标槽位。 */
+private fun pipelineIcon(pipeline: VoicePipeline): ImageVector = when (pipeline) {
+    VoicePipeline.CASCADED -> Icons.AutoMirrored.Filled.Chat
+    VoicePipeline.SEMI_CASCADED -> Icons.Default.GraphicEq
+    VoicePipeline.NATIVE_REALTIME -> Icons.Default.Tune
 }
+
+/** M3 Emphasized decelerate 缓动，用于聊天 ↔ 语音页的空间过渡。 */
+private val EmphasizedDecelerate = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 
 /**
  * 实时语音展示页：整屏主题画布（浅色白→浅灰、深色黑→深灰），墨色粒子球居中承载状态文字。
- * 顶栏两胶囊：左（回聊天）+ 右（新建会话｜通话设备），中性底色与描边适配主题场景；
- * 字幕和动效只消费真实会话快照。底栏主按钮为「开始通话/结束通话」，静音移至侧位；
- * 懒启动下未启动时控制组按会话可用性禁用；新建会话仅待启动态的助手模式可点，
- * 通话中重建会话会打断采集/播放，与模式切换一样置灰。
+ * 顶栏与聊天页几何一致：左（抽屉）+ 中间模式分段 + 右（新建会话）；
+ * 底部 M3 悬浮工具栏：键盘输入、语音设置、中央通话主按钮、静音、关闭回聊天。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -258,42 +279,54 @@ fun RealtimeVoiceScreen(
     onToggleMute: () -> Unit,
     /** 挂断主按钮：只结束会话，留在语音页回到待启动状态。 */
     onEnd: () -> Unit,
-    // 左胶囊「回聊天」：结束通话并返回文字聊天；后台续跑只保留给系统后台切换。
+    // 右胶囊「回聊天」：结束通话并返回文字聊天；后台续跑只保留给系统后台切换。
     onBack: () -> Unit = {},
-    // 右胶囊「新会话」：仅待启动态可用；助手模式新建持久化会话并换绑，轻聊/实时模式无会话可换（置灰）。
-    onNewSession: () -> Unit = {},
-    // 底栏「更多选项」在通话中被点击：抽屉开不了，只提示先结束通话。
-    onMoreOptionsBlocked: () -> Unit = {},
     onRetry: () -> Unit = {},
-    // 右上角通话设备下拉菜单：打开、收起与选择。
-    onOpenDevicePicker: () -> Unit = {},
-    onDismissDevicePicker: () -> Unit = {},
-    onSelectAudioDevice: (Int?) -> Unit = {},
-    onSelectMode: (RealtimeVoiceMode) -> Unit = {},
-    /** 设置抽屉的模型写入；`Realtime` 允许传 null 表示「不使用 Realtime」。 */
-    onSelectSettingsModel: (VoiceSettingsKind, ModelSelection?) -> Unit = { _, _ -> },
-    /** 设置抽屉的音色写入；`Realtime` 允许传 null 表示回到模型缺省音色。 */
-    onSelectSettingsVoice: (VoiceSettingsKind, String?) -> Unit = { _, _ -> },
-    /** 预设抽屉的轻聊预设写入；null 表示不使用预设，回退内置语音人设。 */
-    onSelectPromptPreset: (String?) -> Unit = {},
+    onOpenVoiceSettings: () -> Unit = {},
+    onCloseVoiceSettings: () -> Unit = {},
+    onResetVoiceSettings: () -> Unit = {},
+    roleChips: (@Composable () -> Unit)? = null,
+    onSelectPipeline: (VoicePipeline) -> Unit = {},
+    onSelectFieldModel: (VoiceConfigField, ModelSelection?) -> Unit = { _, _ -> },
+    onSelectVoice: (VoicePipeline, String?) -> Unit = { _, _ -> },
     /** 音色抽屉的「查看官方音色列表」外链。 */
     onOpenUrl: (String) -> Unit = {},
+    onEditInput: () -> Unit = {},
+    onOpenDocument: (FileAttachment) -> Unit = {},
+    /** 页面切换过渡进度（0f = 文字聊天页，1f = 实时语音页），驱动背景、粒子球与底部输入坞分层动效。 */
+    transitionProgress: Float = 1f,
+    /** 页面是否可见或处于过渡中；隐藏时暂停粒子球无限帧动画。 */
+    isVisible: Boolean = true,
+    composerContent: @Composable () -> Unit = {},
 ) {
     val state = uiState.voice
     val colors = MaterialTheme.colorScheme
-    val failed = state.phase == RealtimeVoicePhase.Failed
+    val failed = started && state.phase == RealtimeVoicePhase.Failed
     val savingFailed = state.failure == RealtimeVoiceFailure.Persistence
     val starting = state.phase == RealtimeVoicePhase.Idle || state.phase == RealtimeVoicePhase.Closed
-    val controlsEnabled = !starting && !failed && !uiState.switching
-    // 新建会话仅待启动态可用：通话中重建会话会打断采集/播放，与模式切换同因需先结束通话；
-    // 且只有助手模式有持久化会话可换，轻聊/实时模式的内存会话随每次起呼新建，直接置灰。
-    val newSessionEnabled = !started && !uiState.switching && uiState.mode == RealtimeVoiceMode.Chat
-    // 语音开启后一律不能更换模式（需先结束通话）；切换期与保存失败时同样冻结菜单。
-    val modesEditable = !started && !uiState.switching && !savingFailed
     var modeSheetOpen by remember { mutableStateOf(false) }
     // 抽屉层级由单一状态表达：点行进入下一页、点返回或选完退回上一页，全程只有一个抽屉。
     var sheetPage by remember { mutableStateOf<VoiceSheetPage>(VoiceSheetPage.Entry) }
+    val closeVoiceSettings = {
+        modeSheetOpen = false
+        onCloseVoiceSettings()
+    }
+    DisposableEffect(Unit) {
+        onDispose { if (modeSheetOpen) onCloseVoiceSettings() }
+    }
+    LaunchedEffect(uiState.settingsLocked, isVisible) {
+        if (modeSheetOpen && (uiState.settingsLocked || !isVisible)) closeVoiceSettings()
+    }
+    val navigateSheetBack = {
+        if (sheetPage == VoiceSheetPage.Settings) {
+            // 返回一级时放下未补齐的链路；快捷音色入口继续读取已保存配置。
+            onCloseVoiceSettings()
+        }
+        sheetPage = sheetPage.parent
+    }
     val status = when {
+        uiState.ending -> R.string.voice_ending
+        uiState.settingsSaving -> R.string.voice_settings_saving
         uiState.switching -> R.string.voice_mode_switching
         savingFailed -> R.string.voice_save_failed
         failed -> R.string.voice_failed
@@ -305,132 +338,142 @@ fun RealtimeVoiceScreen(
         state.phase == RealtimeVoicePhase.Speaking -> R.string.voice_speaking
         else -> R.string.voice_listening
     }
-    val failureMessage = when (state.failure) {
-        RealtimeVoiceFailure.Configuration -> R.string.voice_configuration_error
-        RealtimeVoiceFailure.Microphone -> R.string.voice_microphone_error
-        RealtimeVoiceFailure.AudioProcessing -> R.string.voice_audio_error
-        RealtimeVoiceFailure.Recognition -> R.string.voice_recognition_error
-        RealtimeVoiceFailure.Generation -> R.string.voice_generation_error
-        RealtimeVoiceFailure.Synthesis, RealtimeVoiceFailure.Playback -> R.string.voice_synthesis_error
-        RealtimeVoiceFailure.Persistence -> R.string.voice_save_caption
-        RealtimeVoiceFailure.ConversationBusy -> R.string.voice_conversation_busy
-        null -> R.string.voice_error_hint
-    }
-    val routing = state.audioRouting
-    // 通话设备：优先取系统确认的实际输出；没有活跃通话时 currentDeviceId 可能为空，回落到手动首选。
-    val currentDevice = routing.devices.firstOrNull { it.id == routing.currentDeviceId }
-    val device = currentDevice ?: routing.devices.firstOrNull { it.id == routing.preferredDeviceId }
-    val deviceName = voiceAudioDeviceName(device)
-    // 设备切换尚未被平台确认时的无障碍描述：读屏要能听到"正在切到哪个设备"。
-    val switchingDescription = stringResource(R.string.voice_device_switching, deviceName)
+    // 通话设备固定自动路由；设备名称以平台确认的实际输出设备为准。
+    val currentDevice = state.audioRouting.devices.firstOrNull { it.id == state.audioRouting.currentDeviceId }
     val scene = voiceScene(colors)
+    val draft = uiState.draft
+    // M3 Emphasized decelerate 曲线：进入时前段快、尾段柔和落位；顶栏几何与聊天页一致，保持静止。
+    val clampedProgress = EmphasizedDecelerate.transform(transitionProgress.coerceIn(0f, 1f))
+    val maxOrbCap by animateDpAsState(
+        targetValue = if (uiState.composer.editing) 180.dp else 340.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "voice-orb-cap",
+    )
     Scaffold(
-        modifier = Modifier.fillMaxSize().voiceSceneBackground(scene),
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = clampedProgress }
+            .voiceSceneBackground(scene),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            Row(
-                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                    .heightIn(min = 132.dp).padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        val dockProgress = ((clampedProgress - 0.08f) / 0.92f).coerceIn(0f, 1f)
+                        alpha = dockProgress
+                        val scale = 0.92f + 0.08f * dockProgress
+                        scaleX = scale
+                        scaleY = scale
+                        translationY = (1f - dockProgress) * 28.dp.toPx()
+                    }
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .imePadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = if (uiState.composer.editing) 12.dp else 30.dp),
             ) {
-                // 左槽：更多选项抽屉入口。通话中不开放抽屉——模式与语音配置在通话中本就不可写，
-                // 点击只提示原因，不静默吞掉这次点击。
-                VoiceControl(
-                    Icons.Default.Tune,
-                    stringResource(R.string.voice_more_options),
-                    main = false, end = false,
-                    enabled = !uiState.switching && !savingFailed,
-                    contentDescription = stringResource(R.string.voice_open_more_options),
-                    onClick = {
-                        if (started) {
-                            onMoreOptionsBlocked()
-                        } else {
-                            sheetPage = VoiceSheetPage.Entry
-                            modeSheetOpen = true
-                        }
+                VoiceInputDock(
+                    state = uiState,
+                    onSettings = {
+                        sheetPage = VoiceSheetPage.Entry
+                        modeSheetOpen = true
                     },
+                    onChat = onEditInput,
+                    onCall = if (started) onEnd else onStartCall,
+                    onMute = onToggleMute,
+                    onBack = onBack,
+                    composerContent = composerContent,
+                    settingsEnabled = !uiState.settingsLocked && !started && !uiState.switching,
                 )
-                // 主按钮与静音交换位置：挂断升级为中央主按钮，未启动时承载「开始通话」。
-                VoiceControl(
-                    if (started) Icons.Default.CallEnd else Icons.Default.Call,
-                    stringResource(if (started) R.string.voice_end else R.string.voice_start),
-                    main = true, end = started, enabled = started || !uiState.switching,
-                    onClick = if (started) onEnd else onStartCall,
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (uiState.modelName.isNotBlank()) {
+                        LLMModelServiceIcon(
+                            serviceId = uiState.modelTemplateId,
+                            modifier = Modifier.size(14.dp),
+                            contentPadding = 0.dp,
+                        )
+                    }
+                    Text(
+                        text = listOf(uiState.modelName, voiceAudioDeviceName(currentDevice))
+                            .filter(String::isNotBlank)
+                            .joinToString(" · "),
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scene.inkDim,
+                    )
+                    if (uiState.settingsLocked || started) {
+                        Text(
+                            text = stringResource(R.string.voice_settings_after_hangup),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = scene.inkDim,
+                        )
+                    }
+                }
+                Text(
+                    text = stringResource(pipelineTitleRes(uiState.pipeline)),
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scene.inkDim,
                 )
-                VoiceControl(if (state.muted) Icons.Default.MicOff else Icons.Default.Mic,
-                    stringResource(if (state.muted) R.string.voice_unmute else R.string.voice_mute),
-                    main = false, end = false, enabled = controlsEnabled, onClick = onToggleMute)
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).padding(horizontal = 28.dp)) {
-            Box(Modifier.fillMaxWidth().height(64.dp)) {
-                // 左胶囊：只留回聊天（结束通话）；中性底色适配主题场景（48dp 点击区 + 上下内缩 2dp 的 44dp 可视高度）。
-                Box(Modifier.align(Alignment.CenterStart).offset(x = (-12).dp)) {
-                    Surface(Modifier.matchParentSize().padding(vertical = 2.dp), shape = CircleShape,
-                        color = scene.capsuleFill, border = BorderStroke(1.dp, scene.capsuleLine)) {}
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.voice_back_to_chat),
-                                modifier = Modifier.size(24.dp), tint = scene.inkDim)
-                        }
-                    }
-                }
-                Box(Modifier.align(Alignment.CenterEnd).offset(x = 12.dp)) {
-                    // 右胶囊：新建会话｜通话设备，两段以竖分隔线划分独立点击区；与聊天页右胶囊共用图标语言。
-                    Surface(Modifier.matchParentSize().padding(vertical = 2.dp), shape = CircleShape,
-                        color = scene.capsuleFill, border = BorderStroke(1.dp, scene.capsuleLine)) {}
-                    Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        // 新建会话：仅待启动态的助手模式可点；通话中与轻聊/实时模式用更淡的 inkDisabled 明示。
-                        IconButton(onClick = onNewSession, enabled = newSessionEnabled, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.voice_new_session),
-                                modifier = Modifier.size(24.dp),
-                                tint = if (newSessionEnabled) scene.inkDim else scene.inkDisabled)
-                        }
-                        VoiceHeaderDivider(scene)
-                        // 通话设备：图标跟着系统确认的输出设备走，仅通话中可切换。
-                        IconButton(
-                            onClick = onOpenDevicePicker,
-                            enabled = started && !uiState.switching && !routing.switching,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            if (routing.switching) {
-                                // 切换尚未被平台确认：进度环替代图标，别让"正在切"这件事消失。
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp).semantics {
-                                        contentDescription = switchingDescription
-                                    },
-                                    strokeWidth = 2.dp,
-                                    color = scene.ink,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = voiceAudioDeviceIcon(device),
-                                    contentDescription = stringResource(R.string.voice_device_action, deviceName),
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (started) scene.ink else scene.inkDisabled,
-                                )
-                            }
-                        }
-                    }
-                    // 菜单锚在右胶囊上：Material 会把菜单收到锚点右缘，正好贴住屏幕右边。
-                    DropdownMenu(
-                        expanded = uiState.devicePickerOpen,
-                        onDismissRequest = onDismissDevicePicker,
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).padding(horizontal = 16.dp)) {
+            Box(
+                Modifier.fillMaxWidth().padding(vertical = 8.dp).height(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (uiState.conversationTitle.isNotBlank()) {
+                    Surface(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        shape = CircleShape,
+                        color = scene.capsuleFill,
                     ) {
-                        VoiceAudioDeviceMenuItems(routing, onSelectAudioDevice)
+                        Text(
+                            text = uiState.conversationTitle,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = scene.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
             // 球体略低于上半区中心，同时保留下方约 43% 空间给字幕与错误恢复内容；
             // 状态文字按参考视频样式移入球心，由 VoiceOrb 自行渲染。
-            Column(Modifier.weight(1.2f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center) {
+            Column(
+                Modifier
+                    .weight(1.2f)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        val orbScale = 0.76f + 0.24f * clampedProgress
+                        scaleX = orbScale
+                        scaleY = orbScale
+                        translationY = (1f - clampedProgress) * 22.dp.toPx()
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val orbSize = minOf(maxWidth, maxHeight, 340.dp)
-                    VoiceOrb(state, uiState.switching, stringResource(status), Modifier.size(orbSize).offset(y = 16.dp), ink = scene.ink)
+                    val orbSize = minOf(maxWidth, maxHeight, maxOrbCap)
+                    VoiceOrb(
+                        state = state,
+                        switching = uiState.switching,
+                        statusText = stringResource(status),
+                        modifier = Modifier.size(orbSize).offset(y = 16.dp),
+                        ink = scene.ink,
+                        isVisible = isVisible,
+                    )
                 }
             }
             Box(Modifier.weight(.9f).fillMaxWidth()) {
@@ -439,161 +482,204 @@ fun RealtimeVoiceScreen(
                         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(stringResource(failureMessage), style = MaterialTheme.typography.titleMedium, color = scene.ink)
-                        Spacer(Modifier.height(12.dp))
                         Button(onClick = onRetry) {
                             Text(stringResource(if (savingFailed) R.string.voice_retry_save else R.string.voice_retry))
                         }
-                        if (savingFailed) Text(stringResource(R.string.voice_save_retry_hint), style = MaterialTheme.typography.bodySmall,
-                            color = scene.inkDim)
                     }
                     uiState.switching -> VoiceSwitchingIndicator(scene, Modifier.padding(top = 20.dp))
                     else -> VoiceCaptions(
                         inputText = state.inputText,
+                        inputAttachments = state.inputAttachments,
+                        onOpenDocument = onOpenDocument,
                         responseText = state.responseText,
                         spokenText = state.spokenText,
                         speakingText = state.speakingText,
                         revision = state.revision,
-                        reconnectNotice = state.reconnectNotice,
-                        toolNotice = state.toolNotice,
                         responseColor = scene.caption,
                         responseDimColor = scene.captionDim,
                         fadeColor = scene.fade,
-                        noticeContainerColor = colors.surfaceContainerHighest,
-                        // 提示胶囊是半透明容器，labelMedium 小字用 inkDim 对比度不足。
-                        noticeContentColor = scene.ink,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
         }
+        if (roleChips != null) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Box(
+                    Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                        .graphicsLayer {
+                            val dockProgress = ((clampedProgress - 0.08f) / 0.92f).coerceIn(0f, 1f)
+                            alpha = dockProgress
+                            translationY = (1f - dockProgress) * 28.dp.toPx()
+                        },
+                ) {
+                    roleChips()
+                }
+            }
+        }
+
     }
     val settings = uiState.settings
-    if (modeSheetOpen) {
-        // 系统返回按层级逐级回退：三级选择页 → 二级设置页 → 一级入口；一级交给抽屉本身收起。
-        BackHandler(enabled = sheetPage != VoiceSheetPage.Entry) { sheetPage = sheetPage.parent }
+    if (modeSheetOpen && !uiState.settingsLocked && !started) {
+        // 选择页逐级返回；收起整个面板后直接回到语音页。
+        BackHandler(enabled = sheetPage != VoiceSheetPage.Entry, onBack = navigateSheetBack)
         PreferenceStyleScope(PreferenceStyle.Compact) {
             GimiSheetBase(
-                onDismissRequest = { modeSheetOpen = false },
+                onDismissRequest = closeVoiceSettings,
                 initialHeight = SheetHeight.Fraction(0.5f),
                 maxHeight = SheetHeight.Fraction(0.9f),
-                // 三级选择页要放得下可搜索长列表，按页切换主体高度上限。
-                height = if (sheetPage.depth >= 2) SheetHeight.Fraction(0.9f) else SheetHeight.Fraction(0.5f),
+                // 一级入口贴内容长；二级设置页与三级选择页放开到上限：语音设置的链路、
+                // 模型/音色行与应用按钮加起来超过半屏，压在半屏会把底部裁在可视区之外。
+                height = if (sheetPage.depth == 0) {
+                    SheetHeight.Fraction(0.5f)
+                } else {
+                    SheetHeight.Fraction(0.9f)
+                },
+                header = {
+                    // 外壳标题固定在主体上方、不随内容滚动；选择页自带标题行，外壳不再绘制，
+                    // 否则快捷入口的音色选择（层级 1）会叠出两个标题与两个返回箭头。
+                    AnimatedContent(
+                        targetState = sheetPage,
+                        transitionSpec = voiceSheetPageTransition,
+                        label = "voice-sheet-title",
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { page ->
+                        if (!page.hasOwnTitle) {
+                            GimiSheetTitleRow(
+                                title = stringResource(page.titleRes()),
+                                navigationIcon = if (page == VoiceSheetPage.Entry) {
+                                    null
+                                } else {
+                                    Icons.AutoMirrored.Filled.ArrowBack
+                                },
+                                navigationContentDescription = if (page == VoiceSheetPage.Entry) {
+                                    null
+                                } else {
+                                    stringResource(R.string.voice_sheet_back)
+                                },
+                                onNavigationClick = if (page == VoiceSheetPage.Entry) {
+                                    null
+                                } else {
+                                    navigateSheetBack
+                                },
+                            )
+                        }
+                    }
+                },
             ) {
-                // 页与页之间沿用聊天界面「添加到聊天」抽屉的同一套过渡：进入下一级
-                // 整体向左滑出、返回时向右滑回，标题行随页面一起移动而不是原地跳变。
+                // 标题与主体共用同一份翻页规格，左右滑动才会同步。
                 AnimatedContent(
                     targetState = sheetPage,
-                    transitionSpec = {
-                        val towards = if (targetState.depth > initialState.depth) {
-                            AnimatedContentTransitionScope.SlideDirection.Left
-                        } else {
-                            AnimatedContentTransitionScope.SlideDirection.Right
-                        }
-                        slideIntoContainer(towards = towards, animationSpec = tween(220)) + fadeIn(tween(160)) togetherWith
-                            slideOutOfContainer(towards = towards, animationSpec = tween(220)) + fadeOut(tween(120))
-                    },
+                    transitionSpec = voiceSheetPageTransition,
                     label = "voice-sheet-page",
                     modifier = Modifier.fillMaxWidth(),
                 ) { page ->
                     Column(Modifier.fillMaxWidth()) {
                         when (page) {
                             is VoiceSheetPage.ModelPicker -> {
-                                val kind = page.kind
+                                val field = page.field
                                 VoiceModelPickerPage(
-                                    title = stringResource(page.titleRes()),
-                                    rows = when (kind) {
-                                        VoiceSettingsKind.Speech -> settings.speechRows
-                                        VoiceSettingsKind.Tts -> settings.ttsRows
-                                        VoiceSettingsKind.Realtime -> settings.realtimeRows
+                                    title = stringResource(field.pickerTitleRes()),
+                                    rows = when (field) {
+                                        VoiceConfigField.CASCADED_RECOGNITION_MODEL -> settings.recognitionRows
+                                        VoiceConfigField.CASCADED_SYNTHESIS_MODEL, VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL -> settings.synthesisRows
+                                        VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL -> settings.understandingRows
+                                        else -> settings.realtimeRows
                                     },
-                                    currentSelection = when (kind) {
-                                        VoiceSettingsKind.Speech -> settings.speechSelection
-                                        VoiceSettingsKind.Tts -> settings.ttsSelection
-                                        VoiceSettingsKind.Realtime -> settings.realtimeSelection
+                                    currentSelection = draftFieldValue(draft, field) as ModelSelection?,
+                                    onPick = { selection ->
+                                        onSelectFieldModel(field, selection)
+                                        sheetPage = page.parent
                                     },
-                                    allowNone = kind == VoiceSettingsKind.Realtime,
-                                    onPick = { selection -> onSelectSettingsModel(kind, selection) },
-                                    onPickNone = { onSelectSettingsModel(VoiceSettingsKind.Realtime, null) },
-                                    // 选完翻回来源设置页：抽屉不关闭，当前值在副标题原地更新。
                                     onBack = { sheetPage = page.parent },
                                 )
                             }
                             is VoiceSheetPage.VoicePicker -> {
-                                val kind = page.kind
-                                if (kind == VoiceSettingsKind.Tts) {
+                                val pipeline = page.pipeline
+                                if (pipeline == VoicePipeline.NATIVE_REALTIME) {
                                     VoicePickerPage(
-                                        title = stringResource(page.titleRes()),
-                                        currentVoiceId = settings.ttsVoiceId,
-                                        options = settings.ttsVoiceOptions,
-                                        allowCustomInput = settings.ttsVoiceCustomInputAllowed,
-                                        isLoading = settings.isTtsVoiceLoading,
-                                        onPick = { voiceId -> onSelectSettingsVoice(VoiceSettingsKind.Tts, voiceId) },
-                                        onBack = { sheetPage = page.parent },
-                                        // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
-                                        namingTemplate = settings.ttsVoiceIdTemplate,
-                                        docsUrl = settings.ttsVoiceDocsUrl,
-                                        onOpenUrl = onOpenUrl,
-                                    )
-                                } else {
-                                    VoicePickerPage(
-                                        title = stringResource(page.titleRes()),
-                                        currentVoiceId = settings.realtimeVoiceId ?: settings.realtimeDefaultVoice,
+                                        title = stringResource(R.string.voice_settings_pick_realtime_voice),
+                                        currentVoiceId = draft.realtimeVoice.value ?: settings.realtimeDefaultVoice,
                                         options = settings.realtimeVoiceOptions,
                                         allowCustomInput = settings.realtimeCustomVoiceAllowed,
                                         isLoading = false,
                                         // 清空输入等于回到该模型的缺省音色，因此空串要落成 null 而不是一个空覆盖值。
-                                        onPick = { voiceId -> onSelectSettingsVoice(VoiceSettingsKind.Realtime, voiceId.ifBlank { null }) },
+                                        onPick = { voiceId ->
+                                            val picked = voiceId.ifBlank { null }
+                                            onSelectVoice(pipeline, picked)
+                                            sheetPage = page.parent
+                                        },
                                         onBack = { sheetPage = page.parent },
                                         defaultVoiceId = settings.realtimeDefaultVoice,
+                                    )
+                                } else {
+                                    VoicePickerPage(
+                                        title = stringResource(R.string.voice_settings_pick_tts_voice),
+                                        currentVoiceId = when (pipeline) {
+                                            VoicePipeline.SEMI_CASCADED -> draft.semiVoice.value.orEmpty()
+                                            else -> draft.cascadedVoice.value.orEmpty()
+                                        },
+                                        options = settings.synthesisVoiceOptions,
+                                        allowCustomInput = settings.synthesisVoiceCustomInputAllowed,
+                                        isLoading = settings.isSynthesisVoiceLoading,
+                                        onPick = { voiceId ->
+                                            val picked = voiceId.ifBlank { null }
+                                            onSelectVoice(pipeline, picked)
+                                            sheetPage = page.parent
+                                        },
+                                        onBack = { sheetPage = page.parent },
+                                        // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
+                                        namingTemplate = settings.synthesisVoiceIdTemplate,
+                                        docsUrl = settings.synthesisVoiceDocsUrl,
+                                        onOpenUrl = onOpenUrl,
                                     )
                                 }
                             }
                             else -> {
-                                // 一、二级页共用外壳标题行；三级选择页自带标题行（音色输入态会换标题与返回语义）。
-                                GimiSheetTitleRow(
-                                    title = stringResource(page.titleRes()),
-                                    navigationIcon = if (page == VoiceSheetPage.Entry) null else Icons.AutoMirrored.Filled.ArrowBack,
-                                    navigationContentDescription = if (page == VoiceSheetPage.Entry) {
-                                        null
-                                    } else {
-                                        stringResource(R.string.voice_sheet_back)
-                                    },
-                                    onNavigationClick = if (page == VoiceSheetPage.Entry) {
-                                        null
-                                    } else {
-                                        ({ sheetPage = page.parent })
-                                    },
-                                )
-                                when (page) {
-                                    VoiceSheetPage.Entry -> VoiceSheetEntryPage(
-                                        settings = settings,
-                                        currentModeTitle = stringResource(modeTitleRes(uiState.mode)),
-                                        modesEnabled = !uiState.switching && !savingFailed,
-                                        onOpenModes = { sheetPage = VoiceSheetPage.Modes },
-                                        onOpenPresets = { sheetPage = VoiceSheetPage.Presets },
-                                        onOpenSettings = { sheetPage = VoiceSheetPage.Settings(it) },
-                                    )
-                                    // 语音开启后整页禁点，抽屉保持打开以便查看当前模式与原因提示。
-                                    VoiceSheetPage.Modes -> VoiceModeSheetOptions(
-                                        current = uiState.mode,
-                                        chatAvailable = uiState.chatAvailable,
-                                        realtimeAvailable = uiState.realtimeAvailable,
-                                        interactionEnabled = modesEditable,
-                                        blockedByActiveCall = started,
-                                        onSelectMode = onSelectMode,
-                                    )
-                                    VoiceSheetPage.Presets -> VoicePresetPickerPage(
-                                        settings = settings,
-                                        onSelectPreset = onSelectPromptPreset,
-                                    )
-                                    is VoiceSheetPage.Settings -> VoiceSettingsPage(
-                                        kind = page.kind,
-                                        settings = settings,
-                                        onOpenModelPicker = { sheetPage = VoiceSheetPage.ModelPicker(it) },
-                                        onOpenVoicePicker = { sheetPage = VoiceSheetPage.VoicePicker(it) },
-                                    )
-                                    else -> Unit
+                                // 一、二级页的标题已固定在 header；主体统一提供有界滚动容器。
+                                // 滚动容器拿不到明确上限时 viewport 会和内容一样高：既滚不动，
+                                // 超出的设置项又被抽屉主体裁掉。上限取 GimiSheetBase 实测后
+                                // 扣掉外壳的高度；短内容仍贴自身高度长，不会被拉到满屏。
+                                val bodyMaxHeight = LocalGimiSheetBodyMaxHeight.current
+                                Column(
+                                    Modifier.fillMaxWidth()
+                                        .then(
+                                            if (bodyMaxHeight != Dp.Unspecified && bodyMaxHeight > 0.dp) {
+                                                Modifier.heightIn(max = bodyMaxHeight)
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                        .verticalScroll(rememberScrollState()),
+                                ) {
+                                    when (page) {
+                                        VoiceSheetPage.Entry -> VoiceSheetEntryPage(
+                                            uiState = uiState,
+                                            onOpenQuickVoice = {
+                                                if (!uiState.settingsSaving) {
+                                                    onOpenVoiceSettings()
+                                                    sheetPage = VoiceSheetPage.VoicePicker(uiState.pipeline, quick = true)
+                                                }
+                                            },
+                                            onOpenSettings = {
+                                                if (!uiState.settingsSaving) {
+                                                    onOpenVoiceSettings()
+                                                    sheetPage = VoiceSheetPage.Settings
+                                                }
+                                            },
+                                        )
+                                        VoiceSheetPage.Settings -> VoiceSettingsPage(
+                                            uiState = uiState,
+                                            onOpenModelPicker = { field -> sheetPage = VoiceSheetPage.ModelPicker(field) },
+                                            onOpenVoicePicker = { pipeline -> sheetPage = VoiceSheetPage.VoicePicker(pipeline, quick = false) },
+                                            onSelectPipeline = onSelectPipeline,
+                                            onResetVoiceSettings = onResetVoiceSettings,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -604,252 +690,422 @@ fun RealtimeVoiceScreen(
     }
 }
 
-/** 抽屉各页标题；选择页标题也由这里统一给出，避免多处重复拼 when。 */
+/** 音色选择保存目标由调用点决定：快捷入口立即提交，设置页写入草稿。 */
+
+/** 草稿字段的模型值；用于模型选择页的当前选中判断。 */
+private fun draftFieldValue(draft: VoiceDraftUiState, field: VoiceConfigField): Any? = when (field) {
+    VoiceConfigField.CASCADED_RECOGNITION_MODEL -> draft.cascadedRecognitionModel.value
+    VoiceConfigField.CASCADED_SYNTHESIS_MODEL -> draft.cascadedSynthesisModel.value
+    VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL -> draft.semiUnderstandingModel.value
+    VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL -> draft.semiSynthesisModel.value
+    VoiceConfigField.REALTIME_MODEL -> draft.realtimeModel.value
+    else -> null
+}
+
+/** 外壳 header 的标题；选择页标题由页面自身给出，这里仅保留穷尽分支。 */
 @StringRes
 private fun VoiceSheetPage.titleRes(): Int = when (this) {
     VoiceSheetPage.Entry -> R.string.voice_more_options
-    VoiceSheetPage.Modes -> R.string.voice_select_mode
-    VoiceSheetPage.Presets -> R.string.voice_prompt_settings_section
-    is VoiceSheetPage.Settings -> when (kind) {
-        VoiceSettingsKind.Speech -> R.string.voice_settings_stt_page
-        VoiceSettingsKind.Tts -> R.string.voice_settings_tts_page
-        VoiceSettingsKind.Realtime -> R.string.voice_settings_realtime_page
-    }
-    is VoiceSheetPage.ModelPicker -> when (kind) {
-        VoiceSettingsKind.Speech -> R.string.voice_settings_pick_stt
-        VoiceSettingsKind.Tts -> R.string.voice_settings_pick_tts
-        VoiceSettingsKind.Realtime -> R.string.voice_settings_pick_realtime_model
-    }
-    is VoiceSheetPage.VoicePicker -> when (kind) {
-        VoiceSettingsKind.Realtime -> R.string.voice_settings_pick_realtime_voice
-        VoiceSettingsKind.Tts, VoiceSettingsKind.Speech -> R.string.voice_settings_pick_tts_voice
+    VoiceSheetPage.Settings -> R.string.voice_settings_page
+    is VoiceSheetPage.ModelPicker -> field.pickerTitleRes()
+    is VoiceSheetPage.VoicePicker -> when (pipeline) {
+        VoicePipeline.NATIVE_REALTIME -> R.string.voice_settings_pick_realtime_voice
+        else -> R.string.voice_settings_pick_tts_voice
     }
 }
 
-/** 四个对话模式的语义图标，与抽屉里其它菜单行共用图标槽位。 */
-private fun modeIcon(mode: RealtimeVoiceMode): ImageVector = when (mode) {
-    RealtimeVoiceMode.Simple -> Icons.AutoMirrored.Filled.Chat
-    RealtimeVoiceMode.Chat -> Icons.Default.SmartToy
-    RealtimeVoiceMode.Realtime -> Icons.Default.FlashOn
-    RealtimeVoiceMode.RealtimeAssistant -> Icons.Default.AutoAwesome
+/** 模型选择页标题按配置字段给出。 */
+@StringRes
+private fun VoiceConfigField.pickerTitleRes(): Int = when (this) {
+    VoiceConfigField.CASCADED_RECOGNITION_MODEL -> R.string.voice_settings_pick_recognition
+    VoiceConfigField.CASCADED_SYNTHESIS_MODEL -> R.string.voice_settings_pick_synthesis
+    VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL -> R.string.voice_settings_pick_understanding
+    VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL -> R.string.voice_settings_pick_synthesis
+    VoiceConfigField.REALTIME_MODEL -> R.string.voice_settings_pick_realtime_model
+    else -> R.string.voice_settings_page
 }
 
 /**
- * 模式抽屉一级页：模式入口 + 轻聊预设 + 三个语音设置条目，各带当前值副标题。
- * 条目与聊天界面抽屉同一套 One UI 语言：灰画布上的白色圆角分组卡片 + 内缩分隔线。
+ * 抽屉一级页：音色快捷入口、语音设置与 Chatbot 角色预设，各带当前值副标题；
+ * 草稿有未应用修改时提供应用／放弃。条目与聊天界面抽屉同一套 One UI 语言：
+ * 灰画布上的白色圆角分组卡片 + 内缩分隔线。
  */
 @Composable
 private fun VoiceSheetEntryPage(
-    settings: VoiceSettingsUiState,
-    currentModeTitle: String,
-    modesEnabled: Boolean,
-    onOpenModes: () -> Unit,
-    onOpenPresets: () -> Unit,
-    onOpenSettings: (VoiceSettingsKind) -> Unit,
+    uiState: RealtimeVoiceUiState,
+    onOpenQuickVoice: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
-    // 设置条目永远可进入查看；写入由二级页与 ViewModel 按通话/Agent 状态拦截。
-    val speechModel = settings.speechRows.selectionName(settings.speechSelection)
-    val ttsModel = settings.ttsRows.selectionName(settings.ttsSelection)
-    val ttsVoice = settings.ttsVoiceOptions.firstOrNull { it.id == settings.ttsVoiceId }?.name
-    val realtimeModel = settings.realtimeRows.selectionName(settings.realtimeSelection)
-    val promptPreset = settings.selectedPromptPreset()?.name
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        PreferenceGroupCard(Modifier.padding(top = 8.dp)) {
-            PreferenceListItem(
-                icon = Icons.Default.Tune,
-                title = stringResource(R.string.voice_mode_entry),
-                subtitle = stringResource(R.string.voice_mode_current, currentModeTitle),
-                onClick = onOpenModes.takeIf { modesEnabled },
-                showDivider = true,
-            )
-            PreferenceListItem(
-                icon = Icons.Default.AutoAwesome,
-                title = stringResource(R.string.voice_prompt_presets),
-                subtitle = promptPreset ?: stringResource(R.string.voice_prompt_preset_none),
-                onClick = onOpenPresets,
-                showDivider = true,
-            )
-            PreferenceListItem(
-                icon = Icons.Default.Mic,
-                title = stringResource(R.string.voice_settings_stt_title),
-                subtitle = speechModel ?: stringResource(R.string.voice_settings_not_configured),
-                onClick = { onOpenSettings(VoiceSettingsKind.Speech) },
-                showDivider = true,
-            )
-            PreferenceListItem(
-                icon = Icons.AutoMirrored.Filled.VolumeUp,
-                title = stringResource(R.string.voice_settings_tts_title),
-                subtitle = listOfNotNull(ttsModel, ttsVoice).joinToString(" · ")
-                    .ifBlank { stringResource(R.string.voice_settings_not_configured) },
-                onClick = { onOpenSettings(VoiceSettingsKind.Tts) },
-                showDivider = true,
-            )
-            PreferenceListItem(
-                icon = Icons.Default.FlashOn,
-                title = stringResource(R.string.voice_settings_realtime_title),
-                subtitle = realtimeModel ?: stringResource(R.string.voice_settings_not_configured),
-                onClick = { onOpenSettings(VoiceSettingsKind.Realtime) },
-            )
-        }
-        Spacer(Modifier.height(12.dp))
+    val settings = uiState.settings
+    val draft = uiState.draft
+    val pipeline = draft.pipeline.value
+    val voiceField = when (pipeline) {
+        VoicePipeline.CASCADED -> draft.cascadedVoice
+        VoicePipeline.SEMI_CASCADED -> draft.semiVoice
+        VoicePipeline.NATIVE_REALTIME -> draft.realtimeVoice
     }
-}
-
-/**
- * 语音设置二级页：每个可配置项一行（当前值 + ›），点行在同一抽屉内翻到对应选择页。
- * 通话进行中或前台 Agent 忙时只读；改动统一在下次通话生效，页尾给出提示。
- */
-@Composable
-private fun VoiceSettingsPage(
-    kind: VoiceSettingsKind,
-    settings: VoiceSettingsUiState,
-    onOpenModelPicker: (VoiceSettingsKind) -> Unit,
-    onOpenVoicePicker: (VoiceSettingsKind) -> Unit,
-) {
-    val writable = settings.writable
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+    val voiceOptions = if (pipeline == VoicePipeline.NATIVE_REALTIME) {
+        settings.realtimeVoiceOptions
+    } else {
+        settings.synthesisVoiceOptions
+    }
+    val voiceName = voiceField.value?.let { id ->
+        voiceOptions.firstOrNull { it.id == id }?.name ?: id
+    } ?: stringResource(R.string.voice_settings_default_voice)
+    val modelName = if (pipeline == VoicePipeline.NATIVE_REALTIME) {
+        draft.realtimeModel.value?.let { selection ->
+            settings.realtimeRows.selectionRow(selection)?.model?.name ?: selection.modelId
+        }.orEmpty()
+    } else {
+        uiState.chatModelName
+    }.ifBlank { stringResource(R.string.voice_settings_not_configured) }
+    val settingsSubtitle = stringResource(pipelineTitleRes(pipeline)) + " · " + modelName
+    // 滚动由抽屉骨架统一提供（有界 viewport），页面本身只排内容。
+    Column(Modifier.fillMaxWidth()) {
         PreferenceGroupCard(Modifier.padding(top = 8.dp)) {
-            when (kind) {
-                VoiceSettingsKind.Speech -> PreferenceListItem(
-                    icon = Icons.Default.SmartToy,
-                    title = stringResource(R.string.voice_settings_stt_model),
-                    subtitle = settings.speechRows.selectionName(settings.speechSelection)
-                        ?: stringResource(R.string.voice_settings_not_configured),
-                    onClick = if (writable) ({ onOpenModelPicker(VoiceSettingsKind.Speech) }) else null,
-                )
-                VoiceSettingsKind.Tts -> {
-                    PreferenceListItem(
-                        icon = Icons.Default.SmartToy,
-                        title = stringResource(R.string.voice_settings_tts_model),
-                        subtitle = settings.ttsRows.selectionName(settings.ttsSelection)
-                            ?: stringResource(R.string.voice_settings_not_configured),
-                        onClick = if (writable) ({ onOpenModelPicker(VoiceSettingsKind.Tts) }) else null,
-                        showDivider = true,
-                    )
-                    // 音色与 TTS 模型绑定：没有模型就没有可选音色，行随之置灰（与设置页同规则）。
-                    val ttsModelSelected = settings.ttsRows.any { it.selection() == settings.ttsSelection }
-                    PreferenceListItem(
-                        icon = Icons.Default.GraphicEq,
-                        title = stringResource(R.string.voice_settings_tts_voice),
-                        subtitle = settings.ttsVoiceOptions.firstOrNull { it.id == settings.ttsVoiceId }?.name
-                            ?: settings.ttsVoiceId.ifBlank { stringResource(R.string.voice_settings_default_voice) },
-                        onClick = if (writable && ttsModelSelected) {
-                            ({ onOpenVoicePicker(VoiceSettingsKind.Tts) })
-                        } else {
-                            null
-                        },
-                    )
-                }
-                VoiceSettingsKind.Realtime -> {
-                    PreferenceListItem(
-                        icon = Icons.Default.SmartToy,
-                        title = stringResource(R.string.voice_settings_realtime_model),
-                        subtitle = settings.realtimeRows.selectionName(settings.realtimeSelection)
-                            ?: stringResource(R.string.voice_settings_not_configured),
-                        onClick = if (writable) ({ onOpenModelPicker(VoiceSettingsKind.Realtime) }) else null,
-                        showDivider = true,
-                    )
-                    // 音色与模型强绑定：未配置模型时置灰；模型已选但厂商既无缺省音色也不接受自定义时同样无可选。
-                    val realtimeVoiceEnabled = settings.realtimeSelection != null &&
-                        (settings.realtimeDefaultVoice.isNotBlank() || settings.realtimeCustomVoiceAllowed)
-                    val effectiveRealtimeVoice = settings.realtimeVoiceId ?: settings.realtimeDefaultVoice
-                    PreferenceListItem(
-                        icon = Icons.Default.GraphicEq,
-                        title = stringResource(R.string.voice_settings_realtime_voice),
-                        subtitle = settings.realtimeVoiceOptions.firstOrNull { it.id == effectiveRealtimeVoice }?.name
-                            ?: effectiveRealtimeVoice.ifBlank { stringResource(R.string.voice_settings_default_voice) },
-                        onClick = if (writable && realtimeVoiceEnabled) {
-                            ({ onOpenVoicePicker(VoiceSettingsKind.Realtime) })
-                        } else {
-                            null
-                        },
-                    )
-                }
-            }
+            PreferenceListItem(
+                icon = Icons.Default.GraphicEq,
+                title = stringResource(R.string.voice_voice_entry),
+                subtitle = if (voiceField.substituted) {
+                    stringResource(R.string.voice_voice_substituted, voiceName)
+                } else {
+                    voiceName
+                },
+                onClick = onOpenQuickVoice,
+                showDivider = true,
+            )
+            PreferenceListItem(
+                icon = Icons.Default.Settings,
+                title = stringResource(R.string.voice_settings_entry),
+                subtitle = settingsSubtitle,
+                onClick = onOpenSettings,
+            )
         }
-        // 提示与分组卡片内文字对齐（卡片外边距 16dp + 行内缩进 16dp），与「添加到聊天」抽屉的提示同位。
         Text(
-            stringResource(R.string.voice_settings_effect_hint),
+            stringResource(
+                if (draft.hasAnyOverride) R.string.voice_scope_conversation_hint
+                else R.string.voice_scope_global_hint
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
         )
+        Spacer(Modifier.height(12.dp))
     }
 }
 
 /**
- * 模式抽屉二级页：四个模式条目，各带一行详细说明；不可用的置灰并给出原因。
- * 标题只用短名，管线信息（级联或端到端 Realtime）由说明文案承载，避免长标题挤占行宽。
- * 点选即切换，抽屉不关闭，选中标记原地更新。
- * 语音开启后四个模式全部禁点并统一给出「先结束通话」提示——此时不再按配置可用性解释置灰原因，
- * 避免把「已配置 Realtime 模型」误说成「请先配置」。
+ * 语音设置页：链路三段选择 + 当前链路的模型与音色行，展示继承/覆盖状态，
+ * 有效配置会自动保存；缺少必需模型时在对应行给出补齐入口。
  */
 @Composable
-private fun VoiceModeSheetOptions(
-    current: RealtimeVoiceMode,
-    chatAvailable: Boolean,
-    realtimeAvailable: Boolean,
-    interactionEnabled: Boolean,
-    blockedByActiveCall: Boolean,
-    onSelectMode: (RealtimeVoiceMode) -> Unit,
+private fun VoiceSettingsPage(
+    uiState: RealtimeVoiceUiState,
+    onOpenModelPicker: (VoiceConfigField) -> Unit,
+    onOpenVoicePicker: (VoicePipeline) -> Unit,
+    onSelectPipeline: (VoicePipeline) -> Unit,
+    onResetVoiceSettings: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+    val settings = uiState.settings
+    val draft = uiState.draft
+    val pipeline = draft.pipeline.value
+    // 滚动由抽屉骨架统一提供（有界 viewport），页面本身只排内容。
+    Column(Modifier.fillMaxWidth()) {
         PreferenceGroupCard(Modifier.padding(top = 8.dp)) {
-            RealtimeVoiceMode.entries.forEachIndexed { index, mode ->
-                val available = when (mode) {
-                    RealtimeVoiceMode.Simple -> true
-                    RealtimeVoiceMode.Chat -> chatAvailable
-                    // 未配置 Realtime 默认模型时直接置灰；配置入口统一在齿轮 → 设置页。
-                    RealtimeVoiceMode.Realtime, RealtimeVoiceMode.RealtimeAssistant -> realtimeAvailable
+            VoicePipelineSegmentedRow(
+                current = pipeline,
+                semiCascadedSupported = uiState.semiCascadedSupported,
+                onSelectPipeline = onSelectPipeline,
+            )
+        }
+        // 描述、配置行与半级联注释随链路整块交叉淡入淡出；行数差异（3 行 ↔ 2 行）
+        // 由 SizeTransform 的高度动画吸收，避免切档时下方内容硬切跳变。
+        AnimatedContent(
+            targetState = pipeline,
+            transitionSpec = {
+                fadeIn(tween(durationMillis = 220)) togetherWith fadeOut(tween(durationMillis = 140)) using
+                    SizeTransform { _, _ -> tween(durationMillis = 220, easing = FastOutSlowInEasing) }
+            },
+            label = "voicePipelineSettings",
+        ) { target ->
+            Column(Modifier.fillMaxWidth()) {
+                val unavailableReason = when {
+                    target == VoicePipeline.SEMI_CASCADED && !uiState.semiCascadedSupported ->
+                        stringResource(R.string.voice_pipeline_semi_requires_omni)
+                    target == pipeline && draft.missing.isNotEmpty() -> stringResource(R.string.voice_settings_missing_models)
+                    else -> null
                 }
-                val detail = when (mode) {
-                    RealtimeVoiceMode.Simple -> stringResource(R.string.voice_simple_mode_detail)
-                    RealtimeVoiceMode.Chat -> stringResource(R.string.voice_chat_mode_detail)
-                    RealtimeVoiceMode.Realtime -> stringResource(R.string.voice_realtime_mode_detail)
-                    RealtimeVoiceMode.RealtimeAssistant -> stringResource(R.string.voice_realtime_assistant_mode_detail)
-                }
-                // 置灰条目把不可用原因接在说明文字之后，与权限模式抽屉的行样式一致。
-                // 通话中统一由页尾提示解释，不再逐行复述配置类原因。
-                val description = when {
-                    blockedByActiveCall -> detail
-                    available -> detail
-                    else -> detail + "\n" + stringResource(
-                        when (mode) {
-                            RealtimeVoiceMode.Chat -> R.string.voice_chat_unavailable
-                            else -> R.string.voice_realtime_unavailable
+                Text(
+                    unavailableReason ?: stringResource(
+                        when (target) {
+                            VoicePipeline.CASCADED -> R.string.voice_pipeline_cascaded_detail
+                            VoicePipeline.SEMI_CASCADED -> R.string.voice_pipeline_semi_detail
+                            VoicePipeline.NATIVE_REALTIME -> R.string.voice_pipeline_native_detail
                         },
-                    )
-                }
-                GimiSheetOptionRow(
-                    selected = current == mode,
-                    enabled = available && interactionEnabled,
-                    label = stringResource(modeTitleRes(mode)),
-                    description = description,
-                    onClick = { onSelectMode(mode) },
-                    icon = modeIcon(mode),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (unavailableReason == null) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
                 )
-                if (index < RealtimeVoiceMode.entries.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-                    )
+                PreferenceGroupCard {
+                    if (target != VoicePipeline.NATIVE_REALTIME) {
+                        PreferenceListItem(
+                            title = stringResource(
+                                if (target == VoicePipeline.CASCADED) R.string.voice_settings_chat_model
+                                else R.string.voice_settings_understanding_model,
+                            ),
+                            subtitle = uiState.chatModelName.ifBlank {
+                                stringResource(R.string.voice_settings_not_configured)
+                            },
+                            leadingIcon = { iconModifier ->
+                                LLMModelServiceIcon(
+                                    serviceId = uiState.chatModelTemplateId,
+                                    modifier = iconModifier,
+                                    contentPadding = 2.dp,
+                                )
+                            },
+                            showDivider = true,
+                        )
+                    }
+                    when (target) {
+                        VoicePipeline.CASCADED -> {
+                            VoiceConfigModelRow(
+                                titleRes = R.string.voice_settings_stt_model,
+                                field = draft.cascadedRecognitionModel,
+                                missing = VoiceConfigField.CASCADED_RECOGNITION_MODEL in draft.missing,
+                                rows = settings.recognitionRows,
+                                onClick = { onOpenModelPicker(VoiceConfigField.CASCADED_RECOGNITION_MODEL) },
+                            )
+                            VoiceConfigModelRow(
+                                titleRes = R.string.voice_settings_tts_model,
+                                field = draft.cascadedSynthesisModel,
+                                missing = VoiceConfigField.CASCADED_SYNTHESIS_MODEL in draft.missing,
+                                rows = settings.synthesisRows,
+                                onClick = { onOpenModelPicker(VoiceConfigField.CASCADED_SYNTHESIS_MODEL) },
+                                showDivider = true,
+                            )
+                            VoiceConfigVoiceRow(
+                                titleRes = R.string.voice_settings_tts_voice,
+                                field = draft.cascadedVoice,
+                                options = settings.synthesisVoiceOptions,
+                                onClick = { onOpenVoicePicker(VoicePipeline.CASCADED) },
+                            )
+                        }
+                        VoicePipeline.SEMI_CASCADED -> {
+                            VoiceConfigModelRow(
+                                titleRes = R.string.voice_settings_tts_model,
+                                field = draft.semiSynthesisModel,
+                                missing = VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL in draft.missing,
+                                rows = settings.synthesisRows,
+                                onClick = { onOpenModelPicker(VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL) },
+                            )
+                            VoiceConfigVoiceRow(
+                                titleRes = R.string.voice_settings_tts_voice,
+                                field = draft.semiVoice,
+                                options = settings.synthesisVoiceOptions,
+                                onClick = { onOpenVoicePicker(VoicePipeline.SEMI_CASCADED) },
+                            )
+                        }
+                        VoicePipeline.NATIVE_REALTIME -> {
+                            VoiceConfigModelRow(
+                                titleRes = R.string.voice_settings_realtime_model,
+                                field = draft.realtimeModel,
+                                missing = VoiceConfigField.REALTIME_MODEL in draft.missing,
+                                rows = settings.realtimeRows,
+                                onClick = { onOpenModelPicker(VoiceConfigField.REALTIME_MODEL) },
+                                showDivider = true,
+                            )
+                            VoiceConfigVoiceRow(
+                                titleRes = R.string.voice_settings_realtime_voice,
+                                field = draft.realtimeVoice,
+                                options = settings.realtimeVoiceOptions,
+                                defaultVoiceId = settings.realtimeDefaultVoice,
+                                onClick = { onOpenVoicePicker(VoicePipeline.NATIVE_REALTIME) },
+                            )
+                        }
+                    }
                 }
             }
         }
-        // 与语音设置页的「下次通话生效」提示同位；解释四行同时置灰的原因。
-        if (blockedByActiveCall) {
-            Text(
-                stringResource(R.string.voice_mode_switch_blocked),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
-            )
+        Text(
+            stringResource(R.string.voice_settings_scope_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
+        )
+        TextButton(
+            onClick = onResetVoiceSettings,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        ) {
+            Text(stringResource(R.string.voice_reset_defaults))
         }
         Spacer(Modifier.height(12.dp))
     }
 }
 
-/** 轻量圆弧加载：放慢旋转避免模式切换时显得急促，短文案不抢占字幕区域。 */
+
+/** 链路分段控件的高度和圆角。 */
+private val VoicePipelineSwitchHeight = 44.dp
+private val VoicePipelineTrackCornerRadius = 24.dp
+private val VoicePipelineThumbCornerRadius = 20.dp
+
+/**
+ * 链路三段选择：级联／半级联／实时。
+ *
+ * 允许选择缺少可配置模型的链路，再在该链路内补齐。半级联依赖当前聊天模型支持全模态输入。
+ */
+@Composable
+private fun VoicePipelineSegmentedRow(
+    current: VoicePipeline,
+    semiCascadedSupported: Boolean,
+    onSelectPipeline: (VoicePipeline) -> Unit,
+) {
+    val selectedIndex = VoicePipeline.entries.indexOf(current).coerceIn(0, VoicePipeline.entries.lastIndex)
+    // 滑块位置以档位分数表达，measure 后按段宽换算实际 x；offset lambda 内读状态只触发重放置。
+    val slide by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "voicePipelineThumbSlide",
+    )
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(VoicePipelineSwitchHeight)
+            .clip(RoundedCornerShape(VoicePipelineTrackCornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(4.dp),
+    ) {
+        val segment = maxWidth / VoicePipeline.entries.size
+        Box(
+            Modifier
+                .offset { IntOffset((slide * segment.toPx()).roundToInt(), 0) }
+                .width(segment)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(VoicePipelineThumbCornerRadius))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Row(Modifier.fillMaxSize()) {
+            VoicePipeline.entries.forEach { pipeline ->
+                val selected = pipeline == current
+                val available = pipeline != VoicePipeline.SEMI_CASCADED || semiCascadedSupported
+                val contentColor by animateColorAsState(
+                    targetValue = when {
+                        selected -> MaterialTheme.colorScheme.onPrimary
+                        available -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    },
+                    animationSpec = tween(durationMillis = 180),
+                    label = "voicePipelineLabel",
+                )
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(VoicePipelineThumbCornerRadius))
+                        // 语义化分段：TalkBack 播报选中态与 Tab 角色，与 ChatModeSwitch 同约定。
+                        .selectable(
+                            selected = selected,
+                            enabled = available,
+                            role = Role.Tab,
+                            onClick = { onSelectPipeline(pipeline) },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(pipelineTitleRes(pipeline)),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = contentColor,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 配置行共用的副标题：值名 + 继承/覆盖/未应用标记 + 缺项提示。 */
+@Composable
+private fun voiceFieldSubtitle(
+    name: String?,
+    overridden: Boolean,
+    dirty: Boolean,
+    missing: Boolean,
+): String {
+    val value = name ?: stringResource(R.string.voice_settings_not_configured)
+    val markers = buildList {
+        if (missing && name != null) add(stringResource(R.string.voice_field_missing))
+        when {
+            dirty -> add(stringResource(R.string.voice_settings_unsaved))
+            overridden -> add(stringResource(R.string.voice_field_overridden))
+            else -> add(stringResource(R.string.voice_field_inherited))
+        }
+    }
+    return listOf(value, *markers.toTypedArray()).joinToString(" · ")
+}
+
+/**
+ * 链路模型配置行：当前模型名 + 继承状态；缺项时在副标题标注。
+ * 图标取当前选中模型所属厂商的品牌图标，未配置或所选模型已不在候选目录时
+ * 由 [LLMModelServiceIcon] 回落内置占位图。
+ */
+@Composable
+private fun VoiceConfigModelRow(
+    @StringRes titleRes: Int,
+    field: VoiceDraftFieldUi<ModelSelection?>,
+    rows: List<VoiceModelRow>,
+    missing: Boolean,
+    onClick: () -> Unit,
+    showDivider: Boolean = false,
+) {
+    val selection = field.value
+    val selectedRow = rows.selectionRow(selection)
+    val name = selection?.let { selectedRow?.model?.name ?: it.modelId }
+    PreferenceListItem(
+        leadingIcon = { iconModifier ->
+            LLMModelServiceIcon(
+                serviceId = selectedRow?.instance?.templateId.orEmpty(),
+                modifier = iconModifier,
+                contentPadding = 2.dp,
+            )
+        },
+        title = stringResource(titleRes),
+        subtitle = voiceFieldSubtitle(name, field.overridden, field.dirty, missing),
+        onClick = onClick,
+        showDivider = showDivider,
+    )
+}
+
+/** 链路音色配置行：当前音色名 + 继承状态；音色被替代时说明原因。 */
+@Composable
+private fun VoiceConfigVoiceRow(
+    @StringRes titleRes: Int,
+    field: VoiceDraftFieldUi<String?>,
+    options: List<TtsVoice>,
+    defaultVoiceId: String = "",
+    onClick: () -> Unit,
+) {
+    val effectiveVoice = field.value ?: defaultVoiceId
+    val name = effectiveVoice.takeIf { it.isNotBlank() }?.let { id ->
+        options.firstOrNull { it.id == id }?.name ?: id
+    } ?: stringResource(R.string.voice_settings_default_voice)
+    PreferenceListItem(
+        icon = Icons.Default.GraphicEq,
+        title = stringResource(titleRes),
+        subtitle = if (field.substituted) {
+            stringResource(R.string.voice_voice_substituted, voiceFieldSubtitle(name, field.overridden, field.dirty, false))
+        } else {
+            voiceFieldSubtitle(name, field.overridden, field.dirty, false)
+        },
+        onClick = onClick,
+    )
+}
+
+/** 轻量圆弧加载：放慢旋转避免配置切换时显得急促，短文案不抢占字幕区域。 */
 @Composable
 private fun VoiceSwitchingIndicator(scene: VoiceSceneColors, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
@@ -875,109 +1131,6 @@ private fun VoiceSwitchingIndicator(scene: VoiceSceneColors, modifier: Modifier 
     }
 }
 
-@Composable
-private fun VoiceControl(
-    icon: ImageVector,
-    label: String,
-    main: Boolean,
-    end: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    /** 图标的无障碍描述；默认复用可见标签。 */
-    contentDescription: String = label,
-) {
-    val colors = MaterialTheme.colorScheme
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) .94f else 1f,
-        animationSpec = spring(dampingRatio = .8f, stiffness = 600f),
-        label = "Voice control press",
-    )
-    // 主钮颜色在品牌蓝与错误色之间平滑过渡，避免「开始通话 → 结束通话」切换时的硬切。
-    val containerColor by animateColorAsState(
-        targetValue = if (end) colors.error else colors.primary,
-        animationSpec = tween(320),
-        label = "Voice control container",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (end) colors.onError else colors.onPrimary,
-        animationSpec = tween(320),
-        label = "Voice control content",
-    )
-    Column(Modifier.width(86.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        // 主钮是这一屏唯一的品牌蓝动作焦点；挂断属于破坏性操作，改用错误色并保留电话图标语义。
-        // 次要钮保持中性描边，不与主钮争夺注意力。
-        if (main) {
-            // 待启动态给主钮一圈呼吸光晕：蓝色只落在这一个动作上，同时把这一屏唯一的主操作点亮。
-            val pulse = !end && enabled
-            val pulseTransition = rememberInfiniteTransition(label = "voiceMainPulse")
-            val pulsePhase by pulseTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
-                label = "voiceMainPulsePhase",
-            )
-            Box(contentAlignment = Alignment.Center) {
-                if (pulse) {
-                    Canvas(Modifier.size(76.dp)) {
-                        // 光晕半径外扩、透明度同步归零，循环一轮；按钮本身不动。
-                        val base = size.minDimension / 2f
-                        drawCircle(
-                            color = colors.primary.copy(alpha = .26f * (1f - pulsePhase)),
-                            radius = base + base * .45f * pulsePhase,
-                        )
-                    }
-                }
-                FilledIconButton(
-                    onClick = onClick,
-                    enabled = enabled,
-                    interactionSource = interactionSource,
-                    modifier = Modifier.size(76.dp).graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = containerColor,
-                        contentColor = contentColor,
-                    ),
-                ) {
-                    Crossfade(targetState = icon, animationSpec = tween(180), label = "Voice control icon") { currentIcon ->
-                        Icon(currentIcon, contentDescription, Modifier.size(30.dp))
-                    }
-                }
-            }
-        } else {
-            OutlinedIconButton(
-                onClick = onClick,
-                enabled = enabled,
-                interactionSource = interactionSource,
-                modifier = Modifier.size(54.dp).graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                },
-                colors = IconButtonDefaults.outlinedIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = colors.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.5.dp, colors.outline),
-            ) {
-                Crossfade(targetState = icon, animationSpec = tween(180), label = "Voice control icon") { currentIcon ->
-                    Icon(currentIcon, contentDescription, Modifier.size(24.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Crossfade(targetState = label, animationSpec = tween(180), label = "Voice control label") { currentLabel ->
-            Text(currentLabel, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-// ── 抽屉页面预览 ─────────────────────────────────────────────────
-
-/** 抽屉页面预览共用的候选模型行假数据。 */
 private fun previewVoiceModelRow(
     instanceId: String,
     instanceName: String,
@@ -988,7 +1141,8 @@ private fun previewVoiceModelRow(
     val instance = ModelServiceInstance(
         id = instanceId,
         name = instanceName,
-        templateId = instanceId,
+        // 预览用真实模板 ID，品牌图标才不会整屏回落占位图。
+        templateId = instanceId.removePrefix("instance-"),
         isEnabled = true,
         isOfficialToolsEnabled = true,
         sharedApiKey = "preview-key",
@@ -1008,21 +1162,17 @@ private fun previewVoiceModelRow(
     )
 }
 
-/** 抽屉页面预览共用的一套已配置默认模型与音色。 */
+/** 抽屉页面预览共用的一套候选模型与音色。 */
 private fun previewVoiceSettings(): VoiceSettingsUiState = VoiceSettingsUiState(
-    speechRows = listOf(previewVoiceModelRow("instance-minimax", "MiniMax", "conn-synthesis", "speech-02", "Speech-02")),
-    speechSelection = ModelSelection("instance-minimax", "conn-synthesis", "speech-02"),
-    ttsRows = listOf(previewVoiceModelRow("instance-mimo", "MiMo", "conn-synthesis", "mimo-tts", "MiMo TTS")),
-    ttsSelection = ModelSelection("instance-mimo", "conn-synthesis", "mimo-tts"),
-    ttsVoiceId = "tongtong",
-    ttsVoiceOptions = listOf(TtsVoice(id = "tongtong", name = "童童", language = "zh", gender = "Female")),
+    recognitionRows = listOf(previewVoiceModelRow("instance-minimax", "MiniMax", "conn-speech", "speech-02", "Speech-02")),
+    synthesisRows = listOf(previewVoiceModelRow("instance-mimo", "MiMo", "conn-synthesis", "mimo-tts", "MiMo TTS")),
+    understandingRows = listOf(previewVoiceModelRow("instance-qwen", "千问", "conn-asr", "qwen3-omni", "Qwen3 Omni")),
     realtimeRows = listOf(
         previewVoiceModelRow("instance-qwen", "千问", "conn-realtime", "qwen3-omni-flash-realtime", "qwen3-omni-flash-realtime"),
     ),
-    realtimeSelection = ModelSelection("instance-qwen", "conn-realtime", "qwen3-omni-flash-realtime"),
-    realtimeDefaultVoice = "Cherry",
+    synthesisVoiceOptions = listOf(TtsVoice(id = "tongtong", name = "童童", language = "zh", gender = "Female")),
     realtimeVoiceOptions = listOf(TtsVoice(id = "Cherry", name = "Cherry", language = "zh", gender = "Female")),
-    writable = true,
+    realtimeDefaultVoice = "Cherry",
 )
 
 /** 抽屉页面预览共用外壳：灰画布 + 紧凑行样式 + 标题行，模拟抽屉内的观感。 */
@@ -1055,90 +1205,109 @@ private fun VoiceSheetPagePreview(
 private fun VoiceSheetEntryPagePreview() {
     VoiceSheetPagePreview(title = "更多选项", showBack = false) {
         VoiceSheetEntryPage(
-            settings = previewVoiceSettings(),
-            currentModeTitle = "轻聊",
-            modesEnabled = true,
-            onOpenModes = {},
-            onOpenPresets = {},
+            uiState = RealtimeVoiceUiState(settings = previewVoiceSettings()),
+            onOpenQuickVoice = {},
             onOpenSettings = {},
         )
     }
 }
 
-@Preview(name = "抽屉 · 选择对话模式 · 浅色", widthDp = 390, locale = "zh")
-@Preview(name = "抽屉 · 选择对话模式 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "抽屉 · 语音设置（级联） · 浅色", widthDp = 390, locale = "zh")
+@Preview(name = "抽屉 · 语音设置（级联） · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun VoiceSheetModesPagePreview() {
-    VoiceSheetPagePreview(title = "选择对话模式", showBack = true) {
-        VoiceModeSheetOptions(
-            current = RealtimeVoiceMode.Chat,
-            chatAvailable = true,
-            realtimeAvailable = false,
-            interactionEnabled = true,
-            blockedByActiveCall = false,
-            onSelectMode = {},
-        )
-    }
-}
-
-/** 已配置 Realtime 默认模型：待启动态下实时与实时助手都应可选。 */
-@Preview(name = "抽屉 · 选择对话模式 · 已配置 Realtime · 浅色", widthDp = 390, locale = "zh")
-@Preview(name = "抽屉 · 选择对话模式 · 已配置 Realtime · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun VoiceSheetModesPageRealtimeConfiguredPreview() {
-    VoiceSheetPagePreview(title = "选择对话模式", showBack = true) {
-        VoiceModeSheetOptions(
-            current = RealtimeVoiceMode.Simple,
-            chatAvailable = true,
-            realtimeAvailable = true,
-            interactionEnabled = true,
-            blockedByActiveCall = false,
-            onSelectMode = {},
-        )
-    }
-}
-
-/** 通话中：四个模式全部禁点，只给一条「先结束通话」提示。 */
-@Preview(name = "抽屉 · 选择对话模式 · 通话中 · 浅色", widthDp = 390, locale = "zh")
-@Preview(name = "抽屉 · 选择对话模式 · 通话中 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun VoiceSheetModesPageBlockedPreview() {
-    VoiceSheetPagePreview(title = "选择对话模式", showBack = true) {
-        VoiceModeSheetOptions(
-            current = RealtimeVoiceMode.Realtime,
-            chatAvailable = true,
-            realtimeAvailable = true,
-            interactionEnabled = false,
-            blockedByActiveCall = true,
-            onSelectMode = {},
-        )
-    }
-}
-
-@Preview(name = "抽屉 · 语音合成设置 · 浅色", widthDp = 390, locale = "zh")
-@Preview(name = "抽屉 · 语音合成设置 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun VoiceSheetTtsPagePreview() {
-    VoiceSheetPagePreview(title = "语音合成设置", showBack = true) {
+private fun VoiceSettingsCascadedPreview() {
+    VoiceSheetPagePreview(title = "语音设置", showBack = true) {
         VoiceSettingsPage(
-            kind = VoiceSettingsKind.Tts,
-            settings = previewVoiceSettings(),
+            uiState = RealtimeVoiceUiState(
+                settings = previewVoiceSettings(),
+                cascadedAvailable = true,
+            ),
             onOpenModelPicker = {},
             onOpenVoicePicker = {},
+            onSelectPipeline = {},
+            onResetVoiceSettings = {},
         )
     }
 }
 
-@Preview(name = "抽屉 · Realtime 语音设置 · 浅色", widthDp = 390, locale = "zh")
-@Preview(name = "抽屉 · Realtime 语音设置 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "抽屉 · 语音设置（实时） · 浅色", widthDp = 390, locale = "zh")
+@Preview(name = "抽屉 · 语音设置（实时） · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun VoiceSheetRealtimePagePreview() {
-    VoiceSheetPagePreview(title = "Realtime 语音设置", showBack = true) {
+private fun VoiceSettingsRealtimePreview() {
+    VoiceSheetPagePreview(title = "语音设置", showBack = true) {
         VoiceSettingsPage(
-            kind = VoiceSettingsKind.Realtime,
-            settings = previewVoiceSettings(),
+            uiState = RealtimeVoiceUiState(
+                settings = previewVoiceSettings(),
+                cascadedAvailable = true,
+                draft = VoiceDraftUiState(
+                    pipeline = VoiceDraftFieldUi(VoicePipeline.NATIVE_REALTIME, overridden = true, dirty = true),
+                    missing = setOf(VoiceConfigField.REALTIME_MODEL),
+                ),
+            ),
             onOpenModelPicker = {},
             onOpenVoicePicker = {},
+            onSelectPipeline = {},
+            onResetVoiceSettings = {},
+        )
+    }
+}
+
+@Preview(name = "语音页 · 待启动 · 浅色", widthDp = 390, heightDp = 844, locale = "zh")
+@Preview(name = "语音页 · 待启动 · 深色", widthDp = 390, heightDp = 844, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RealtimeVoiceScreenReadyPreview() {
+    GimiTheme {
+        RealtimeVoiceScreen(
+            uiState = RealtimeVoiceUiState(
+                settings = previewVoiceSettings(),
+                cascadedAvailable = true,
+            ),
+            started = false,
+            onStartCall = {},
+            onToggleMute = {},
+            onEnd = {},
+        )
+    }
+}
+
+@Preview(name = "语音页 · 通话中文字与文件输入 · 浅色", widthDp = 390, heightDp = 844, locale = "zh")
+@Preview(name = "语音页 · 通话中文字与文件输入 · 深色", widthDp = 390, heightDp = 844, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RealtimeVoiceScreenEditingPreview() {
+    GimiTheme {
+        RealtimeVoiceScreen(
+            uiState = RealtimeVoiceUiState(
+                active = true,
+                settingsLocked = true,
+                settings = previewVoiceSettings(),
+                pipeline = VoicePipeline.NATIVE_REALTIME,
+                cascadedAvailable = true,
+                realtimeAvailable = true,
+                composer = VoiceComposerUiState(editing = true),
+            ),
+            started = true,
+            onStartCall = {},
+            onToggleMute = {},
+            onEnd = {},
+            composerContent = {
+                VoiceComposerInput(
+                    params = github.ponyhuang.gimi.feature.chat.ComposerInputContentParams(
+                        messageData = github.ponyhuang.gimi.feature.chat.MessageData(text = "帮我分析这份文档"),
+                        isGenerating = false,
+                        voiceInputState = github.ponyhuang.gimi.feature.chat.VoiceInputUiState.Idle,
+                        isVoiceInputAvailable = true,
+                        voiceErrorMessage = null,
+                        onVoiceErrorShown = {},
+                        onTextChange = {},
+                        onRemoveAttachment = {},
+                        onSendClick = {},
+                        onStopClick = {},
+                        onVoiceInputStart = {},
+                    ),
+                    sendEnabled = true,
+                    onClose = {},
+                )
+            },
         )
     }
 }

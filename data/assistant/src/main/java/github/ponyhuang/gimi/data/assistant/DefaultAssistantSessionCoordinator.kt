@@ -19,6 +19,7 @@ import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -54,6 +55,7 @@ import kotlinx.coroutines.NonCancellable
  */
 @Singleton
 class DefaultAssistantSessionCoordinator @Inject constructor(
+    @AssistantConversationPartition
     private val conversations: ConversationRepository,
     private val chatAgent: ChatAgentRepository,
     private val runtimeGate: AgentRuntimeGate,

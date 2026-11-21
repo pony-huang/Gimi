@@ -11,12 +11,12 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
 import com.google.adk.kt.types.ToolConfig
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
 import github.ponyhuang.gimi.data.agent.recommendation.AgentRecommendationGenerator.Companion.READ_ONLY_STATUS_TOOLS
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
@@ -170,18 +170,25 @@ private class JsonNativeTool(
 /** 使用快速模型优先策略执行无工具、无会话的推荐生成请求。 */
 @Singleton
 class AgentRecommendationGenerator @Inject constructor(
-    private val modelFactory: AgentLLMModelFactory,
+    private val modelFactory: AgentModelRuntime,
     private val contributionRegistry: AgentContributionRegistry,
 ) : RecommendationGenerator {
     override suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation> {
         val resolvedInput =
             input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
-        val config = modelFactory.forRecommendationJson(
-            modelFactory.selectFastModelConfig()
-                ?: throw RecommendationNotConfiguredException(
-                    "Configure an OpenAI-compatible fast model for recommendation generation.",
-                ),
-        )
+        val fastModel = modelFactory.selectFastModelConfig()
+            ?: throw RecommendationNotConfiguredException(
+                "Configure an OpenAI-compatible fast model for recommendation generation.",
+            )
+        val config = try {
+            modelFactory.forRecommendationJson(fastModel)
+        } catch (error: IllegalStateException) {
+            // 快速模型缺少 Completions 连接等协议限制属于配置问题，重试梯子不会自愈，
+            // 按未配置直接落最终失败，避免白等 30/60/120/180 秒。
+            throw RecommendationNotConfiguredException(
+                error.message ?: "The fast model service cannot generate JSON recommendations.",
+            )
+        }
         val model = modelFactory.createModel(config)
         val request = LlmRequest(
             model = model,
@@ -248,7 +255,8 @@ class AgentRecommendationGenerator @Inject constructor(
      */
     private suspend fun allRecommendationTools(config: ModelConfig): List<BaseTool> =
         contributionRegistry
-            .toolCatalog(AgentToolCatalogContext(modelRuntime = config.toRuntimeMetadata()))
+            // 工具目录同样按来源隔离：坏掉的贡献方不阻断整次推荐生成。
+            .toolCatalogIsolatingFailures(AgentToolCatalogContext(modelRuntime = config.toRuntimeMetadata()))
             .flatMap { entry -> entry.tools }
             .distinctBy { it.name }
             .map(::JsonNativeTool)

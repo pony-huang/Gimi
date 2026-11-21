@@ -44,7 +44,7 @@
 #### 新增
 
 - **实时语音通话**：新增 OpenAI Realtime 与 Qwen-Audio Realtime（阿里云百炼）两种原生全双工实时模式，支持自动断句与随时打断；「实时助手」模式可在通话过程中调用已授权的手机工具、MCP、插件、AppFunction 与沙盒工具。
-- **语音模式**：语音通话提供「轻聊」「助手」「实时」「实时助手」四种模式；实时模式改为按需连接，挂断后保留页面。
+- **语音模式**：语音通话提供「Chatbot」「助手」「实时」「实时助手」四种模式；实时模式改为按需连接，挂断后保留页面。
 - **语音服务**：Qwen（阿里云百炼）、MiniMax、MiMo 与 OpenAI 分别提供语音识别与合成，Qwen 与 OpenAI Realtime 额外提供原生实时语音；语音服务与聊天模型分开配置，支持搜索选择。
 - **千问语音**：新增 qwen-audio 3.1/3.0 的流式识别、flash/plus 合成与 realtime 模型，实时音色由服务配置下发。
 - **官方语音预设**：内置官方语音提示词预设，可在语音抽屉中直接选用。
@@ -74,7 +74,7 @@ The first 1.0.0 beta brings a major update to voice, chat, and agent tools.
 #### New features
 
 - **Realtime voice calls** — Native full-duplex OpenAI Realtime and Qwen-Audio Realtime (Alibaba Cloud Bailian), with automatic turn detection and interruption. Realtime Assistant can invoke authorized phone, MCP, plugin, AppFunction, and sandbox tools during calls.
-- **Voice modes** — Choose Light Chat, Assistant, Realtime, or Realtime Assistant. Realtime connections start on demand, and the call page stays open after hanging up.
+- **Voice modes** — Choose Chatbot, Assistant, Realtime, or Realtime Assistant. Realtime connections start on demand, and the call page stays open after hanging up.
 - **Speech services** — Configure speech recognition and synthesis separately from chat models, with searchable service pickers for Qwen, MiniMax, MiMo, and OpenAI. Qwen and OpenAI also support native realtime voice.
 - **Qwen voice** — Streaming recognition with qwen-audio 3.1/3.0, flash/plus synthesis, realtime models, and service-provided realtime voice choices.
 - **Voice presets and background calls** — Built-in official voice prompt presets are available in the voice drawer. Realtime calls continue in the background with notification controls.

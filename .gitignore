@@ -18,6 +18,7 @@ local.properties
 /.opencode/
 /.claude/
 /.codex/
+/.codex-attachments/
 /.kotlin/
 /.agents/
 /.codex-remote-attachments/

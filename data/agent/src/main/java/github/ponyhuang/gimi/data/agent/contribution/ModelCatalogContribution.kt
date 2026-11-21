@@ -5,13 +5,12 @@ import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
 
 /**
  * 模型目录贡献方：不贡献工具，只把模型服务配置的 revision 纳入 Agent 缓存键，
  * 使模型服务增删 / 启停 / 编辑后已缓存的 Agent 运行时失效重建。模型实例本身的
  * 解析与构建由 [github.ponyhuang.gimi.data.agent.AgentFactory] 委托
- * [github.ponyhuang.gimi.data.agent.AgentLLMModelFactory] 完成。
+ * `AgentModelRuntime` 完成。
  */
 @Singleton
 class ModelCatalogContribution @Inject constructor(

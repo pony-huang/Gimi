@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.core.designsystem.R
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.theme.LocalGimiDarkTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -120,6 +121,18 @@ val LocalGimiSheetController: ProvidableCompositionLocal<GimiSheetController> =
     staticCompositionLocalOf { error("LocalGimiSheetController 只能在抽屉内部读取") }
 
 /**
+ * 抽屉主体实际可用的高度上限：已扣掉横杆、标题区与底部操作区，也压在窗口上限之内。
+ *
+ * 主体 `Box` 用 `heightIn(max = …)` 收住的是它自己；`Column`/`AnimatedContent` 里的滚动
+ * 容器仍可能拿到无界高度，viewport 和内容一样高就永远滚不动，多出的内容被直接裁掉。
+ * 主体内容用它给滚动容器设 `heightIn(max = LocalGimiSheetBodyMaxHeight.current)` 才有
+ * 确定的可滚动范围。短内容仍贴着自身高度长，抽屉不会被强行拉高。
+ * 抽屉外（例如预览）读到 [Dp.Unspecified]，按不限高处理。
+ */
+val LocalGimiSheetBodyMaxHeight: ProvidableCompositionLocal<Dp> =
+    staticCompositionLocalOf { Dp.Unspecified }
+
+/**
  * 抽屉基础容器：模态外壳 + 顶部横杆 + 连续高度 + 固定插槽骨架。
  *
  * 抽屉贴着内容长：主体的高度上限由 [initialHeight] 给出，内容比它短时抽屉就只长到
@@ -138,7 +151,8 @@ val LocalGimiSheetController: ProvidableCompositionLocal<GimiSheetController> =
  * @param height 外部指定的高度上限；抽屉分页时用它切换。拖动结果在下一次外部变更前有效。
  * @param header 标题区，固定在主体上方，不随主体滚动。
  * @param footer 底部操作区，固定在主体下方。
- * @param content 主体内容，高度由内容自身决定，滚动由调用方实现。
+ * @param content 主体内容，高度由内容自身决定，滚动由调用方实现；滚动容器的高度上限
+ * 从 [LocalGimiSheetBodyMaxHeight] 读取。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,6 +171,10 @@ fun GimiSheetBase(
     val scope = rememberCoroutineScope()
     val controller = remember(sheetState, scope) { GimiSheetController(sheetState, scope) }
     var dismissed by remember { mutableStateOf(false) }
+    val isDark = LocalGimiDarkTheme.current
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    // 深色模态浮层使用 surfaceContainerHigh 以清晰辨认圆角边界；浅色使用设置画布色（surfaceContainerLow）。
+    val sheetColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else preferenceCanvasColor()
 
     fun notifyDismissed() {
         if (dismissed) return
@@ -172,8 +190,8 @@ fun GimiSheetBase(
         // 内容滚动因此永远不会带动抽屉。
         sheetGesturesEnabled = false,
         dragHandle = null,
-        containerColor = preferenceCanvasColor(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = sheetColor,
+        shape = sheetShape,
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalGimiSheetController provides controller) {
@@ -257,7 +275,9 @@ fun GimiSheetBase(
                             )
                             .clipToBounds(),
                     ) {
-                        content()
+                        CompositionLocalProvider(LocalGimiSheetBodyMaxHeight provides effectiveBodyCap) {
+                            content()
+                        }
                     }
                     Box(
                         modifier = Modifier

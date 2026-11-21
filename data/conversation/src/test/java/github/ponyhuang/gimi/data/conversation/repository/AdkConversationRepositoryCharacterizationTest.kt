@@ -85,7 +85,8 @@ class AdkConversationRepositoryCharacterizationTest {
         val expected = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("mcp-1"),
         )
-        coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
+        coEvery { metadataDao.get("test-user", "session-1") } returns ConversationMetadataEntity(
+            partition = "test-user",
             sessionId = "session-1",
             toolConfigurationJson = ConversationToolConfigurationCodec.encode(expected),
         )
@@ -107,7 +108,7 @@ class AdkConversationRepositoryCharacterizationTest {
 
         // 只读窗口，不再反序列化整段历史。
         assertEquals(20, configs.single()?.numRecentEvents)
-        coVerify { metadataDao.setLastMessage("session-1", "最后一条回答") }
+        coVerify { metadataDao.setLastMessage("test-user", "session-1", "最后一条回答") }
         assertEquals("最后一条回答", repository.conversations.value.single().lastMessage)
     }
 
@@ -116,8 +117,9 @@ class AdkConversationRepositoryCharacterizationTest {
         coEvery { sessionService.listSessions(appName = any(), userId = any()) } returns mockk {
             every { sessions } returns listOf(sessionWithEvents())
         }
-        coEvery { metadataDao.getAll() } returns listOf(
+        coEvery { metadataDao.getAll("test-user") } returns listOf(
             ConversationMetadataEntity(
+                partition = "test-user",
                 sessionId = "session-1",
                 lastMessage = "重启后仍然可见的预览",
             ),
@@ -136,7 +138,7 @@ class AdkConversationRepositoryCharacterizationTest {
             Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
         )
         coEvery { sessionService.getSession(any(), any()) } returns session
-        coEvery { metadataDao.setLastMessage(any(), any()) } throws IllegalStateException("metadata unavailable")
+        coEvery { metadataDao.setLastMessage(any(), any(), any()) } throws IllegalStateException("metadata unavailable")
         val repository = repository()
 
         repository.refreshConversation("session-1")
@@ -152,7 +154,8 @@ class AdkConversationRepositoryCharacterizationTest {
             Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = null)))),
         )
         coEvery { sessionService.getSession(any(), any()) } returns session
-        coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
+        coEvery { metadataDao.get("test-user", "session-1") } returns ConversationMetadataEntity(
+            partition = "test-user",
             sessionId = "session-1",
             lastMessage = "上一次的预览",
         )
@@ -198,6 +201,7 @@ class AdkConversationRepositoryCharacterizationTest {
 
         coVerify {
             metadataDao.setToolConfiguration(
+                "test-user",
                 "session-1",
                 match { payload ->
                     ConversationToolConfigurationCodec.decode(payload) == configuration
@@ -216,7 +220,7 @@ class AdkConversationRepositoryCharacterizationTest {
         repository.notifyConversationContentChanged("session-1")
         repository.deleteConversation("session-1")
         coVerify(exactly = 1) { sessionService.deleteSession(match { it.id == "session-1" }) }
-        coVerify(exactly = 1) { metadataDao.delete("session-1") }
+        coVerify(exactly = 1) { metadataDao.delete("test-user", "session-1") }
         assertEquals(emptyMap<String, Long>(), repository.conversationContentRevisions.value)
     }
 
@@ -232,7 +236,7 @@ class AdkConversationRepositoryCharacterizationTest {
         } catch (actual: java.io.IOException) {
             assertEquals(error, actual)
         }
-        coVerify(exactly = 0) { metadataDao.delete(any()) }
+        coVerify(exactly = 0) { metadataDao.delete(any(), any()) }
         assertEquals(mapOf("session-1" to 1L), repository.conversationContentRevisions.value)
     }
 
@@ -240,7 +244,7 @@ class AdkConversationRepositoryCharacterizationTest {
     fun deleteConversationPropagatesMetadataFailure() = runTest {
         coEvery { sessionService.deleteSession(any()) } returns Unit
         val error = IllegalStateException("metadata unavailable")
-        coEvery { metadataDao.delete("session-1") } throws error
+        coEvery { metadataDao.delete("test-user", "session-1") } throws error
         try {
             repository().deleteConversation("session-1")
             throw AssertionError("Metadata failure was swallowed")
@@ -258,7 +262,7 @@ class AdkConversationRepositoryCharacterizationTest {
         } catch (_: CancellationException) {
             // 取消不能转换成删除成功。
         }
-        coVerify(exactly = 0) { metadataDao.delete(any()) }
+        coVerify(exactly = 0) { metadataDao.delete(any(), any()) }
     }
 
     private fun repository() = AdkConversationRepository(

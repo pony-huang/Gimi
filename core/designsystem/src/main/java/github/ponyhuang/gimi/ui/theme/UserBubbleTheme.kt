@@ -6,31 +6,32 @@ import androidx.compose.ui.graphics.Color
 /**
  * 聊天气泡 —— 用户角色专用配色。
  *
- * 故意独立于 [androidx.compose.material3.MaterialTheme.colorScheme]，原因：
+ * 对齐 M3 黑白墨灰（Monochrome Ink-Gray）体系的 `surfaceContainerHighest` 角色：
  *
- * 1. **稳定性**：动态色（Material You，Android 12+）下 `primary` 会随壁纸变化，
- *    而用户希望气泡"始终温暖"，不希望出现冷蓝色或暗紫色的"变色"气泡。
- * 2. **角色语义**：用户气泡代表"我自己"，用一组与品牌色不同的暖色能让对话
- *    一眼分辨说话方，无需看对齐方向。
- * 3. **可读性**：暖杏/焦糖的明度经过挑选 —— 不刺眼、不发灰，长时间对话不疲倦。
+ * 1. **层次清晰**：用户气泡采用高阶墨灰容器（浅色 `#E0E0E5` / 深色 `#2E2E33`），
+ *    与无气泡背景的助手长文本回复自然拉开视觉层级。
+ * 2. **可读性**：搭配高对比深墨字/宣白字，长时间阅读不刺眼、不疲倦。
  *
  * 通过 [LocalUserBubbleColors] 在 [GimiTheme] 中按 dark/light 模式注入；
  * 调用方直接读取 [LocalUserBubbleColors.current]，无需中间 wrapper。
+ *
+ * @property container 气泡容器背景色。
+ * @property onContainer 气泡内文字与图标前景色。
  */
 data class UserBubbleColors(
     val container: Color,
     val onContainer: Color,
 )
 
-/** 浅色模式 —— 低对比浅灰，保留文字可读性而不过分抢眼。 */
+/** 浅色模式 —— 淡墨灰容器（`surfaceContainerHighest`），保留文字高可读性。 */
 val LightUserBubbleColors = UserBubbleColors(
-    container = Color(0xFFE9E9E9),
+    container = NeutralLightSurfaceContainerHighest,
     onContainer = NeutralLightText,
 )
 
-/** 深色模式 —— 深灰表面，和聊天背景形成柔和层级。 */
+/** 深色模式 —— 焦墨灰容器（`surfaceContainerHighest`），和徽墨黑聊天背景形成柔和层级。 */
 val DarkUserBubbleColors = UserBubbleColors(
-    container = Color(0xFF262626),
+    container = NeutralDarkSurfaceContainerHighest,
     onContainer = NeutralDarkText,
 )
 

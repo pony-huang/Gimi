@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.data.conversation.repository
 
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
@@ -20,6 +21,7 @@ import kotlinx.coroutines.sync.withLock
 /** [ConversationSessionResolver] 的进程级实现，保证恢复和创建不会并发生成多个当前会话。 */
 @Singleton
 class DefaultConversationSessionResolver @Inject constructor(
+    @AssistantConversationPartition
     private val conversations: ConversationRepository,
     private val modelCatalog: ModelCatalogRepository,
     private val mcpRepository: McpRepository,

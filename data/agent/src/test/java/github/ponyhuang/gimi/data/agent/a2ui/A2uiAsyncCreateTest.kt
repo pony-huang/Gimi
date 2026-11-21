@@ -19,8 +19,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
-import github.ponyhuang.gimi.data.modelaccess.ModelConfig
-import github.ponyhuang.gimi.data.modelaccess.toRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 
 /** 真实 Runner 的异步交付、取消与归档回归，避免主 Agent 等待及后台付费调用泄漏。 */
 class A2uiAsyncCreateTest {

@@ -4,7 +4,8 @@ import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.UrlContextTool
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.data.modelaccess.VendorLocalToolBinder
 import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmReaderTool
 import github.ponyhuang.gimi.data.modelaccess.glm.tool.GlmWebSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
@@ -121,7 +122,7 @@ class DefaultOfficialToolsetTest {
     fun skipsCrossModelToolsWhenTheirServiceDisablesOfficialTools() = runTest {
         val modelServices = allServices(officialToolsEnabled = false)
         val catalog = testCatalog(modelServices)
-        val factory = OfficialToolFactory(testHttpClient(), modelServices)
+        val factory = OfficialToolFactory(modelServices, VendorLocalToolBinder(testHttpClient()))
 
         val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository()).resolveTools(
             config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
@@ -261,7 +262,7 @@ class DefaultOfficialToolsetTest {
     fun glmToolsEmptyWithoutCredentials() = runTest {
         val modelServices = emptyServices()
         val catalog = testCatalog(modelServices)
-        val factory = OfficialToolFactory(testHttpClient(), modelServices)
+        val factory = OfficialToolFactory(modelServices, VendorLocalToolBinder(testHttpClient()))
 
         assertTrue(
             DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository())
@@ -372,7 +373,7 @@ class DefaultOfficialToolsetTest {
         val client = cannedClient(500, "{}") { requests.incrementAndGet() }
         val services = allServices("key")
         val catalog = testCatalog(services)
-        val factory = OfficialToolFactory(client, services)
+        val factory = OfficialToolFactory(services, VendorLocalToolBinder(client))
         val functions = catalog.listFunctions("kimi_web_tools")
         val spec = catalog.all.single { it.toolId == "kimi_web_tools" }
         assertEquals(functions.map { it.id }, factory.createTools(spec).map { it.name })
@@ -384,7 +385,7 @@ class DefaultOfficialToolsetTest {
         val client = cannedClient(500, "{}")
         val services = allServices("key")
         val catalog = testCatalog(services)
-        val factory = OfficialToolFactory(client, services)
+        val factory = OfficialToolFactory(services, VendorLocalToolBinder(client))
         for (spec in catalog.all) {
             assertTrue("Missing factory for ${spec.toolId}", factory.createTools(spec).isNotEmpty())
         }
@@ -400,7 +401,7 @@ class DefaultOfficialToolsetTest {
         val services = allServices(credential)
         return DefaultOfficialToolset(
             testCatalog(services),
-            OfficialToolFactory(httpClient, services),
+            OfficialToolFactory(services, VendorLocalToolBinder(httpClient)),
             FakeToolAccessRepository(toolAccessMode),
         )
     }

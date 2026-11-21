@@ -2,243 +2,130 @@
 
 [简体中文](../../zh/voice/runtime.md) · English
 
-> Deep dive of [Realtime voice system](realtime-voice-system.md): the state
-> machine and the three generation counters, audio device routing, background
-> survival (foreground service and call ending), and the reliability rules —
-> timeouts, deliberate non-retrying, backpressure, and cancellation propagation.
+> Companion to [Realtime voice system](realtime-voice-system.md). Keeps only what
+> code cannot tell you: why the state/counter split exists, routing and lifecycle
+> gotchas, and reliability contracts. Names, tables, and exact timeouts: read the code.
+
+Audience: coding agents working on Gimi's realtime voice feature.
 
 ## State machine
 
-`RealtimeVoicePhase` transitions:
+Read the current `RealtimeVoicePhase` transitions in code. Two facts to internalize:
 
-| From | Event | To |
-|---|---|---|
-| `Idle` | `start()` succeeded (recording running) | `Listening` |
-| `Listening` | An utterance was segmented (already switched back from `Speaking` at onset) | `Transcribing` |
-| `Transcribing` | Recognition empty | `Listening` |
-| `Transcribing` | Non-empty text | `Thinking` (turn generation +1) |
-| `Thinking` | First audio block actually written to `AudioTrack` | `Speaking` |
-| `Speaking` | **Segment played out (no exceptions; every segment takes this edge)** | `Thinking` |
-| `Thinking` | Segment flow ended and the last segment also played out | `Listening` |
-| Any (including `Speaking`) | Local onset / backend `Interrupted` / playback generation invalidated | `Listening` |
-| Any | `fail(failure)` | `Failed` (session alive, audio stopped) |
-| `Failed` | `retry()` | fresh `start()` → `Listening` |
-| Any | `close()` | `Closed` (terminal) |
+- `Thinking` and `Speaking` alternate **per segment**, not once per turn. Each
+  played segment writes the phase back to `Thinking`; only the end of the segment
+  flow writes `Listening` — a two-hop `Speaking → Thinking → Listening`.
+- Barge-in (local onset / backend `Interrupted` / playback generation check) is
+  one action: stop playback, cancel generation, clear captions, return to
+  `Listening`; only the trigger origin differs.
 
-The table has one cycle worth internalizing: **`Thinking` and `Speaking`
-alternate per segment**, it is not a one-shot `Thinking → Speaking`. In code,
-`playSegment()` always writes the phase back to `Thinking` after playback, and
-only `reply()` writes `Listening` after `playback.join()` returns (segment flow
-closed). So "last segment played out" is a two-hop `Speaking → Thinking →
-Listening`, never a direct jump.
+`listening` is **orthogonal to `phase`** and stored separately: the mic keeps
+capturing during playback for barge-in. `speechStarted()` checks only
+`closed`/`started`/`muted`, never `phase` — never infer mic state from `phase != Speaking`.
 
-The three barge-in sources collapse into one row because they do exactly the same
-thing: stop playback + cancel generation + clear captions + return to
-`Listening`. They differ only in where the trigger originates (local VAD /
-backend event / player generation check).
+## Three generation counters — do not conflate
 
-### Why `listening` is separate from `phase`
+| Counter (code name) | Guards against |
+|---|---|
+| `inputRevision` (session-private `Long`) | stale **recognition** results |
+| `state.revision` ("turn generation") | stale **generation / playback / caption** results |
+| `RealtimePcmPlayer.generation` ("playback generation") | old audio **not yet written** |
 
-The domain comment answers this directly: "the phase of speaking and inference;
-listening state is stored separately because the microphone must keep capturing
-during playback to support barge-in". The code agrees: `speechStarted()` checks
-only `closed` / `started` / `muted`, **never `phase`** — that is what makes a
-`Speaking` state interruptible (given it is unmuted).
+"Turn generation" here always means `state.revision`, not the player's
+`generation`; `inputRevision` guards only recognition. Each guards a different
+segment — mixing them writes the wrong guard. Together they silently drop late
+async results after cancellation instead of leaking an old answer's audio into a new turn.
 
-So do not infer "is the mic capturing" from `phase != Speaking`; the two are
-orthogonal.
-
-### Three generation counters, do not conflate
-
-| Counter | Incremented when | Discards |
-|---|---|---|
-| `inputRevision` (session-private `Long`) | Speech onset, mute toggling, failure, `finishPendingTurn`, `close` | Stale **recognition** results |
-| `state.revision` (in the state snapshot; "turn generation") | Each successful recognition entering `Thinking` | Stale **generation / playback / caption** results |
-| `RealtimePcmPlayer.generation` (inside the player; "playback generation") | `stop()` or a new `play()` | Audio from an old turn **not yet written** |
-
-Terminology warning: in this document **"turn generation" always means
-`state.revision`**, which is not the player's `generation`; `inputRevision` guards
-only the recognition side. Each layer guards a different segment, and mixing them
-up produces wrong guard conditions. Together they ensure late async results after
-a cancellation are silently dropped instead of leaking an old answer's captions
-or audio into a new turn.
-
-Additionally, `recognize()` calls `replyJob?.cancelAndJoin()` before starting a
-new turn — the previous turn must be genuinely cancelled and its text submitted
-before the next turn may take backend ownership. That is a correctness
-requirement, not a performance trade-off.
+`recognize()` calls `replyJob?.cancelAndJoin()` before a new turn: the old turn
+must be genuinely cancelled and its text submitted before the next owns the
+backend. Correctness, not optimization.
 
 ## Audio devices and routing
 
-Enumeration comes from `AudioManager.availableCommunicationDevices` (the call
-routing device set, not all output devices). Types map to six kinds: speaker /
-earpiece / Bluetooth (including BLE and hearing aids) / wired / USB / other.
+Enumeration is `AudioManager.availableCommunicationDevices` (call-routing set,
+not all outputs). Selection is a pure function (`VoiceAudioDeviceSelection`) —
+read it for the rule. "Headphones" means Bluetooth / wired / USB, **not** speaker
+or earpiece.
 
-Selection is a pure function (`VoiceAudioDeviceSelection`):
+Gotchas:
 
-```text
-manual selection if present -> headphones in reverse connect order -> speaker -> first in list
-```
-
-"Headphones" here means Bluetooth / wired / USB — **not** speaker or earpiece.
-
-"Connect order" is the first-seen order the controller records itself, not the
-platform list order: platform order is unstable and would make "auto" jump to an
-unexpected device after a plug event.
-
-Timing details that bite:
-
-- Route changes **reset the DSP** (`echoCanceller.reset()` / `detector.reset()` /
-  `segmenter.reset()`), and the reset is dispatched to an IO thread. Doing it on
-  the main thread while holding `inputLock` contends with the capture thread's
-  per-frame DSP, which shows up as jank.
-- `devicesChanged()` refreshes twice: immediately, then **again 1000 ms later**.
-  A Bluetooth call endpoint may appear after the physical-device notification.
-- Switching has a 30-second confirmation timeout. If it still has not taken
-  effect, the preference is cleared, `selectionFailed` is set, and
-  `clearCommunicationDevice()` runs.
-- Disconnects and switch failures are distinguished **by a monotonically
-  increasing `noticeRevision`**; `selectionFailed` is only a label for the latest
-  event. Using a Long instead of a Boolean lets two consecutive Bluetooth
-  disconnects each raise their own notice.
-- `close()` restores the communication device snapshotted at `start()`, ignoring
-  late callbacks.
-
-The code never calls `startBluetoothSco()` or `setSpeakerphoneOn()`; Bluetooth
-relies purely on `setCommunicationDevice` + `MODE_IN_COMMUNICATION`. Actual
-A2DP/SCO switching behaviour can only be verified on real hardware.
+- "Connect order" is the controller's own first-seen order, **not** platform order
+  (unstable → "auto" would jump devices after a plug event).
+- Route changes reset the DSP on an **IO thread**; on the main thread under
+  `inputLock` this contends with per-frame capture DSP and shows up as jank.
+- `devicesChanged()` refreshes twice — now and again 1000 ms later — because a
+  Bluetooth call endpoint can appear after the physical-device notice.
+- Switching has a confirmation timeout; on failure clear preference, mark
+  `selectionFailed`, call `clearCommunicationDevice()`.
+- Disconnects vs. switch failures use a **monotonic `noticeRevision`** (Long, so
+  two consecutive BT disconnects each raise a notice); `selectionFailed` only
+  labels the latest event.
+- `close()` restores the device snapshotted at `start()`, ignoring late callbacks.
+- No `startBluetoothSco()` / `setSpeakerphoneOn()`; Bluetooth relies solely on
+  `setCommunicationDevice` + `MODE_IN_COMMUNICATION`. Real A2DP/SCO behavior needs
+  on-device verification.
 
 ## Background and lifecycle
 
-### Why leaving the page does not end the call
+A call survives leaving the page because the `@Singleton`
+`RealtimeVoiceCallController` owns the session and teardown on application-scoped
+coroutines; page, navigation, and foreground changes never cancel them. The
+`ViewModel` only derives UI state and **never holds the session**.
 
-`RealtimeVoiceCallController` is a `@Singleton` with its own
-`SupervisorJob + Dispatchers.Main.immediate` scope. The session, state
-collection, and the teardown chain all live on application-level coroutines, so
-page destruction, navigation, and foreground/background changes never cancel
-recording, generation, or playback.
+Foreground service:
 
-Conversely, `RealtimeVoiceViewModel` only derives UI state in `viewModelScope` and
-**never holds the session**.
+- Type `microphone` (required for background mic use since Android 14).
+- `START_NOT_STICKY`: no cross-process-resumable session exists, and a restarted
+  idle service would just squat the microphone.
+- Channel ID is immutable after creation — raising importance needs a **new ID**;
+  the legacy channel is deleted at creation.
+- Promotion must (1) happen **before deciding to exit** (else
+  `startForegroundService` times out) and (2) run in **every `onStartCommand`**,
+  not just `onCreate`, so a failed first attempt or system downgrade can recover.
+- Wake lock renewal failure has no special handling: the call continues but the
+  process may freeze after screen-off — a known weak point.
 
-### Foreground service
-
-- Type `microphone` (mandatory for background microphone use since Android 14).
-- `START_NOT_STICKY`: no restart after process death. There is no
-  cross-process-resumable audio session, and an idle service would just squat on
-  the microphone.
-- Notification channel `realtime_voice_call_v2` (`IMPORTANCE_DEFAULT`). Channel
-  importance is immutable after creation, so upgrading from the legacy
-  `realtime_voice_call` requires a new ID, and the old channel is deleted on
-  creation.
-- The notification snapshot collapses to `VoiceCallNotificationContent` (phase,
-  mute, ending, title, backgrounded). Mic levels and streaming captions
-  **never** trigger a notification refresh.
-- Wake lock `PARTIAL_WAKE_LOCK`, 10-minute expiry, renewed every 5 minutes.
-  Renewal failure has **no** special handling: it does not end the call, but the
-  process may be frozen after screen-off. This is a known weak point.
-
-Two ordering constraints must hold:
-
-1. **Promote to foreground before deciding to exit.** Otherwise
-   `startForegroundService` times out and throws
-   `ForegroundServiceDidNotStartInTimeException`.
-2. **Attempt foreground promotion in every `onStartCommand`**, not just
-   `onCreate`. When the app returns to the foreground, `ensureForeground()` only
-   reaches `onStartCommand` for an already-running service; if promotion were not
-   repeatable, recovery from a failed first attempt or a system downgrade would be
-   impossible.
-
-### Ending a call
-
-There are exactly two entries, and both converge on
-`RealtimeVoiceCallController.end()`:
-
-- the in-page **End call** (which requires returning to the voice page via the
-  text chat's voice button or by tapping the notification);
-- the **End call** action on the status-bar notification.
-
-`end()` is idempotent, and the `ending` state is held until `close()` returns —
-the foreground service and wake lock must cover the entire release. The teardown
-coroutine runs in `NonCancellable`: neither leaving the page nor starting a new
-session may truncate the release of the old microphone ownership.
-
-Release order in the session-level `close()` (the order is itself the contract):
-
-```text
-stop playback (player.stop -> generation++)
-  -> stop and join recording (recorder.releaseAndJoin)
-  -> cancel recognition / join the reply job
-  -> release the DSP under inputLock
-  -> session.close() (failure degrades to Persistence but does not block the rest)
-  -> restore audio focus and routing, restore audio.mode
-  -> phase = Closed, cancel the scope
-```
-
-Recording must be `cancel()` + `stop()`-ed so the blocking `read()` returns, and
-only then `release()`-ed while the IO thread is still parked in `read` — that is
-the device-specific crash path.
-
-Audio focus deliberately **does not register a loss listener**: closing the
-session because another app briefly stole focus would cause spurious
-interruptions, so focus changes are advisory only.
+Ending a call: every hang-up path converges on the controller's `end()`; navigation
+waits for `ending` to clear. `end()` is idempotent; `ending` is held until `close()`
+returns and teardown runs in `NonCancellable`, so nothing truncates release of the
+old mic ownership. The **release order in `close()` is itself the contract** (see
+code): stop playback → stop/join recording → cancel recognition and join the reply
+job → release DSP → `session.close()` → restore focus, routing, and mode → `Closed`,
+cancel scope. Recording must be `cancel()`+`stop()`-ed so blocking `read()` returns,
+then `release()`-ed while the IO thread is still in `read` — the device-specific
+crash path. Audio focus has **no loss listener**: a brief steal must not spuriously
+end the call, so focus changes are advisory only.
 
 ## Reliability
 
-### Timeouts
+Timeouts span DashScope/MiniMax handshakes, route confirmation, and connectivity
+probes (locations and exact values live in code):
 
-| Location | Timeout | Purpose |
-|---|---|---|
-| DashScope awaiting `task-started` | 15 s | With heartbeats, a "half-dead" server never surfaces as a disconnect |
-| DashScope synthesis `task-started` | 15 s | Same |
-| MiniMax bidi `task_started` | 15 s | Close the connection on timeout |
-| MiniMax bidi `task_flushed` | 10 s | Throws `IOException` on timeout |
-| MiniMax bidi teardown | 3 s | Wait for `task_finished` |
-| Route confirmation | 30 s | Roll back if not applied |
-| Connectivity probe | 15 s | Handshake / `GET /models` |
+| Location | Why a deadline is needed |
+|---|---|
+| Recognition & synthesis `task-started` | heartbeats keep a half-dead server from surfacing as a disconnect |
+| Bidi `task_started` / `task_flushed` / teardown | bound connection setup, flush, and finish waits |
+| Route confirmation | roll back a switch that never takes effect |
+| Connectivity probe | bound handshake / `GET /models` |
 
-Every timeout is deliberately wrapped in `withContext(Dispatchers.IO)`: a comment
-states that the limit must run on a real dispatcher rather than the caller's
-virtual-time test dispatcher, so no matter what context the caller is in, the
-timeout falls back to a real clock.
+**Every timeout must run on a real dispatcher**, never the caller's virtual-time
+test dispatcher — each is wrapped in `withContext(Dispatchers.IO)` to fall back to
+a real clock.
 
-### Not retrying is deliberate
+Not retrying is deliberate: recognition bills by **audio duration**, synthesis by
+**character**, so replay double-bills. WS/HTTP clients disable connection failure
+retries; the only "reconnect" is a fresh connection per turn. The sole user-visible
+retry is `Session.retry()` in `Failed` state, which rebuilds the recording stream
+and DSP rather than resuming playback.
 
-Recognition and synthesis **never retry**, and the reason lives in code comments
-worth preserving:
+Backpressure (rationale — see code for channel types): inbound frames use an
+unbounded queue because dropping silently loses audio and is harder to diagnose
+than a backlog; outbound audio delays past a size threshold to stop uplink buildup;
+segment delivery and cascaded `emit`/`await` are serialized so a returned `emit`
+means the consumer accepted it — no synthesis running ahead or accumulating billable requests.
 
-- Recognition bills by **audio duration**, so replaying the audio double-bills.
-- Synthesis bills by **character**, so replaying the same text double-bills.
-
-Hence the WebSocket client sets `retryOnConnectionFailure(false)` globally and
-each HTTP client disables it too. The only "auto-reconnect" is really a fresh
-connection per turn.
-
-The only user-visible retry is `RealtimeVoiceSession.retry()`, available **in
-`Failed` state only**. It rebuilds the recording stream and reopens the DSP rather
-than merely resuming playback.
-
-### Backpressure
-
-| Layer | Mechanism | Rationale |
-|---|---|---|
-| WS inbound frames | `Channel(UNLIMITED)` | A bounded queue with drops would silently lose audio frames, which is harder to diagnose than a backlog |
-| WS outbound audio | `delay(10)` once the queue exceeds 1 MB | Prevents uplink buildup |
-| Simple-mode audio segments | `Channel(RENDEZVOUS)` | Production is authorized only when collection starts, and cancelling playback wakes a blocked connection |
-| Between segments (session layer) | `Channel(1)` | Genuine serial playback across segments |
-| Playback writes | Non-blocking + `delay(5)` | No stale audio after cancellation |
-| Cascaded delivery | `Channel(RENDEZVOUS)` + `await` | A returned `emit` means the consumer accepted it, preventing synthesis from running ahead or accumulating billable requests |
-
-### Cancellation must propagate unchanged
-
-`CancellationException` is never mapped to a business failure. Three concrete
-practices:
-
-- `core:common/cancellationAwareRunCatching` catches cancellation before generic
-  exceptions.
-- `CascadedVoiceModel` expresses interruption with `TurnInterrupted` /
-  `ConnectionClosed`, both extending `CancellationException`, and calls
-  `ensureActive()` before emitting the `interrupted` event — so a genuine
-  cancellation is never mistaken for a server-side interrupt.
-- All `close()` teardown runs in `NonCancellable`; cancellation cannot truncate
-  resource release.
+Cancellation must propagate unchanged: never map `CancellationException` to a
+business failure. Catch cancellation before generic exceptions
+(`cancellationAwareRunCatching`); express interrupts with `CancellationException`
+subtypes and call `ensureActive()` before emitting the interrupt event (a real
+cancel is not a server interrupt); run all `close()` teardown in `NonCancellable`.

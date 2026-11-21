@@ -18,10 +18,13 @@ import github.ponyhuang.gimi.data.conversation.export.AndroidConversationExportR
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.gimi.data.conversation.repository.DefaultConversationSessionResolver
+import github.ponyhuang.gimi.data.conversation.repository.DefaultChatbotConversationResolver
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
 import github.ponyhuang.gimi.domain.conversation.export.ConversationExportRepository
+import github.ponyhuang.gimi.data.conversation.local.UploadedFileDao
+import github.ponyhuang.gimi.data.conversation.repository.DefaultUploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
@@ -29,11 +32,21 @@ import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
+import github.ponyhuang.gimi.domain.conversation.runtime.ChatbotConversationPartition
+import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object ConversationModule {
+
+    @Provides
+    @Singleton
+    fun provideChatbotRoleRepository(
+        implementation: github.ponyhuang.gimi.data.conversation.repository.ChatbotRolePreferences,
+    ): github.ponyhuang.gimi.domain.conversation.repository.ChatbotRoleRepository = implementation
+
 
     @Provides
     @Singleton
@@ -93,11 +106,13 @@ object ConversationModule {
 
     @Provides
     @Singleton
-    fun provideConversationRepository(
+    @AssistantConversationPartition
+    fun provideAssistantConversationRepository(
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
         subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository,
+        voiceOverrides: VoiceOverrideRepository,
     ): ConversationRepository = AdkConversationRepository(
         appName = AgentSessionIdentity.APP_NAME,
         userId = AgentSessionIdentity.DEFAULT_USER_ID,
@@ -105,6 +120,25 @@ object ConversationModule {
         metadataDao = database.conversationMetadataDao(),
         context = context,
         subtasks = subtasks,
+        voiceOverrides = voiceOverrides,
+    )
+
+    @Provides
+    @Singleton
+    @ChatbotConversationPartition
+    fun provideChatbotConversationRepository(
+        @ApplicationContext context: Context,
+        sessionService: SessionService,
+        database: ConversationMetadataDatabase,
+        voiceOverrides: VoiceOverrideRepository,
+    ): ConversationRepository = AdkConversationRepository(
+        appName = AgentSessionIdentity.APP_NAME,
+        userId = AgentSessionIdentity.CHATBOT_USER_ID,
+        sessionService = sessionService,
+        metadataDao = database.conversationMetadataDao(),
+        context = context,
+        subtasks = null,
+        voiceOverrides = voiceOverrides,
     )
 
     @Provides
@@ -112,5 +146,23 @@ object ConversationModule {
     fun provideConversationSessionResolver(
         implementation: DefaultConversationSessionResolver,
     ): ConversationSessionResolver = implementation
+
+    @Provides
+    @Singleton
+    fun provideChatbotConversationResolver(
+        implementation: DefaultChatbotConversationResolver,
+    ): github.ponyhuang.gimi.domain.conversation.chatbot.ChatbotConversationResolver = implementation
+
+    @Provides
+    @Singleton
+    fun provideUploadedFileDao(
+        database: ConversationMetadataDatabase,
+    ): UploadedFileDao = database.uploadedFileDao()
+
+    @Provides
+    @Singleton
+    fun provideUploadedFileRegistry(
+        implementation: DefaultUploadedFileRegistry,
+    ): github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry = implementation
 
 }

@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.feature.plugin
 
-import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallbackRequest
@@ -140,14 +139,13 @@ class PluginConfigViewModelTest {
         )
         viewModel.load("zhihu")
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginConfigAction.Save)
+        viewModel.onAction(PluginConfigAction.Save)
+        advanceUntilIdle()
 
-            assertEquals(
-                PluginConfigEffect.ShowToast(messageRes = R.string.plugin_config_saved),
-                awaitItem(),
-            )
-        }
+        assertEquals(
+            PluginConfigNotice.ShowToast(messageRes = R.string.plugin_config_saved),
+            viewModel.state.value.notice,
+        )
     }
 
     @Test
@@ -179,11 +177,10 @@ class PluginConfigViewModelTest {
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginConfigAction.RunAction("login"))
+        viewModel.onAction(PluginConfigAction.RunAction("login"))
+        advanceUntilIdle()
 
-            assertEquals(PluginConfigEffect.ShowToast(message = "Authorized"), awaitItem())
-        }
+        assertEquals(PluginConfigNotice.ShowToast(message = "Authorized"), viewModel.state.value.notice)
         assertEquals(listOf("spotify" to "login"), repository.runActionCalls)
         // 执行结束后 running 复位。
         assertEquals(false, viewModel.state.value.actions.single().running)
@@ -236,17 +233,16 @@ class PluginConfigViewModelTest {
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginConfigAction.RunAction("login"))
-            advanceUntilIdle()
-            assertEquals("login", viewModel.state.value.callback?.actionId)
-            viewModel.onAction(PluginConfigAction.ReceiveActionCallback("login", values))
+        viewModel.onAction(PluginConfigAction.RunAction("login"))
+        advanceUntilIdle()
+        assertEquals("login", viewModel.state.value.callback?.actionId)
+        viewModel.onAction(PluginConfigAction.ReceiveActionCallback("login", values))
+        advanceUntilIdle()
 
-            assertEquals(
-                PluginConfigEffect.ShowToast(message = "Authorization succeeded"),
-                awaitItem(),
-            )
-        }
+        assertEquals(
+            PluginConfigNotice.ShowToast(message = "Authorization succeeded"),
+            viewModel.state.value.notice,
+        )
         assertEquals(
             listOf(Triple("spotify", "login", PluginActionCallback(values))),
             repository.actionCallbackCalls,

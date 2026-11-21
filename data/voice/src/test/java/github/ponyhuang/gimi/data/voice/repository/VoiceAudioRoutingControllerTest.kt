@@ -10,7 +10,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
-/** 覆盖系统设备列表、用户偏好与会话清理的 Android 边界。 */
+/** 覆盖系统设备列表与自动路由失败/断开通知的 Android 边界。 */
 class VoiceAudioRoutingControllerTest {
     private val audio = mockk<AudioManager>(relaxed = true)
     private val handler = mockk<Handler>(relaxed = true)
@@ -32,29 +32,27 @@ class VoiceAudioRoutingControllerTest {
     }
 
     @Test
-    fun manuallySelectedSpeakerIsExplicitlyRequestedAndSurvivesConnections() {
+    fun automaticRoutingPrefersHeadsetAndSurvivesConnections() {
         controller.start()
-        controller.select(1)
-        callback.captured.onAudioDevicesAdded(arrayOf(headset))
-        assertEquals(1, state.preferredDeviceId)
-        assertEquals(1, state.currentDeviceId)
-        verify { audio.setCommunicationDevice(speaker) }
+        assertEquals(2, state.currentDeviceId)
+        verify { audio.setCommunicationDevice(headset) }
+        // 新设备连入只刷新列表，不改变已确认的实际输出。
+        callback.captured.onAudioDevicesAdded(arrayOf(speaker))
+        verify(exactly = 1) { audio.setCommunicationDevice(headset) }
     }
 
     @Test
-    fun disconnectResetsManualPreferenceAndNotifiesWithActualFallback() {
+    fun headsetDisconnectionFallsBackToSpeakerAndNotifies() {
         controller.start()
-        controller.select(2)
         devices = listOf(speaker)
         callback.captured.onAudioDevicesRemoved(arrayOf(headset))
-        assertNull(state.preferredDeviceId)
         assertEquals(1, state.currentDeviceId)
         assertEquals(1L, state.noticeRevision)
         assertFalse(state.selectionFailed)
     }
 
     @Test
-    fun rejectedSelectionKeepsActualDeviceAndReportsFailure() {
+    fun rejectedRoutingKeepsActualDeviceAndReportsFailure() {
         devices = listOf(speaker)
         controller.start()
         devices = listOf(speaker, headset)

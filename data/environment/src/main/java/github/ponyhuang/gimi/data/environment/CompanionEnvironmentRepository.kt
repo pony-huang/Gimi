@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,13 +34,43 @@ class CompanionEnvironmentRepository @Inject constructor(@ApplicationContext pri
         context.assets.open("environment-runtime.apk").use { input -> file.outputStream().use { input.copyTo(it) } }
         return file
     }
-    private val bundledVersion by lazy {
-        val info = context.packageManager.getPackageArchiveInfo(extractBundledApk().absolutePath, PackageManager.GET_META_DATA)
-            ?: throw IOException("Invalid bundled runtime")
-        check(info.packageName == RUNTIME_PACKAGE)
-        info.runtimeVersion()
+    /**
+     * 每个进程只解压一次；失败结果也缓存，避免状态轮询反复读 assets 并刷日志。
+     * 解压失败意味着当前安装包不完整（缺 assets/environment-runtime.apk），
+     * 属于构建/安装缺陷而非运行时故障，不能中断状态查询与推荐刷新等旁路调用。
+     */
+    private val bundledApk: Result<java.io.File> by lazy {
+        try {
+            Result.success(extractBundledApk())
+        } catch (error: Exception) {
+            Log.w(TAG, "Bundled runtime APK is unavailable", error)
+            Result.failure(error)
+        }
     }
-    override suspend fun companionApk(): String = withContext(Dispatchers.IO) { extractBundledApk().absolutePath }
+    /** 内置包不可读时返回 null：版本比较降级为“无内置版本”，环境状态仍可正常返回。 */
+    private val bundledVersion: RuntimeVersion? by lazy {
+        bundledApk.getOrNull()?.let { file ->
+            try {
+                val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, PackageManager.GET_META_DATA)
+                    ?: throw IOException("Invalid bundled runtime")
+                check(info.packageName == RUNTIME_PACKAGE)
+                info.runtimeVersion()
+            } catch (error: Exception) {
+                Log.w(TAG, "Bundled runtime APK is unreadable", error)
+                null
+            }
+        }
+    }
+    override suspend fun companionApk(): String = withContext(Dispatchers.IO) {
+        // 安装/更新是用户显式动作：缓存被回收时重新解压，资源缺失时给出明确失败文案。
+        val cached = bundledApk.getOrNull()
+        val file = cached?.takeIf { it.isFile } ?: try {
+            extractBundledApk()
+        } catch (error: Exception) {
+            throw IOException("Bundled runtime APK is unavailable", error)
+        }
+        file.absolutePath
+    }
 
     private fun PackageInfo.runtimeVersion() = RuntimeVersion(longVersionCode, versionName.orEmpty(),
         applicationInfo?.metaData?.getInt("github.ponyhuang.gimi.environment.API_VERSION", 0) ?: 0)
@@ -119,6 +150,10 @@ class CompanionEnvironmentRepository @Inject constructor(@ApplicationContext pri
         }
     override suspend fun stopJob(session: String, id: String) { call("stopJob", args(session).apply { putString("id", id) }) }
     private fun Bundle.commandResult() = EnvironmentCommandResult(getString("stdout").orEmpty(), getString("stderr").orEmpty(), getInt("exitCode"), getBoolean("timedOut"))
+
+    private companion object {
+        const val TAG: String = "CompanionEnvironment"
+    }
 }
 
 @Module

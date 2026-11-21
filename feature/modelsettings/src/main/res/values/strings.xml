@@ -67,8 +67,6 @@
     <string name="modelsettings_defaults_voice_title">播放音色</string>
     <string name="modelsettings_defaults_section_realtime">Realtime</string>
     <string name="modelsettings_defaults_realtime_model_title">Realtime 模型</string>
-    <string name="modelsettings_defaults_realtime_voice_title">Realtime 音色</string>
-    <string name="modelsettings_defaults_realtime_model_none">不使用 Realtime</string>
 
     <string name="modelsettings_dialog_pick_assistant">选择默认模型</string>
     <string name="modelsettings_dialog_pick_quick">选择快速模型</string>
@@ -76,7 +74,6 @@
     <string name="modelsettings_dialog_pick_tts">选择语音合成模型</string>
     <string name="modelsettings_dialog_pick_voice">选择播放音色</string>
     <string name="modelsettings_dialog_pick_realtime_model">选择 Realtime 模型</string>
-    <string name="modelsettings_dialog_pick_realtime_voice">选择 Realtime 音色</string>
     <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
@@ -246,6 +243,7 @@
     <string name="modelsettings_category_all">全部</string>
     <!-- 接口设置 -->
     <string name="modelsettings_field_protocol">接口协议</string>
+    <string name="modelsettings_protocol_locked_hint">该服务固定使用此接口协议，不可更换。</string>
     <string name="modelsettings_field_endpoint">接口地址</string>
     <string name="modelsettings_field_credential_source">密钥来源</string>
     <string name="modelsettings_credential_shared">使用共享密钥</string>
@@ -311,4 +309,6 @@
     <string name="modelsettings_protocol_openai">Completions</string>
     <string name="modelsettings_protocol_anthropic">Messages</string>
     <string name="modelsettings_protocol_gemini">Gemini</string>
+    <string name="modelsettings_file_upload">文件</string>
+    <string name="modelsettings_file_upload_subtitle">开启后该厂商全部模型支持文档附件，文档将上传至厂商文件服务</string>
 </resources>

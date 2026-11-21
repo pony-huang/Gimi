@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.feature.chat
 
-import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.VoiceFailure
@@ -70,6 +69,11 @@ sealed interface ChatAction {
     /** 删除指定会话（当前激活或进行中的会话会被拒绝并提示）。 */
     data class DeleteConversation(val sessionId: String) : ChatAction
 
+    /** 删除一条已上传的厂商文件；成功后本地注册表记录由网关同步移除。 */
+    data class DeleteUploadedFile(
+        val entry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry,
+    ) : ChatAction
+
     /** 最近会话面板的搜索、多选及删除操作。 */
     data class RecentConversations(val action: RecentConversationsAction) : ChatAction
 
@@ -98,20 +102,20 @@ sealed interface ChatAction {
 
     /** 用户关闭工具配置保存失败的提示。 */
     data object ClearToolConfigurationError : ChatAction
+    /** 确认一次性提示已呈现，清空 ChatUiState.notice。 */
+    data object ConsumeNotice : ChatAction
 }
 
 /**
- * 聊天页一次性 UI 反馈（Toast 等），由 Route 经 [ChatViewModel.effects] 通道消费；
+ * 聊天页命令式副作用（打开外部 URL 等），由 Route 经 [ChatViewModel.effects] 通道消费；
  * Android 副作用（Toast / 导航 / 权限）只发生在 Route。
  *
- * 当前 ViewModel 产生的瞬时反馈只有 notice 一类 —— 导航与附件打开均由 Route 自主发起，
- * 不经过 ViewModel，因此不引入多余的 effect 成员。
+ * 一次性提示（[ChatNotice]）不以事件流承载，改由 [github.ponyhuang.gimi.feature.chat.ChatUiState.notice]
+ * 状态字段传递，呈现后由 Route 消费清除；本通道只保留无法用状态表达的系统跳转命令。
  */
 sealed interface ChatEffect {
     /** 目录中的 openUrl 交给 Route 执行平台副作用。 */
     data class OpenA2uiUrl(val url: String) : ChatEffect
-    /** 向用户展示一条一次性提示；文案由 Route 侧解析（`ChatNotice` → stringResource / 动态文本）。 */
-    data class ShowNotice(val notice: ChatNotice) : ChatEffect
 }
 
 /**
@@ -120,6 +124,8 @@ sealed interface ChatEffect {
  */
 sealed interface ChatNotice {
     data object ConfigureChatModel : ChatNotice
+    /** 当前会话已经是新会话，无需重复创建。 */
+    data object AlreadyNewConversation : ChatNotice
     data object ModelSwitchBlocked : ChatNotice
     data object ParallelTaskLimitReached : ChatNotice
     data object CurrentConversationBusy : ChatNotice
@@ -143,8 +149,14 @@ sealed interface ChatNotice {
     /** 附件的 MIME 类型不受支持或单文件超过模型上限。 */
     data class AttachmentUnsupportedOrTooLarge(val displayName: String) : ChatNotice
 
+    /** 附件已上传到其他厂商的文件服务，无法随当前厂商的模型发送。 */
+    data class AttachmentVendorMismatch(val displayName: String) : ChatNotice
+
     /** 文档附件合计大小超过单次请求上限。 */
     data object DocumentTotalSizeLimitExceeded : ChatNotice
+
+    /** 已上传厂商文件删除失败；本地条目保留，用户可重试。 */
+    data object UploadedFileDeleteFailed : ChatNotice
 
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice

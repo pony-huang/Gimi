@@ -5,7 +5,8 @@ import com.google.adk.kt.models.*
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.types.*
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
+import github.ponyhuang.gimi.data.modelaccess.DefaultAgentLLMModelFactory
 import github.ponyhuang.gimi.domain.a2ui.*
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -40,11 +41,11 @@ class A2uiCreateRetryTest {
                 ))))))
             }
         }
-        val factory = mockk<AgentLLMModelFactory> {
+        val factory = mockk<DefaultAgentLLMModelFactory> {
             every { selectModelConfig(any()) } returns mockk(relaxed = true)
-            every { createModel(any()) } returns model
+            every { createModel(any(), any()) } returns model
         }
-        val retry = A2uiCreateRetry(factory, mockk(relaxed = true), sessions)
+        val retry = A2uiCreateRetry(AgentModelRuntime(factory), mockk(relaxed = true), sessions)
 
         val events = retry.retry("chat", ModelSelection("service", "group", "fixture"), task.callId, A2uiCapabilities("catalog", "{}")).toList()
 

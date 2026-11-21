@@ -4,74 +4,34 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.models.openai.ChatCompletions
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.InputAudioDataEncoding
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.OpenAiCompatibleChatCompletions
 import com.google.adk.kt.types.HttpOptions
+import github.ponyhuang.gimi.domain.modelaccess.AgentLlmModelSource
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
+import github.ponyhuang.gimi.domain.modelaccess.isOfficialDeepSeekAnthropicEndpoint
+import github.ponyhuang.gimi.domain.modelaccess.toolLoadingMode
+import github.ponyhuang.gimi.domain.modelaccess.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
 import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.Claude
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.AnthropicToolLoadingRequestConverter
-import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.toolLoadingMode
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageChat
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageToolLoadingRequestConverter
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.latestReminderContent
 
 /**
- * 解析后的模型配置（[AgentLLMModelFactory.createModel] 用）。
- *
- * 只描述当前请求的不可变模型运行参数（服务、协议、模型 ID、端点和凭据）。
- * 会话级工具勾选仍由 invocation context 提供，不与凭据混存。
- *
- * @property serviceId 模型服务实例 ID，用于匹配当前会话的官方函数选择与凭据归属。
- * @property templateId 厂商模板 ID；厂商工具支持矩阵与协议特例按模板匹配。null 表示自定义服务。
- * @property baseType 当前连接使用的 API 协议。
- * @property modelId 实际请求模型 ID，也是厂商模型家族判断的唯一依据。
- * @property apiKey 当前连接的生效凭据，仅保留在请求模型配置中。
- * @property fullBaseUrl 已解析到协议所需层级的连接端点。
+ * 协议适配装配：把 [AgentLlmModelSource] 的模型选择实现为可绑定具体类，
+ * 并按 [ModelConfig] 构造 ADK Model（厂商 SDK 适配的唯一入口）。
  */
-data class ModelConfig(
-    val serviceId: String,
-    val templateId: String?,
-    val baseType: ApiProtocol,
-    val modelId: String,
-    val apiKey: String,
-    val fullBaseUrl: String,
-    val supportsImages: Boolean = false,
-)
-
-/**
- * 可安全写入 ADK `RunConfig.customMetadata` 的模型运行信息。
- *
- * 该类型刻意不包含 API Key：ADK 会把 custom metadata 合并进持久化 Event，
- * 凭据必须在官方工具真正执行前根据 [serviceId] 从安全配置源重新解析。
- *
- * @property serviceId 模型服务实例 ID。
- * @property templateId 厂商模板 ID；null 表示自定义服务。
- * @property baseType 当前请求使用的协议。
- * @property modelId 实际模型 ID。
- * @property fullBaseUrl 当前协议对应的完整服务端点。
- */
-data class ModelRuntimeMetadata(
-    val serviceId: String,
-    val templateId: String?,
-    val baseType: ApiProtocol,
-    val modelId: String,
-    val fullBaseUrl: String,
-    val supportsImages: Boolean = false,
-)
-
-fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntimeMetadata(
-    serviceId = serviceId,
-    templateId = templateId,
-    baseType = baseType,
-    modelId = modelId,
-    fullBaseUrl = fullBaseUrl,
-    supportsImages = supportsImages,
-)
-
 @Singleton
-class AgentLLMModelFactory @Inject constructor(
+class DefaultAgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
-) {
+) : AgentLlmModelSource {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
      *
@@ -82,7 +42,7 @@ class AgentLLMModelFactory @Inject constructor(
      * 没有可用配置时抛 [IllegalStateException]，由 UI 层提示用户在
      * Settings → Model Service 启用至少一个服务。不再使用任何硬编码兜底配置——
      */
-    fun selectModelConfig(explicitSelection: ModelSelection?): ModelConfig {
+    override fun selectModelConfig(explicitSelection: ModelSelection?): ModelConfig {
         // 1. Explicit callers (for example the detached Bluetooth voice runner) do not mutate
         // the chat screen's process-wide current selection.
         val explicit = modelServices.resolveChatModel(explicitSelection)
@@ -105,26 +65,61 @@ class AgentLLMModelFactory @Inject constructor(
     }
 
 
-    fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
+    /**
+     * 按协议装配模型。
+     *
+     * @param conversationTitleEnabled 是否请求厂商随回答返回会话标题（DeepSeek 内联标题）。
+     *   仅 Chatbot 形态开启：助手形态的标题由标题插件的独立快模型请求生成。
+     */
+    fun createModel(cfg: ModelConfig, conversationTitleEnabled: Boolean = false): Model = AttachmentResolvingModel(
+        documentIngestMode = cfg.documentIngestMode,
+        audioDelegate = if (cfg.templateId == "mimo") lazy { createMiMoAudioModel(cfg) } else null,
         delegate = when (cfg.baseType) {
             // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
-            ApiProtocol.OpenaiChatcompletions -> ChatCompletions(
-                name = cfg.modelId,
-                apiKey = cfg.apiKey,
-                httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
-            )
+            // 实例开启文件上传时改用 fork 的 file 块适配器：ADK 官方实现是 final class 且
+            // 无转换器注入点，无法发出 file 引用块（2026-11 ADK 1.5.0 现状）。
+            ApiProtocol.OpenaiChatcompletions ->
+                if (cfg.documentIngestMode == FileIngestMode.FILE_REFERENCE) {
+                    OpenAiCompatibleChatCompletions(
+                        name = cfg.modelId,
+                        apiKey = cfg.apiKey,
+                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                        audioEncoding = audioEncodingFor(cfg),
+                    )
+                } else {
+                    ChatCompletions(
+                        name = cfg.modelId,
+                        apiKey = cfg.apiKey,
+                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                    )
+                }
 
-            ApiProtocol.Anthropic -> Claude(
-                name = cfg.modelId,
-                requestConverter = AnthropicToolLoadingRequestConverter(
-                    cfg.modelId, 8196,
-                    toolLoadingMode(cfg.toRuntimeMetadata()),
-                )::convert,
-                client = AnthropicOkHttpClient.builder()
-                    .baseUrl(cfg.fullBaseUrl)
-                    .apiKey(cfg.apiKey)
-                    .build(),
-            )
+            ApiProtocol.Anthropic ->
+                if (isOfficialDeepSeekAnthropicEndpoint(cfg.toRuntimeMetadata())) {
+                    // 仅官方端点走 DeepSeek 专属适配器：首轮注入 title 参数、转换器注入
+                    // latest_reminder；第三方代理回落通用 Claude 适配器，零扩展字段风险。
+                    DeepSeekMessageChat(
+                        name = cfg.modelId,
+                        conversationTitleEnabled = conversationTitleEnabled,
+                        requestConverter = DeepSeekMessageToolLoadingRequestConverter(
+                            cfg.modelId, 8196,
+                            toolLoadingMode(cfg.toRuntimeMetadata()),
+                            latestReminder = { latestReminderContent() },
+                        )::convert,
+                        client = AnthropicOkHttpClient.builder()
+                            .baseUrl(cfg.fullBaseUrl)
+                            .apiKey(cfg.apiKey)
+                            .build(),
+                    )
+                } else {
+                    Claude(
+                        name = cfg.modelId,
+                        client = AnthropicOkHttpClient.builder()
+                            .baseUrl(cfg.fullBaseUrl)
+                            .apiKey(cfg.apiKey)
+                            .build(),
+                    )
+                }
 
             // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
             ApiProtocol.Gemini -> Gemini(
@@ -134,14 +129,48 @@ class AgentLLMModelFactory @Inject constructor(
         },
     )
 
-    fun selectFastModelConfig(): ModelConfig? {
+    override fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatModel(modelServices.fastSelection.value)
             ?: return null
         return resolved.toModelConfig()
     }
 
+    internal fun createSemiCascadedModel(config: ModelConfig): Model {
+        if (config.templateId != "mimo") return createModel(config)
+        return AttachmentResolvingModel(
+            documentIngestMode = config.documentIngestMode,
+            delegate = createMiMoAudioModel(config),
+        )
+    }
+
+    private fun createMiMoAudioModel(config: ModelConfig): Model {
+        // MiMo 的 WAV 输入走 Chat Completions，沿用所选连接的主机和凭据。
+        val endpoint = config.fullBaseUrl.trimEnd('/')
+        val baseUrl = if (config.baseType == ApiProtocol.Anthropic) {
+            check(endpoint.endsWith("/anthropic")) {
+                "The MiMo connection must use an /anthropic base URL or configure Chat Completions."
+            }
+            endpoint.removeSuffix("/anthropic") + "/v1"
+        } else {
+            endpoint
+        }
+        return OpenAiCompatibleChatCompletions(
+            name = config.modelId,
+            apiKey = config.apiKey,
+            httpOptions = HttpOptions(baseUrl = baseUrl),
+            audioEncoding = audioEncodingFor(config),
+        )
+    }
+
+    /** MiMo 的 `input_audio.data` 要 data-URI；其它 OpenAI 兼容后端走裸 base64 + format。 */
+    private fun audioEncodingFor(cfg: ModelConfig) = if (cfg.templateId == "mimo") {
+        InputAudioDataEncoding.MIMO_DATA_URI
+    } else {
+        InputAudioDataEncoding.OPENAI_BASE64
+    }
+
     /** 格式化推荐只走快速模型所属实例的 OpenAI 兼容对话端点，不沿用聊天协议。 */
-    fun forRecommendationJson(config: ModelConfig): ModelConfig {
+    override fun forRecommendationJson(config: ModelConfig): ModelConfig {
         if (config.baseType == ApiProtocol.OpenaiChatcompletions) {
             return config
         }
@@ -166,5 +195,6 @@ class AgentLLMModelFactory @Inject constructor(
         apiKey = apiKey,
         fullBaseUrl = modelBaseUrl,
         supportsImages = supportsImages,
+        documentIngestMode = documentIngestMode,
     )
 }

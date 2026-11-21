@@ -37,7 +37,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
 
 /**
  * Claude 适配器实际发出的 HTTP 请求体契约。
@@ -80,7 +79,7 @@ class ClaudeRequestPayloadTest {
                     if (parts.isNotEmpty()) add(Content(role = Role.USER, parts = parts))
                 }
 
-                val body = capture("deepseek-flash", LlmRequest(contents = history))
+                val body = capture("compatible-model", LlmRequest(contents = history))
 
                 val messages = body["messages"]!!.jsonArray
                 assertEquals("Every tool_use needs an immediately following user result: $body", 3, messages.size)
@@ -97,142 +96,6 @@ class ClaudeRequestPayloadTest {
                 assertEquals(completedCalls.size, history.flatMap { it.parts }.count { it.functionResponse != null })
             }
         }
-    }
-
-    @Test
-    fun searchedToolsAreDefinedAfterEmptyResultsWithoutChangingTopLevelTools() {
-        val request = inlineSearchRequest(listOf("clock"), "clock")
-        val body = capture("deepseek-flash", request)
-
-        assertEquals("tool_search", body["tools"]!!.jsonArray.first().jsonObject["name"].text())
-        val messages = body["messages"]!!.jsonArray
-        val result = messages[2].jsonObject["content"]!!.jsonArray.single().jsonObject
-        assertEquals("tool_result", result["type"].text())
-        assertEquals("", result["content"].text())
-        val addition = messages[3].jsonObject
-        assertEquals("system", addition["role"].text())
-        val block = addition["content"]!!.jsonArray.single().jsonObject
-        assertEquals("tool_addition", block["type"].text())
-        val tool = block["tool"]!!.jsonObject
-        assertEquals("tool_reference", tool["type"].text())
-        assertEquals("clock", tool["name"].text())
-        val deferred = body["tools"]!!.jsonArray.last().jsonObject
-        assertEquals("true", deferred["defer_loading"].text())
-        assertEquals("object", deferred["input_schema"]!!.jsonObject["type"].text())
-        assertNull(lastBetaHeader)
-    }
-
-    @Test
-    fun followupAfterInterruptedModelKeepsSystemAfterUserResults() {
-        val request = inlineSearchRequest(listOf("clock"), "clock")
-        val body = capture("deepseek-flash", request.copy(contents = request.contents + userContent()))
-        assertEquals(listOf("user", "assistant", "user", "system"),
-            body["messages"]!!.jsonArray.map { it.jsonObject["role"].text() })
-        assertEquals(4, request.contents.size)
-    }
-
-    @Test
-    fun unadaptedEndpointDoesNotReceiveInlineBlocksOrBetaHeader() {
-        val body = capture("claude-opus-5-5", inlineSearchRequest(listOf("clock"), "clock"))
-        assertFalse(body.toString().contains("tool_addition"))
-        assertFalse(body.toString().contains("defer_loading"))
-        assertEquals(listOf("tool_search", "clock"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
-        assertNull(lastBetaHeader)
-    }
-
-    @Test
-    fun deferredCatalogIsDeclaredBeforeTheFirstSearch() {
-        val body = capture("deepseek-flash", inlineSearchRequest(listOf("clock")))
-        val clock = body["tools"]!!.jsonArray.last().jsonObject
-        assertEquals("clock", clock["name"].text())
-        assertEquals("true", clock["defer_loading"].text())
-        assertFalse(body.toString().contains("tool_addition"))
-    }
-
-    @Test
-    fun replacingSearchSelectionUsesCurrentDeclarationsWithoutUnsupportedRemovalBlocks() {
-        val request = inlineSearchRequest(listOf("calendar"), "clock", "calendar")
-        val body = capture("deepseek-flash", request)
-        assertFalse(body.toString().contains("tool_removal"))
-        assertFalse(body.toString().contains("tool_addition"))
-        assertFalse(body.toString().contains("defer_loading"))
-        assertEquals(listOf("tool_search", "calendar"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
-        assertEquals(7, request.contents.size)
-    }
-
-    @Test
-    fun disabledSearchedToolIsWithdrawnBeforeContinuing() {
-        val body = capture("deepseek-flash", inlineSearchRequest(emptyList(), "clock"))
-        assertFalse(body.toString().contains("tool_removal"))
-        assertFalse(body.toString().contains("tool_addition"))
-        assertFalse(body.toString().contains("defer_loading"))
-        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
-    }
-
-    @Test
-    fun withdrawingAToolPreservesItsHistoricalCallAndResult() {
-        val request = inlineSearchRequest(listOf("calendar"), "clock", "calendar")
-        val historicalCall = Content(role = Role.MODEL, parts = listOf(Part(functionCall = FunctionCall(
-            id = "clock_call", name = "clock", args = emptyMap(),
-        ))))
-        val historicalResult = Content(role = Role.USER, parts = listOf(Part(functionResponse = FunctionResponse(
-            id = "clock_call", name = "clock", response = mapOf("time" to "12:00"),
-        ))))
-        val history = request.contents.take(4) + listOf(historicalCall, historicalResult) + request.contents.drop(4)
-        val body = capture("deepseek-flash", request.copy(contents = history))
-        val blocks = body["messages"]!!.jsonArray.flatMap { it.jsonObject["content"]!!.jsonArray }
-            .map { it.jsonObject }
-        assertTrue(blocks.any { it["type"].text() == "tool_use" && it["id"].text() == "clock_call" })
-        assertTrue(blocks.any { it["type"].text() == "tool_result" && it["tool_use_id"].text() == "clock_call" })
-        assertFalse(body.toString().contains("tool_removal"))
-        assertEquals(listOf("tool_search", "calendar"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
-        assertEquals(historicalCall, history[4])
-    }
-
-    @Test
-    fun repeatedAndAdditiveSearchesOnlyDeclareNewToolReferences() {
-        val body = capture("deepseek-flash", inlineSearchRequest(listOf("clock", "calendar"), "clock", "clock", "calendar"))
-        val additions = body["messages"]!!.jsonArray.flatMap { it.jsonObject["content"]!!.jsonArray }
-            .map { it.jsonObject }.filter { it["type"].text() == "tool_addition" }
-        assertEquals(listOf("clock", "calendar"), additions.map { it["tool"]!!.jsonObject["name"].text() })
-        assertFalse(body.toString().contains("tool_removal"))
-        assertTrue(body.toString().contains("defer_loading"))
-    }
-
-    private var lastBetaHeader: String? = null
-
-    @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)
-    private fun inlineSearchRequest(enabled: List<String>, vararg searches: String): LlmRequest {
-        val contents = buildList {
-            add(userContent())
-            searches.forEachIndexed { index, name ->
-                add(Content(role = Role.MODEL, parts = listOf(Part(functionCall = FunctionCall(
-                    id = "search_$index", name = "tool_search", args = mapOf("query" to name),
-                )))))
-                add(Content(role = Role.USER, parts = listOf(Part(functionResponse = FunctionResponse(
-                    id = "search_$index", name = "tool_search", response = emptyMap(),
-                )))))
-                add(Content(role = Role.SYSTEM, parts = listOf(Part(
-                    text = "", partMetadata = mapOf(
-                        "gimi.inline_tool_definitions" to listOf(
-                            """{"name":"$name","description":"Read $name","parameters":{"type":"OBJECT","properties":{}}}""",
-                        ),
-                    ),
-                ))))
-            }
-        }
-        val catalog = (enabled + searches.toList()).distinct().map {
-            com.google.adk.kt.serialization.adkJson.encodeToString(FunctionDeclaration.serializer(),
-                FunctionDeclaration(name = it, description = "Read $it"))
-        }
-        return LlmRequest(contents = contents, config = GenerateContentConfig(
-            systemInstruction = Content(parts = listOf(Part(partMetadata = mapOf(
-                "gimi.deferred_tool_catalog" to catalog,
-            )))),
-            tools = listOf(Tool(functionDeclarations = (listOf("tool_search") + enabled).map {
-                FunctionDeclaration(name = it, description = "Read $it")
-            })),
-        ))
     }
 
     @Test
@@ -309,6 +172,28 @@ class ClaudeRequestPayloadTest {
         assertEquals("document", pdf["type"].text())
         assertEquals("url", pdf["source"]!!.jsonObject["type"].text())
         assertEquals("https://example.com/report.pdf", pdf["source"]!!.jsonObject["url"].text())
+    }
+
+    @Test
+    fun vendorFileReferenceBecomesFileIdSourceBlocks() {
+        // gimi-file:// 引用直通 file_id 来源块：重放不读本地文件、不重传（与 openaicompatible 一致）。
+        val body = capture("claude-sonnet-4-5", LlmRequest(contents = listOf(Content(
+            role = Role.USER,
+            parts = listOf(
+                Part(fileData = FileData(mimeType = "application/pdf", fileUri = "gimi-file://anthropic/file_01")),
+                Part(fileData = FileData(mimeType = "image/png", fileUri = "gimi-file://anthropic/img_02")),
+            ),
+        ))))
+
+        val parts = body["messages"]!!.jsonArray.single().jsonObject["content"]!!.jsonArray
+        val pdf = parts[0].jsonObject
+        assertEquals("document", pdf["type"].text())
+        assertEquals("file", pdf["source"]!!.jsonObject["type"].text())
+        assertEquals("file_01", pdf["source"]!!.jsonObject["file_id"].text())
+        val image = parts[1].jsonObject
+        assertEquals("image", image["type"].text())
+        assertEquals("file", image["source"]!!.jsonObject["type"].text())
+        assertEquals("img_02", image["source"]!!.jsonObject["file_id"].text())
     }
 
     @Test
@@ -559,16 +444,7 @@ class ClaudeRequestPayloadTest {
             name = model,
             client = client,
             maxTokens = maxTokens,
-            requestConverter = AnthropicToolLoadingRequestConverter(
-                model, maxTokens,
-                toolLoadingMode(
-                    if (model.startsWith("deepseek")) ModelRuntimeMetadata(
-                        "instance-deepseek", "deepseek",
-                        github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
-                        model, "https://api.deepseek.com/anthropic",
-                    ) else null,
-                ),
-            )::convert,
+            requestConverter = ClaudeRequestConverter(model, maxTokens)::convert,
         )
         server.enqueue(
             MockResponse()
@@ -579,7 +455,6 @@ class ClaudeRequestPayloadTest {
             val responses = runBlocking { claude.generateContent(request, stream = false).toList() }
             val sent = server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)
                 ?: error("No HTTP request: ${responses.map { it.errorMessage }}")
-            lastBetaHeader = sent.getHeader("anthropic-beta")
             return Json.parseToJsonElement(sent.body.readUtf8()).jsonObject
         } finally {
             client.close()

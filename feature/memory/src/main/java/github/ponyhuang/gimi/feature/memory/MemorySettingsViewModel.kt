@@ -6,9 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.memory.repository.MemorySettingsRepository
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -20,9 +18,6 @@ class MemorySettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(repository.configuration.value.toUiState())
     val uiState = mutableUiState.asStateFlow()
-
-    private val mutableEffects = MutableSharedFlow<MemorySettingsEffect>(extraBufferCapacity = 1)
-    val effects = mutableEffects.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -69,6 +64,9 @@ class MemorySettingsViewModel @Inject constructor(
                 it.copy(token = action.token, tokenError = false)
             }
             MemorySettingsAction.Save -> persist()
+            MemorySettingsAction.ConsumeNotice -> mutableUiState.update {
+                it.copy(notice = null)
+            }
         }
     }
 
@@ -93,9 +91,9 @@ class MemorySettingsViewModel @Inject constructor(
                         token = saved.apiKey,
                         tokenError = false,
                         saving = false,
+                        notice = MemorySettingsNotice.Saved,
                     )
                 }
-                mutableEffects.emit(MemorySettingsEffect.Saved)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -105,9 +103,9 @@ class MemorySettingsViewModel @Inject constructor(
                         memoryEnabled = configuration.memoryEnabled,
                         mem0Enabled = configuration.mem0Enabled,
                         saving = false,
+                        notice = MemorySettingsNotice.SaveFailed,
                     )
                 }
-                mutableEffects.emit(MemorySettingsEffect.SaveFailed)
             }
         }
     }

@@ -8,7 +8,6 @@ import com.google.gson.JsonParser
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognizer
 
-import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAuthenticationException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceServiceException
@@ -29,7 +28,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import github.ponyhuang.gimi.data.modelaccess.shared.encodePcm16Wav
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
 import github.ponyhuang.gimi.data.modelaccess.shared.awaitSpeechRecognitionBody
 
 /**

@@ -141,33 +141,9 @@ fun DefaultModelSettingsScreen(
                         title = stringResource(R.string.modelsettings_defaults_realtime_model_title),
                         selection = state.realtimeSelection,
                         rows = state.realtimeModels,
-                        showDivider = true,
+                        showDivider = false,
                         onClick = if (state.isMutationBlocked) null else {
                             { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.RealtimeModel)) }
-                        },
-                    )
-                    // 音色与模型强绑定：没有模型就没有可选音色，行随之置灰；
-                    // 模型已选但厂商既没给缺省音色也不接受自定义时同样无可选。
-                    val realtimeVoiceEnabled = state.realtimeSelection != null &&
-                        (state.realtimeDefaultVoice.isNotBlank() || state.realtimeCustomVoiceAllowed)
-                    val effectiveRealtimeVoice = state.realtimeVoiceId ?: state.realtimeDefaultVoice
-                    val realtimeVoiceLabel = state.realtimeVoiceOptions
-                        .firstOrNull { it.id == effectiveRealtimeVoice }?.name ?: effectiveRealtimeVoice
-                    PreferenceListItem(
-                        icon = Icons.Default.GraphicEq,
-                        title = stringResource(R.string.modelsettings_defaults_realtime_voice_title),
-                        subtitle = realtimeVoiceLabel,
-                        showDivider = false,
-                        onClick = if (realtimeVoiceEnabled && !state.isMutationBlocked) {
-                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.RealtimeVoice)) }
-                        } else {
-                            null
-                        },
-                        iconContainer = Color.Transparent,
-                        iconTint = if (realtimeVoiceEnabled) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         },
                     )
                 }
@@ -237,36 +213,16 @@ fun DefaultModelSettingsScreen(
             onAddService = onAddService,
         )
 
-        DefaultModelDialog.RealtimeVoice -> VoicePickerDialog(
-            title = stringResource(R.string.modelsettings_dialog_pick_realtime_voice),
-            currentVoiceId = state.realtimeVoiceId ?: state.realtimeDefaultVoice,
-            options = state.realtimeVoiceOptions,
-            allowCustomInput = state.realtimeCustomVoiceAllowed,
-            isLoading = false,
-            // 清空输入等于回到该模型的缺省音色，因此空串要落成 null 而不是一个空覆盖值。
-            onPick = { voiceId ->
-                onAction(DefaultModelSettingsAction.SelectRealtimeVoice(voiceId.ifBlank { null }))
-            },
-            onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
-            defaultVoiceId = state.realtimeDefaultVoice,
-        )
-
         null -> Unit
     }
 }
 
 /**
- * Realtime 模型选择器的一行：一个候选模型，或"不使用 Realtime"。
+ * Realtime 默认模型的选择弹窗：只列真实候选模型。
  *
- * "不使用"是一等状态而不是隐藏动作：Realtime 模型是全局唯一的选择入口，
- * 用户需要能主动关掉它（Realtime 模式随即不可进入）。
+ * 不提供「不使用 Realtime」占位项——没有候选模型就是没有：候选为空时展示空态与补配服务入口，
+ * 未配置状态由「没有选中任何候选」表达，不需要用户主动清除。
  */
-private sealed interface RealtimeModelOption {
-    data class Model(val row: SelectableModelRow) : RealtimeModelOption
-    data object Disabled : RealtimeModelOption
-}
-
-/** Realtime 默认模型的选择弹窗；首项是"不使用 Realtime"，用于清除默认配置。 */
 @Composable
 private fun RealtimeModelChoiceDialog(
     rows: List<SelectableModelRow>,
@@ -275,55 +231,19 @@ private fun RealtimeModelChoiceDialog(
     onAddService: (DefaultModelDialog) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val disabledTitle = stringResource(R.string.modelsettings_defaults_realtime_model_none)
-    val options = remember(rows) {
-        listOf(RealtimeModelOption.Disabled) + rows.map { RealtimeModelOption.Model(it) }
-    }
     SearchablePickerSingleChoiceDialog(
         query = query,
         onQueryChange = { query = it },
-        // "不使用"始终可被搜到（关键词含"不使用"与"realtime"），否则一搜就被过滤掉。
-        searchText = { option ->
-            when (option) {
-                is RealtimeModelOption.Model ->
-                    "${option.row.model.name} ${option.row.model.id} ${option.row.instance.name}"
-                RealtimeModelOption.Disabled -> "$disabledTitle realtime"
-            }
-        },
+        searchText = { "${it.model.name} ${it.model.id} ${it.instance.name}" },
         searchPlaceholder = stringResource(R.string.modelsettings_search_model_or_service),
-        options = options,
-        selected = { option ->
-            when (option) {
-                is RealtimeModelOption.Model -> option.row.selection() == currentSelection
-                RealtimeModelOption.Disabled -> currentSelection == null
-            }
-        },
-        key = {
-            when (it) {
-                is RealtimeModelOption.Model -> "model/${it.row.instance.id}/${it.row.connection.id}/${it.row.model.id}"
-                RealtimeModelOption.Disabled -> "disabled"
-            }
-        },
+        options = rows,
+        selected = { it.selection() == currentSelection },
+        key = { "${it.instance.id}/${it.connection.id}/${it.model.id}" },
         title = stringResource(R.string.modelsettings_dialog_pick_realtime_model),
-        optionTitle = { option ->
-            when (option) {
-                is RealtimeModelOption.Model -> option.row.model.name
-                RealtimeModelOption.Disabled -> disabledTitle
-            }
-        },
-        optionSubtitle = { option ->
-            when (option) {
-                is RealtimeModelOption.Model -> option.row.instance.name
-                RealtimeModelOption.Disabled -> ""
-            }
-        },
+        optionTitle = { it.model.name },
+        optionSubtitle = { it.instance.name },
         emptyText = stringResource(R.string.modelsettings_dialog_no_models),
-        onPick = { option ->
-            when (option) {
-                is RealtimeModelOption.Model -> onAction(DefaultModelSettingsAction.SelectRealtimeModel(option.row.selection()))
-                RealtimeModelOption.Disabled -> onAction(DefaultModelSettingsAction.SelectRealtimeModel(null))
-            }
-        },
+        onPick = { onAction(DefaultModelSettingsAction.SelectRealtimeModel(it.selection())) },
         onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
         emptyContent = {
             EmptyCatalogWithAddService { onAddService(DefaultModelDialog.RealtimeModel) }
@@ -492,8 +412,6 @@ private fun defaultModelSettingsPreviewState(isMutationBlocked: Boolean): Defaul
         ttsModels = listOf(row),
         realtimeSelection = realtimeRow.selection(),
         realtimeModels = listOf(realtimeRow),
-        realtimeDefaultVoice = "longanqian_v3.1",
-        realtimeCustomVoiceAllowed = true,
         isMutationBlocked = isMutationBlocked,
     )
 }
@@ -513,12 +431,11 @@ private fun DefaultModelSettingsScreenPreview() {
 @Preview(name = "Realtime 未配置 · 深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun DefaultModelSettingsScreenRealtimeUnsetPreview() {
-    // 未配置 Realtime 模型：音色行随之置灰（音色与模型强绑定，没有模型就没有可选音色）。
+    // 未配置 Realtime 模型：Realtime 链路不可进入，候选列表展示空态。
     GimiTheme {
         DefaultModelSettingsScreen(
             state = defaultModelSettingsPreviewState(isMutationBlocked = false).copy(
                 realtimeSelection = null,
-                realtimeDefaultVoice = "",
             ),
             onAction = {})
     }

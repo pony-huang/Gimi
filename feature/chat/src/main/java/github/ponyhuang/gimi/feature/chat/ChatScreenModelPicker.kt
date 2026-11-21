@@ -179,6 +179,9 @@ fun ModelTitleAndPicker(
     reasoningEnabled: Boolean = true,
     onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onThinkingEnabledChange: (Boolean) -> Unit = { },
+    /** 会话因包含厂商 file 引用附件而锁定的厂商模板 ID；null 表示未锁定。 */
+    lockedVendor: String? = null,
+    modelSwitchCreatesNewSession: Boolean = false,
 ) {
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用实例 → 对话连接 → 第一个模型"。两个都没有则 null（空态）。
@@ -269,6 +272,8 @@ fun ModelTitleAndPicker(
             reasoningEnabled = reasoningEnabled,
             onReasoningEffortChange = onReasoningEffortChange,
             onThinkingEnabledChange = onThinkingEnabledChange,
+            lockedVendor = lockedVendor,
+            modelSwitchCreatesNewSession = modelSwitchCreatesNewSession,
         )
     }
 }

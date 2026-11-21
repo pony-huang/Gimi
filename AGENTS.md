@@ -68,6 +68,7 @@ domain/data/core -X-> feature or app
 - Suspending code should let cancellation propagate naturally: avoid broad catches, catch recoverable exception types, and use the shared cancellation-aware recovery helper only at boundaries that require a fallback.
 - Do not promote code to `core` merely because two files look alike.
 - Resolve graph conflicts through contracts/interfaces, not shortcut dependencies. Document any temporary exception with its owner and removal condition.
+- `:data:agent` (orchestration) depends on `:data:modelaccess` (vendor adapters) only through the narrow ADK-runtime seam that cannot cross `:domain:*` (domain forbids ADK imports): `AgentModelRuntime` (the sole `DefaultAgentLLMModelFactory` consumer, ADK `Model` creation), `VendorLocalToolBinder` (vendor SDK tool assembly, ADK `BaseTool`), `VoiceLiveModelFactory` (ADK `Model`), and `RealtimeManualInputSink` (ADK `Content`). Everything else — model config DTOs, selection contracts (`AgentLlmModelSource`), tool-search policy constants, realtime voice contracts — lives in `:domain:modelaccess` or `:domain:voice` and must be consumed from there. Owner: architecture check (`.github/scripts/check_architecture.py`); removal condition: ADK types gain a domain-side abstraction, or ADK leaves the orchestration path.
 
 ## Compose, UI, i18n, and Style
 
@@ -77,11 +78,13 @@ domain/data/core -X-> feature or app
 - Route composables collect state lifecycle-aware and own navigation, Toast/Snackbar delivery, activity results, permissions, URL opening, and other Android/UI side effects.
 - Screens and business components are stateless: state enters as parameters and events leave as callbacks. They do not fetch ViewModels, repositories, or Context, or launch business coroutines.
 - Keep loading, testing, refreshing, notices, and other ephemeral business-operation state in the ViewModel.
+- One-shot Toast-class notices travel as a nullable `notice` field on the screen's UiState and are cleared by an explicit `ConsumeNotice` action (template: the Skills screen). Command-class effects keep explicit effect flows — system page launches, installers, file choosers, and the navigation commands in the Settings/About/ModelServiceDetail/PluginSettings/A2a/Mcp/Logs/Update ViewModels; Route-side consumption remains the only place Android side effects happen.
+- Stream-backed `uiState` exposed to the UI should use `stateIn(WhileSubscribed(5_000))` so paused subscriptions stop upstream collection.
 - `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable with fixture data. Accepted exception: `ui/settings/llmmodel/LLMModelServiceIcon` and its `ic_model_provider_*` drawables are shared brand assets consumed by both `:feature:chat` and `:feature:modelsettings`; they stay in `:core:designsystem` because feature-to-feature dependencies are forbidden. Second exception: `ui/components/VoicePickerPage` and `ui/components/VoicePickerDialog` (with the `voice_picker_*`/`voice_gender_*`/`voice_group_*` strings and the `:domain:voice` api dependency) are the two presentations of the shared voice picker: the in-drawer page is consumed by `:feature:chat`, the dialog by `:feature:modelsettings`. Both stay in `:core:designsystem` so the shared copy and domain types live in one place without a feature-to-feature dependency.
 
 ### Preview-first UI design review
 
-Before changing UI, read [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) for the design workflow, interaction continuity, and motion verification principles. Small, localized adjustments may proceed directly; larger changes require an isolated Compose preview draft, an image-delivery preference, and explicit design approval before implementation unless the user explicitly waives approval. Preserve relevant production previews and use proportional verification.
+Before changing UI, read [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) for the design workflow, interaction continuity, and motion verification principles. Small, localized adjustments may proceed directly; larger changes require a design draft, an image-delivery preference, and explicit design approval before implementation unless the user explicitly waives approval. When drafting designs or exploring UI layouts, invoke the `/prototype` skill (`.agents/skills/prototype/`) and default to an HTML prototype (e.g. self-contained HTML under `temp/` simulating the mobile frame, light/dark themes, and interactive variants for rapid browser inspection). Once approved, implement the design into Compose, preserve relevant production previews, and use proportional verification.
 
 ### Brand styling
 
@@ -129,6 +132,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 - Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules. Keep one build running at a time.
 - Validate a coherent source state: finish or explicitly stop an active build before further edits, and associate each result with the source state it actually checked. Validate subsequent changes separately.
 - After switching branches, a generated-code failure referencing a removed class may come from stale outputs. Check the current source/dependency graph and generated-file timestamps, then clean only the affected module's generated outputs when confirmed. Use a repository-wide `clean` only when evidence shows the problem spans modules.
+- Regenerate the committed baseline profile after changing `MainApplication`/`MainActivity` startup paths or first-screen composition: `ANDROID_SERIAL=<serial> ./gradlew :app:generateReleaseBaselineProfile`. Run `:baselineprofile` benchmarks only on a physical device that permits instrumentation installs (they refuse emulators by design).
 - After a test failure, inspect the exact failing test and cause before rerunning. Repair a stale fixture or source issue, then rerun the same targeted tests; report unrelated failures separately. Reuse successful validation for behavior unchanged by subsequent edits. Record compilation, tests, APK assembly, deployment, and device verification separately; distinguish active build time from IDE/dialog waits and infrastructure retries. A combined test-and-assembly command's elapsed time is not the unit-test execution time.
 
 ### CI/CD (GitHub Actions, `.github/workflows/`)
@@ -143,7 +147,7 @@ Choose the smallest validation that covers the changed behavior and risk. Review
 | Change | Default validation |
 |---|---|
 | Text-only documentation, comments, copy, or prompts | Review the diff and run `git diff --check`; no build or automated tests unless logic, structured contracts, resource wiring, or UI behavior also changes. |
-| Presentation-only Compose UI | Relevant `@Preview` states and affected-module compilation; manual device checks when needed. Do not add automated UI interaction, layout, or screenshot tests. |
+| Presentation-only Compose UI | Relevant `@Preview` states and affected-module compilation; manual device checks when needed. Do not add automated UI interaction, layout, or screenshot tests; the navigation smoke test over typed destinations is the sanctioned UI-level regression (see Testing and verification). |
 | Business behavior or a behavioral bug fix | Focused behavior tests in the owning layer and affected-module compilation. Core rules require domain/use-case or ViewModel coverage; repositories/gateways need applicable success, failure, exception, and mapping coverage. |
 | Behavior-preserving refactor of core ViewModel transitions or externally visible repository behavior | Characterization coverage and affected-module compilation. |
 | Public module contracts or app composition | `app:compileDebugKotlin` and focused tests for affected behavior. |
@@ -218,7 +222,7 @@ android run --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-
 
 ## Spec documentation
 
-Long-lived spec documents live in `spec/en/` (English, read by agents) with Chinese companions under `spec/zh/` at the same relative path. Each document opens with a cross-language link (and, for dated references, a `Reviewed:` date and intended audience). When a business area gains a new spec document, add a row to the table below; keep the English and Chinese companions in sync when updating a spec.
+Long-lived spec documents live in `spec/en/` (English, read by agents) with Chinese companions under `spec/zh/` at the same relative path. Each document opens with a cross-language link and an intended audience; never register review dates. When a business area gains a new spec document, add a row to the table below; keep the English and Chinese companions in sync when updating a spec.
 
 Load specs on demand:
 
@@ -229,9 +233,9 @@ Load specs on demand:
 | Document (English) | Read before… |
 |---|---|
 | [Model services](spec/en/modelcatalog/model-services.md) | discussing model configuration terminology, changing model service configuration, adding a vendor template/provider tool/speech adapter, or touching the instance storage format |
-| [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) | changing UI or motion, deciding whether a design draft is required, or preparing design approval and image delivery |
+| [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) | changing UI or motion, preparing design drafts/prototypes (via `/prototype` HTML), deciding whether a draft is required, or preparing design approval and image delivery |
 | [Gimi brand styling](spec/en/ui/brand-styling.md) | designing UI or creating Gimi-branded visual artifacts; choosing colors, typography, shapes, or brand assets |
-| [Predictive back support](spec/en/ui/predictive-back.md) | changing back navigation, system animations, drawer/bottom-sheet back handling, or verifying predictive back on a device |
+| [Bottom sheet](spec/en/ui/bottom-sheet.md) | changing sheet height, gestures, or slots; adding or restyling entries inside a picker sheet; opening sub-lists or picker pages from a sheet |
 | [Agent business execution](spec/en/agent/agent-execution.md) | adding an `AgentContribution`, changing run lifecycle, confirmation, event pipeline, or cache-key behavior |
 | [A2UI business execution](spec/en/a2ui/a2ui-execution.md) | changing the `generate_a2ui` chain, protocol validation, chat catalog components, or upgrading a2ui artifacts |
 | [AppFunctions](spec/en/appfunctions.md) | adding or changing app function tools exposed to the agent |
@@ -241,4 +245,4 @@ Load specs on demand:
 | [Realtime voice test coverage](spec/en/voice/testing.md) | writing, moving, or deleting realtime voice tests, or judging what only device verification can cover |
 | [Plugins](spec/en/plugin/plugins.md) | adding or changing a plugin, or its integrated platform |
 | [Testing and verification](spec/en/testing.md) | writing or evaluating tests, diagnosing cross-platform failures, changing HTTP/paid integrations |
-| [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, prereleases, tag-based releases |
+| [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, prereleases, tag-based releases, or resolving module boundary violations |

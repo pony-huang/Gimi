@@ -8,6 +8,9 @@ on:
       - '!release-please--**'
       - '!backup/**'
       - '!dependabot/**'
+  pull_request:
+    branches:
+      - '**'
 
 concurrency:
   group: ci-${{ github.ref }}

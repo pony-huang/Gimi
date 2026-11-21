@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.modelaccess.shared
 
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

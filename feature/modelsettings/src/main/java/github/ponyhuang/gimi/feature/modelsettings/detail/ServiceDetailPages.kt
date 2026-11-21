@@ -181,19 +181,28 @@ internal fun ConnectionsPage(state: ModelServiceDetailUiState, onAction: (ModelS
         PreferenceSectionTitle(stringResource(capabilityLabelRes(editor.connection.capability)))
         PreferenceGroupCard {
             PreferenceFormContent {
-                if (editor.isConversation && editor.protocols.size > 1) {
-                    // 在组合期把协议标签解析好；onSelect 回调不是组合上下文。
-                    val protocolOptions = editor.protocols.map { it to protocolLabel(it) }
-                    ExposedProtocolDropdown(
-                        label = stringResource(R.string.modelsettings_field_protocol),
-                        value = protocolLabel(editor.connection.protocol),
-                        options = protocolOptions.map { it.second },
-                        onSelect = { label ->
-                            protocolOptions.firstOrNull { it.second == label }?.let { (protocol, _) ->
-                                onAction(ModelServiceDetailAction.ConnectionProtocolChanged(editor.connection.id, protocol))
-                            }
-                        },
-                    )
+                if (editor.isConversation) {
+                    if (editor.protocols.size > 1) {
+                        // 在组合期把协议标签解析好；onSelect 回调不是组合上下文。
+                        val protocolOptions = editor.protocols.map { it to protocolLabel(it) }
+                        ExposedProtocolDropdown(
+                            label = stringResource(R.string.modelsettings_field_protocol),
+                            value = protocolLabel(editor.connection.protocol),
+                            options = protocolOptions.map { it.second },
+                            onSelect = { label ->
+                                protocolOptions.firstOrNull { it.second == label }?.let { (protocol, _) ->
+                                    onAction(ModelServiceDetailAction.ConnectionProtocolChanged(editor.connection.id, protocol))
+                                }
+                            },
+                        )
+                    } else {
+                        // 模板只开放一种协议（如 DeepSeek / MiniMax 固定 Messages）：只展示
+                        // 当前值，不提供任何切换入口，避免给出可以更换协议的暗示。
+                        LockedProtocolField(
+                            label = stringResource(R.string.modelsettings_field_protocol),
+                            value = protocolLabel(editor.connection.protocol),
+                        )
+                    }
                 }
                 if (editor.endpointPolicy == EndpointPolicy.UserConfigured) {
                     PreferenceTextField(
@@ -454,6 +463,20 @@ fun protocolLabel(protocol: ApiProtocol): String = when (protocol) {
     ApiProtocol.Gemini -> stringResource(R.string.modelsettings_protocol_gemini)
 }
 
+/** 模板固定协议时的只读展示：与下拉同形态但没有展开入口，明确不可更换。 */
+@Composable
+private fun LockedProtocolField(label: String, value: String) {
+    PreferenceTextField(
+        value = value,
+        onValueChange = {},
+        label = { Text(label) },
+        supportingText = { Text(stringResource(R.string.modelsettings_protocol_locked_hint)) },
+        readOnly = true,
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ExposedProtocolDropdown(
@@ -508,6 +531,25 @@ private fun ConnectionsPagePreview() {
                 isLoading = false,
                 draft = github.ponyhuang.gimi.feature.modelsettings.detail.PreviewDrafts.builtIn(),
                 connections = PreviewDrafts.connectionEditors(),
+                connectionTestVersion = 1,
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "接口设置 · 固定 Messages · 浅色", showBackground = true, widthDp = 390, heightDp = 800, locale = "zh")
+@Preview(
+    name = "接口设置 · 固定 Messages · 深色", showBackground = true, widthDp = 390, heightDp = 800,
+    locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun LockedMessagesConnectionsPagePreview() {
+    GimiTheme {
+        ConnectionsPage(
+            state = ModelServiceDetailUiState(
+                isLoading = false,
+                connections = PreviewDrafts.lockedMessagesConnectionEditors(),
                 connectionTestVersion = 1,
             ),
             onAction = {},

@@ -241,6 +241,8 @@ class AdkChatAgentRepositoryMappingTest {
         every { errorCode } returns null
         every { errorMessage } returns null
         every { timestamp } returns 123L
+        every { finishReason } returns null
+        every { customMetadata } returns null
     }
 
     private fun localFileResponse(): Map<String, Any?> = mapOf(

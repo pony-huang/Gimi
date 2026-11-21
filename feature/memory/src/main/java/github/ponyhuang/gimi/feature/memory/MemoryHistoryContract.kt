@@ -19,6 +19,8 @@ data class MemoryHistoryUiState(
     val operatingMemoryId: String? = null,
     /** 已展开以显示完整文本和操作按钮的记忆标识。 */
     val expandedMemoryIds: Set<String> = emptySet(),
+    /** 待呈现的一次性通知；Route 呈现后经 [MemoryHistoryAction.ConsumeNotice] 清除。 */
+    val notice: MemoryHistoryNotice? = null,
 ) {
     /** 是否应显示删除确认对话框。 */
     val showDeleteConfirmation: Boolean get() = pendingDelete != null
@@ -50,16 +52,19 @@ sealed interface MemoryHistoryAction {
         val feedback: ManagedMemoryFeedback,
         val reason: String?,
     ) : MemoryHistoryAction
+
+    /** 确认一次性通知已呈现，清空 [MemoryHistoryUiState.notice]。 */
+    data object ConsumeNotice : MemoryHistoryAction
 }
 
-/** 云端记忆历史页一次性的用户提示。 */
-sealed interface MemoryHistoryEffect {
+/** 云端记忆历史页一次性通知；以 UiState 字段承载，由 Route 呈现后消费清除。 */
+sealed interface MemoryHistoryNotice {
     /** 删除已完成。 */
-    data object Deleted : MemoryHistoryEffect
+    data object Deleted : MemoryHistoryNotice
 
     /** 反馈已提交。 */
-    data object FeedbackSubmitted : MemoryHistoryEffect
+    data object FeedbackSubmitted : MemoryHistoryNotice
 
     /** 远端请求失败。 */
-    data object OperationFailed : MemoryHistoryEffect
+    data object OperationFailed : MemoryHistoryNotice
 }

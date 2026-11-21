@@ -2,8 +2,12 @@ package github.ponyhuang.gimi.feature.chat.realtime
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRoleRepository
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,7 +27,7 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun creatingAPresetStoresItWithAGeneratedId() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository)
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
 
         viewModel.onAction(SimpleChatPromptAction.StartCreate)
         viewModel.onAction(SimpleChatPromptAction.Save("简洁速答", "直接给结论。"))
@@ -37,7 +41,7 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun blankInputIsNotPersisted() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository)
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
 
         viewModel.onAction(SimpleChatPromptAction.StartCreate)
         viewModel.onAction(SimpleChatPromptAction.Save("  ", "内容"))
@@ -48,8 +52,8 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun editingAPresetKeepsItsId() = runTest {
         val repository = FakePromptRepository()
-        repository.upsertPreset(SimpleChatPromptPreset("p1", "旧名", "旧内容。"))
-        val viewModel = SimpleChatPromptViewModel(repository)
+        repository.upsertPreset(ChatbotRolePreset("p1", "旧名", "旧内容。"))
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
 
         viewModel.onAction(SimpleChatPromptAction.StartEdit("p1"))
         viewModel.onAction(SimpleChatPromptAction.Save("新名", "新内容。"))
@@ -62,7 +66,7 @@ class SimpleChatPromptViewModelTest {
     @Test
     fun builtInPresetsAreListedAndViewedWithoutEnteringTheEditor() = runTest {
         val repository = FakePromptRepository()
-        val viewModel = SimpleChatPromptViewModel(repository)
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
 
         viewModel.uiState.test {
             assertEquals(listOf("builtin.demo"), awaitItem().builtInPresets.map { it.id })
@@ -75,16 +79,69 @@ class SimpleChatPromptViewModelTest {
         }
     }
 
+
+    @Test
+    fun selectingRoleKeepsConversationSelectionsIndependent() = runTest {
+        val repository = FakePromptRepository()
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        viewModel.bind("first")
+        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        viewModel.bind("second")
+        viewModel.onAction(SimpleChatPromptAction.Select(null))
+        assertEquals("builtin.demo", repository.selectedPresetIds.value["first"])
+        assertNull(repository.selectedPresetIds.value["second"])
+    }
+
+    @Test
+    fun unboundManagementDoesNotChangeConversationRoles() = runTest {
+        val repository = FakePromptRepository()
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        assertTrue(repository.selectedPresetIds.value.isEmpty())
+    }
+
+    @Test
+    fun copyingBuiltInRoleCreatesEditableIndependentPreset() = runTest {
+        val repository = FakePromptRepository()
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController())
+        viewModel.onAction(SimpleChatPromptAction.ViewPrompt("builtin.demo"))
+        viewModel.onAction(SimpleChatPromptAction.CopyViewedPreset)
+        viewModel.onAction(SimpleChatPromptAction.Save("我的角色", "自定义正文"))
+        assertEquals("我的角色", repository.presets.value.single().name)
+        assertTrue(repository.presets.value.single().id != "builtin.demo")
+        assertEquals("官方人设", repository.builtInPresets.single().name)
+    }
+
+    @Test
+    fun roleRemainsLockedFromConnectionThroughCallCleanup() = runTest {
+        val repository = FakePromptRepository()
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
+        val viewModel = SimpleChatPromptViewModel(repository, voiceCallController(call))
+        viewModel.bind("conversation")
+
+        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        assertNull(repository.selectedPresetIds.value["conversation"])
+        call.value = RealtimeVoiceCallState(ending = true)
+        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        assertNull(repository.selectedPresetIds.value["conversation"])
+        call.value = RealtimeVoiceCallState()
+        viewModel.onAction(SimpleChatPromptAction.Select("builtin.demo"))
+        assertEquals("builtin.demo", repository.selectedPresetIds.value["conversation"])
+    }
+
+    private fun voiceCallController(call: MutableStateFlow<RealtimeVoiceCallState> = MutableStateFlow(RealtimeVoiceCallState())) =
+        mockk<RealtimeVoiceCallController> { every { state } returns call }
+
     /** 内存假仓库：只保留行为，不落盘。 */
     private class FakePromptRepository(
-        override val builtInPresets: List<SimpleChatPromptPreset> = listOf(
-            SimpleChatPromptPreset("builtin.demo", "官方人设", "# Role and Objective\n正文", "官方说明"),
+        override val builtInPresets: List<ChatbotRolePreset> = listOf(
+            ChatbotRolePreset("builtin.demo", "官方人设", "# Role and Objective\n正文", "官方说明"),
         ),
-    ) : SimpleChatPromptRepository {
-        override val presets = MutableStateFlow(emptyList<SimpleChatPromptPreset>())
-        override val selectedPresetId = MutableStateFlow<String?>(null)
+    ) : ChatbotRoleRepository {
+        override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
+        override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
 
-        override fun upsertPreset(preset: SimpleChatPromptPreset) {
+        override fun upsertPreset(preset: ChatbotRolePreset) {
             presets.value = presets.value.filterNot { it.id == preset.id } + preset
         }
 
@@ -92,8 +149,8 @@ class SimpleChatPromptViewModelTest {
             presets.value = presets.value.filterNot { it.id == presetId }
         }
 
-        override fun selectPreset(presetId: String?) {
-            selectedPresetId.value = presetId
+        override fun selectPreset(conversationId: String, presetId: String?) {
+            selectedPresetIds.value = if (presetId == null) selectedPresetIds.value - conversationId else selectedPresetIds.value + (conversationId to presetId)
         }
     }
 }

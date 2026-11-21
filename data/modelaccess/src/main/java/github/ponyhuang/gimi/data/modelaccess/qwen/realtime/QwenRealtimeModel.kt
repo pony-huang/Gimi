@@ -16,13 +16,14 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.core.network.VoiceWsKernel
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeInstructionSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import okhttp3.OkHttpClient
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
 import github.ponyhuang.gimi.data.modelaccess.shared.realtimeResponseDisposition
@@ -63,9 +64,9 @@ internal class QwenRealtimeModel(
         flow { throw UnsupportedOperationException("Realtime 模型不提供非实时文本调用") }
 
     override suspend fun connect(request: LlmRequest): LiveConnection {
-        val instructions = request.config?.systemInstruction?.parts.orEmpty()
+        val instructions = request.config.systemInstruction?.parts.orEmpty()
             .filter { it.text != null }.joinToString("") { it.text.orEmpty() }
-        val tools = request.config?.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
+        val tools = request.config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
         val kernel = VoiceWsKernel(
             client = webSocketClient,
             request = QwenRealtimeProtocol.connectRequest(endpoint, model, apiKey, workspaceId),
@@ -78,7 +79,7 @@ internal class QwenRealtimeModel(
         private val kernel: VoiceWsKernel,
         private val instructions: String,
         private val toolDeclarations: List<FunctionDeclaration>,
-    ) : LiveConnection, RealtimeFunctionCallSink {
+    ) : LiveConnection, RealtimeInstructionSink, RealtimeFunctionCallSink {
         private val collecting = Mutex()
 
         /** `session.updated` 确认前的上行缓冲；满则丢最旧，确认后一次冲出。 */
@@ -95,6 +96,11 @@ internal class QwenRealtimeModel(
 
         /** 服务端 function_call 参数累积；仅接收循环访问。 */
         private val toolCalls = RealtimeToolCallBuffer()
+
+        override suspend fun updateInstructions(instructions: String) {
+            check(sessionConfigured)
+            kernel.sendControl(QwenRealtimeProtocol.instructionsUpdate(instructions))
+        }
 
         override suspend fun sendHistory(history: List<Content>) {
             // 全双工会话的上下文由服务端会话自身持有；历史注入留阶段二（Chat 原生化）。

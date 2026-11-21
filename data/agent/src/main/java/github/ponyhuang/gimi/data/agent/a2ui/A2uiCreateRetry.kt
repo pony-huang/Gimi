@@ -6,7 +6,7 @@ import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
+import github.ponyhuang.gimi.data.agent.AgentModelRuntime
 import github.ponyhuang.gimi.domain.a2ui.*
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 /** 重试复用已归档的事实和 surface，不启动主 Agent，也不执行任何业务工具。 */
 class A2uiCreateRetry @Inject constructor(
-    private val models: AgentLLMModelFactory,
+    private val models: AgentModelRuntime,
     private val protocol: A2uiProtocol,
     private val sessions: SessionService,
 ) {

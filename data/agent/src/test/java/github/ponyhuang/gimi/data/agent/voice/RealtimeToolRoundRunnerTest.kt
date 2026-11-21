@@ -13,12 +13,16 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionCall
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /** 一轮 Realtime 工具调用的编排边界：逐个写回结果、整轮只触发一次二轮推理。 */
 class RealtimeToolRoundRunnerTest {
@@ -133,6 +137,25 @@ class RealtimeToolRoundRunnerTest {
             // 回写异常照常向上传播，这里只断言 finally 里的二轮触发。
         }
         assertEquals(1, sink.triggers)
+    }
+
+    @Test
+    fun cancelledToolRoundDoesNotTriggerAnObsoleteAnswer() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        var triggers = 0
+        val sink = object : RealtimeFunctionCallSink {
+            override suspend fun sendFunctionResult(callId: String, outputJson: String) {
+                entered.complete(Unit)
+                awaitCancellation()
+            }
+            override suspend fun sendResponseTrigger() { triggers++ }
+        }
+        val job = launch {
+            RealtimeToolRoundRunner(null, sink).run(listOf(FunctionCall(name = "get_weather", id = "old-call")))
+        }
+        entered.await()
+        job.cancelAndJoin()
+        assertEquals(0, triggers)
     }
 
     private companion object {

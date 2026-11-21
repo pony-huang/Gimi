@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
+    private val chatLaunchRequest = mutableStateOf<github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest?>(null)
     private val openPermissionsRequest = mutableStateOf(0)
 
     override fun onStart() {
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermissionOnFreshInstall()
         consumeReturnToVoiceCall(intent)
+        consumeChatLaunch(intent)
         sharedMediaUris.value = savedInstanceState
             ?.getStringArrayList(KEY_SHARED_MEDIA_URIS)
             ?.map(Uri::parse)
@@ -142,9 +144,11 @@ class MainActivity : ComponentActivity() {
             GimiTheme(darkTheme = darkTheme) {
                 androidx.compose.foundation.layout.Box {
                     MainScreen(
+                        voiceCallController = voiceCallController,
                         assistantSessionCoordinator = assistantSessionCoordinator,
                         assistantPanelInteractor = assistantPanelInteractor,
                         openChatRequest = openChatRequest.value,
+                        chatLaunchRequest = chatLaunchRequest.value,
                         openPermissionsRequest = openPermissionsRequest.value,
                         sharedMediaUris = sharedMediaUris.value,
                         onSharedMediaConsumed = ::consumeSharedMedia,
@@ -231,6 +235,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         consumeReturnToVoiceCall(intent)
+        consumeChatLaunch(intent)
         when (intent.action) {
             Intent.ACTION_SEND,
             Intent.ACTION_SEND_MULTIPLE
@@ -238,6 +243,17 @@ class MainActivity : ComponentActivity() {
             ACTION_OPEN_PERMISSIONS -> openPermissionsRequest.value += 1
             ACTION_OPEN_CURRENT_CHAT -> openChatRequest.value += 1
         }
+    }
+
+    private fun consumeChatLaunch(intent: Intent) {
+        val mode = github.ponyhuang.gimi.domain.conversation.model.ChatMode.entries
+            .firstOrNull { it.name == intent.getStringExtra(github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_MODE) }
+            ?: return
+        chatLaunchRequest.value = github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest(
+            mode, intent.getStringExtra(github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_SESSION), System.nanoTime(),
+        )
+        intent.removeExtra(github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_MODE)
+        intent.removeExtra(github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_SESSION)
     }
 
     /** 常驻通知的点击只请求返回语音页；请求驻留在通话状态里，等页面可见时再消费。 */

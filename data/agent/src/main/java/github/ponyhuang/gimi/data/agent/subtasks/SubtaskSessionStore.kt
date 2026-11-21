@@ -37,6 +37,7 @@ class SubtaskSessionStore @Inject constructor(private val sessions: SessionServi
             decode(existing.state[SNAPSHOT])!!
         } else {
             sessions.createSession(key, mapOf(SNAPSHOT to Json.encodeToString(batch), FINGERPRINT to fingerprint))
+            try { sessions.flush(key) } catch (_: Throwable) {}
             batch
         }
     }
@@ -52,6 +53,7 @@ class SubtaskSessionStore @Inject constructor(private val sessions: SessionServi
                 author = "subtasks",
                 actions = EventActions(stateDelta = mutableMapOf(SNAPSHOT to Json.encodeToString(next))),
             ))
+            try { sessions.flush(indexKey(id)) } catch (_: Throwable) {}
             next
         }
         updates.emit(batch)

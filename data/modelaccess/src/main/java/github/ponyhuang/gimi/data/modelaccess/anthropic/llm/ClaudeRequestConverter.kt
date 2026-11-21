@@ -14,6 +14,8 @@ import com.anthropic.models.messages.ContentBlockParam.Companion.ofThinking
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofToolResult
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofToolUse
 import com.anthropic.models.messages.DocumentBlockParam
+import com.anthropic.models.messages.FileDocumentSource
+import com.anthropic.models.messages.FileImageSource
 import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.JsonOutputFormat
 import com.anthropic.models.messages.MessageCreateParams
@@ -43,6 +45,7 @@ import com.google.adk.kt.types.Schema
 import java.util.Base64
 import kotlin.time.Duration.Companion.hours
 import com.google.adk.kt.types.Tool as AdkTool
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 
 /** 纯请求转换：处理历史、媒体、普通工具、缓存及 schema；传输与产品思考规则分别维护。 */
@@ -62,6 +65,12 @@ internal class ClaudeRequestConverter(
         val messages = contents.mapNotNull(::contentToAnthropicMessageParam)
         val builder = MessageCreateParams.builder().model(modelName).maxTokens(maxTokens.toLong())
             .messages(if (cache == null) messages else messages.withCacheBreakpoint(cache))
+        // 兼容 Messages 服务仍要求文件 beta 头；历史消息中的文件引用也必须覆盖。
+        if (contents.any { content -> content.parts.any { part ->
+                part.fileData?.fileUri?.let(VendorFileReference::parse) != null
+            } }) {
+            builder.putAdditionalHeader("anthropic-beta", "files-api-2025-04-14")
+        }
         val system = request.config.systemInstruction?.parts?.mapNotNull { it.text }?.joinToString("\n").orEmpty()
         if (system.isNotBlank()) {
             if (cache == null) builder.system(system)
@@ -207,6 +216,29 @@ internal class ClaudeRequestConverter(
                 blob.mimeType
                     ?: throw UnsupportedOperationException("FileData MIME type is missing")
             val uri = blob.fileUri ?: throw UnsupportedOperationException("FileData Uri is missing")
+            // 厂商文件引用（gimi-file://，见 VendorFileReference）直通转换为 file_id 来源块：
+            // 与 openaicompatible 协议的处理一致，重放不读本地文件、不重传，fileId 是唯一真源。
+            VendorFileReference.parse(uri)?.let { (_, fileId) ->
+                return when {
+                    isSupportedImageMimeType(mimeType) ->
+                        ofImage(
+                            ImageBlockParam.builder()
+                                .source(FileImageSource.of(fileId))
+                                .build()
+                        )
+
+                    isSupportedDocumentMimeType(mimeType) ->
+                        ofDocument(
+                            DocumentBlockParam.builder()
+                                .source(FileDocumentSource.of(fileId))
+                                .build()
+                        )
+
+                    else -> throw UnsupportedOperationException(
+                        "Unsupported file reference MIME type: $mimeType"
+                    )
+                }
+            }
             require(uri.isHttpReference()) { "Unsupported remote file reference: $uri" }
             return when {
                 isSupportedImageMimeType(mimeType) ->

@@ -76,6 +76,8 @@ data class ModelServiceDetailUiState(
     val baseline: ModelServiceDraft? = null,
     /** 已有实例的启停状态；来自仓库，独立于草稿提交。 */
     val isEnabled: Boolean = true,
+    /** 实例级"文件上传"开关：新建阶段随草稿落盘，落库后直接写仓库并由仓库观察回流同步。 */
+    val isFileUploadEnabled: Boolean = false,
     val page: ServiceEditorPage = ServiceEditorPage.Detail,
     val modelQuery: String = "",
     val selectedCategory: ServiceCapability? = null,
@@ -125,6 +127,9 @@ sealed interface ModelServiceDetailAction {
     data class SharedApiKeyChanged(val value: String) : ModelServiceDetailAction
     data object ToggleApiKeyVisibility : ModelServiceDetailAction
     data object ToggleConnectionKeyVisibility : ModelServiceDetailAction
+    /** 实例级"文件上传"开关切换（新建随草稿落盘，落库后独立写仓库）。 */
+    data class FileUploadChanged(val enabled: Boolean) : ModelServiceDetailAction
+
     /** 独立启停；停用保留默认引用。 */
     data class EnabledChanged(val enabled: Boolean) : ModelServiceDetailAction
     /** 厂商工具偏好（详情页与工具页共用）。 */

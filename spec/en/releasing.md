@@ -60,9 +60,10 @@ GitHub settings; editing the YAML does not enable them.
 3. Push a development branch to run release script tests, architecture checks, JVM unit tests,
    debug APK assembly, plugin compilation, and lint. Development branches are all branches except
    `main`, `release-please--**`, `backup/**`, and `dependabot/**`. Local commits alone do not run CI.
-4. Open the pull request with actual verification results. PR events, main merges, version PRs,
-   tags, and manual dispatches do not trigger CI. Prepare Release only maintains version PRs and
-   starts publication.
+4. Open the pull request with actual verification results. Pull requests targeting main, main
+   merges, version PRs, tags, and manual dispatches do not trigger CI; a pull request targeting a
+   development branch triggers it in addition to its branch push. Prepare Release only maintains
+   version PRs and starts publication.
 
 ## Version PR and changelog
 

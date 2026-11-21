@@ -2,13 +2,12 @@ package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -26,8 +25,8 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.MicNone
@@ -47,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -73,12 +73,22 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.domain.modelcatalog.model.FILE_UPLOAD_TEMPLATE_IDS
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.GimiTheme
+
+/** 判断子页切换方向：从详情页进入子页为前进，返回详情页为后退。 */
+private fun isForwardTransition(from: ServiceEditorPage, to: ServiceEditorPage): Boolean = when {
+    from == ServiceEditorPage.Detail -> true
+    to == ServiceEditorPage.Detail -> false
+    else -> to.ordinal > from.ordinal
+}
 
 /** 服务详情的无状态渲染：页面切换、各子页与确认对话框。 */
 @Composable
@@ -88,40 +98,62 @@ fun ServiceDetailScreen(
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier, style = PreferenceStyle.Compact) {
+    Box(modifier = modifier.fillMaxSize()) {
         when {
-            state.isLoading -> Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator()
-            }
-            state.draft == null -> Text(
-                stringResource(R.string.modelsettings_notice_instance_missing),
-                Modifier.padding(24.dp),
-            )
-            else -> AnimatedContent(
-                targetState = state.page,
-                // 与「添加到聊天」抽屉同一套切页动效：进入下一级自右向左滑入，返回时自左向右滑回。
-                transitionSpec = {
-                    val towards = if (targetState.ordinal > initialState.ordinal) {
-                        AnimatedContentTransitionScope.SlideDirection.Left
-                    } else {
-                        AnimatedContentTransitionScope.SlideDirection.Right
+            state.isLoading -> {
+                PreferenceScaffold(
+                    style = PreferenceStyle.Compact,
+                    title = stringResource(R.string.modelsettings_list_title),
+                    onBack = { onAction(ModelServiceDetailAction.Back) },
+                ) { scaffoldModifier ->
+                    PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+                        Column(
+                            Modifier.fillMaxSize().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
-                    slideIntoContainer(towards = towards, animationSpec = tween(220)) + fadeIn(tween(160)) togetherWith
-                        slideOutOfContainer(towards = towards, animationSpec = tween(220)) + fadeOut(tween(120))
-                },
-                label = "service-editor-page",
-            ) { page ->
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                }
+            }
+            state.draft == null -> {
+                PreferenceScaffold(
+                    style = PreferenceStyle.Compact,
+                    title = stringResource(R.string.modelsettings_list_title),
+                    onBack = { onAction(ModelServiceDetailAction.Back) },
+                ) { scaffoldModifier ->
+                    PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+                        Text(
+                            stringResource(R.string.modelsettings_notice_instance_missing),
+                            Modifier.padding(24.dp),
+                        )
+                    }
+                }
+            }
+            else -> {
+                // 与全局导航一致的全屏水平平移切页动效：进入下一级子页自右向左滑入，返回上一级自左向右滑回。
+                AnimatedContent(
+                    targetState = state.page,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        val isForward = isForwardTransition(initialState, targetState)
+                        if (isForward) {
+                            slideInHorizontally(initialOffsetX = { it }) togetherWith
+                                slideOutHorizontally(targetOffsetX = { -it })
+                        } else {
+                            slideInHorizontally(initialOffsetX = { -it }) togetherWith
+                                slideOutHorizontally(targetOffsetX = { it })
+                        }
+                    },
+                    label = "service-editor-page",
+                ) { page ->
                     when (page) {
-                        ServiceEditorPage.Detail -> DetailPage(state, onAction, onOpenUrl)
-                        ServiceEditorPage.Models -> ModelsPage(state, onAction)
-                        ServiceEditorPage.Connections -> ConnectionsPage(state, onAction)
-                        ServiceEditorPage.OfficialTools -> OfficialToolsPage(state, onAction)
-                        ServiceEditorPage.Suggestions -> SuggestionsPage(state, onAction)
+                        ServiceEditorPage.Detail -> DetailScreen(state, onAction, onOpenUrl)
+                        ServiceEditorPage.Models -> ModelsScreen(state, onAction)
+                        ServiceEditorPage.Connections -> ConnectionsScreen(state, onAction)
+                        ServiceEditorPage.OfficialTools -> OfficialToolsScreen(state, onAction)
+                        ServiceEditorPage.Suggestions -> SuggestionsScreen(state, onAction)
                     }
                 }
             }
@@ -135,10 +167,187 @@ fun ServiceDetailScreen(
         if (state.isDiscardDialogVisible) {
             DiscardChangesDialog(onAction)
         }
-        state.errorRes?.let { error ->
-            ErrorBanner(stringResource(error))
+    }
+}
+
+@Composable
+private fun DetailScreen(
+    state: ModelServiceDetailUiState,
+    onAction: (ModelServiceDetailAction) -> Unit,
+    onOpenUrl: (String) -> Unit,
+) {
+    val saveLabel = if (state.isNewInstance) {
+        stringResource(R.string.modelsettings_save_new_service)
+    } else {
+        stringResource(R.string.modelsettings_save_changes)
+    }
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = state.draft?.name?.ifBlank {
+            stringResource(
+                if (state.isNewInstance) R.string.modelsettings_add_service else R.string.modelsettings_list_title,
+            )
+        } ?: stringResource(R.string.modelsettings_list_title),
+        onBack = { onAction(ModelServiceDetailAction.Back) },
+        bottomBar = {
+            PreferenceSaveBarHost(
+                label = saveLabel,
+                enabled = state.canEdit,
+                enabledState = state,
+                onSave = { onAction(ModelServiceDetailAction.Save) },
+            )
+        },
+    ) { scaffoldModifier ->
+        PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                state.errorRes?.let { error ->
+                    ErrorBanner(stringResource(error))
+                }
+                DetailPage(state, onAction, onOpenUrl)
+            }
         }
     }
+}
+
+@Composable
+private fun ConnectionsScreen(
+    state: ModelServiceDetailUiState,
+    onAction: (ModelServiceDetailAction) -> Unit,
+) {
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = stringResource(R.string.modelsettings_connection_settings),
+        onBack = { onAction(ModelServiceDetailAction.Back) },
+    ) { scaffoldModifier ->
+        PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                state.errorRes?.let { error ->
+                    ErrorBanner(stringResource(error))
+                }
+                ConnectionsPage(state, onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelsScreen(
+    state: ModelServiceDetailUiState,
+    onAction: (ModelServiceDetailAction) -> Unit,
+) {
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = stringResource(R.string.modelsettings_section_available_models),
+        onBack = { onAction(ModelServiceDetailAction.Back) },
+        actions = {
+            if (state.template?.supportsConversation != false) {
+                FetchModelsAction(
+                    isRefreshing = state.isRefreshing,
+                    onClick = { onAction(ModelServiceDetailAction.FetchModels) },
+                )
+            }
+        },
+        bottomBar = {
+            PreferenceSaveBarHost(
+                label = stringResource(R.string.modelsettings_confirm_models, state.pendingSelectionCount),
+                enabled = state.canEdit && state.pendingSelectionCount > 0,
+                enabledState = state,
+                onSave = { onAction(ModelServiceDetailAction.ConfirmModels) },
+            )
+        },
+    ) { scaffoldModifier ->
+        PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                state.errorRes?.let { error ->
+                    ErrorBanner(stringResource(error))
+                }
+                ModelsPage(state, onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfficialToolsScreen(
+    state: ModelServiceDetailUiState,
+    onAction: (ModelServiceDetailAction) -> Unit,
+) {
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = stringResource(R.string.modelsettings_official_tools),
+        onBack = { onAction(ModelServiceDetailAction.Back) },
+    ) { scaffoldModifier ->
+        PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                state.errorRes?.let { error ->
+                    ErrorBanner(stringResource(error))
+                }
+                OfficialToolsPage(state, onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionsScreen(
+    state: ModelServiceDetailUiState,
+    onAction: (ModelServiceDetailAction) -> Unit,
+) {
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = stringResource(R.string.modelsettings_suggestions_title),
+        onBack = { onAction(ModelServiceDetailAction.Back) },
+        bottomBar = {
+            PreferenceSaveBarHost(
+                label = stringResource(R.string.modelsettings_save_with_defaults),
+                enabled = state.canEdit,
+                enabledState = state,
+                onSave = { onAction(ModelServiceDetailAction.ConfirmSuggestions) },
+            )
+        },
+    ) { scaffoldModifier ->
+        PreferencePageContainer(scaffoldModifier, style = PreferenceStyle.Compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                state.errorRes?.let { error ->
+                    ErrorBanner(stringResource(error))
+                }
+                SuggestionsPage(state, onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FetchModelsAction(isRefreshing: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        if (isRefreshing) {
+            CircularProgressIndicator(Modifier.size(18.dp))
+        } else {
+            Icon(
+                Icons.Outlined.Refresh,
+                contentDescription = stringResource(R.string.modelsettings_fetch_models),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreferenceSaveBarHost(
+    label: String,
+    enabled: Boolean,
+    enabledState: ModelServiceDetailUiState,
+    onSave: () -> Unit,
+) {
+    PreferenceSaveBar(
+        label = label,
+        onSave = onSave,
+        enabled = enabled,
+        notice = if (!enabledState.isEnabled) {
+            stringResource(R.string.modelsettings_save_notice_paused)
+        } else {
+            null
+        },
+    )
 }
 
 @Composable
@@ -209,28 +418,55 @@ private fun DetailPage(
             title = stringResource(R.string.modelsettings_connection_settings),
             subtitle = stringResource(R.string.modelsettings_connection_settings_subtitle),
             onClick = { onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.Connections)) },
-            showDivider = state.supportsTools,
+            showDivider = state.supportsTools || state.template?.id in FILE_UPLOAD_TEMPLATE_IDS,
         )
         if (state.supportsTools) {
             PreferenceListItem(
-                icon = Icons.Outlined.Build,
+                // SVG 官方字形走 drawable 资源；leadingIcon 槽自管 tint，与 Compact 行默认灰一致
+                leadingIcon = { modifier ->
+                    Icon(
+                        painterResource(R.drawable.ic_service_toolbox),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = modifier,
+                    )
+                },
                 title = stringResource(R.string.modelsettings_official_tools),
                 subtitle = stringResource(R.string.modelsettings_official_tools_subtitle),
                 onClick = { onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.OfficialTools)) },
+                showDivider = state.template?.id in FILE_UPLOAD_TEMPLATE_IDS,
+            )
+        }
+        // 文件上传是实例级开关（仅在支持文件上传的厂商模板展示）：
+        // 新建草稿阶段随草稿落盘，落库后直接写仓库并由仓库观察回流同步。
+        if (state.template?.id in FILE_UPLOAD_TEMPLATE_IDS) {
+            PreferenceSwitchRow(
+                leadingIcon = { modifier ->
+                    Icon(
+                        painterResource(R.drawable.ic_cloud_upload),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = modifier,
+                    )
+                },
+                title = stringResource(R.string.modelsettings_file_upload),
+                description = stringResource(R.string.modelsettings_file_upload_subtitle),
+                checked = state.isFileUploadEnabled,
+                onCheckedChange = { onAction(ModelServiceDetailAction.FileUploadChanged(it)) },
             )
         }
     }
     PreferenceSectionTitle(stringResource(R.string.modelsettings_section_available_models))
     PreferenceGroupCard {
-        state.draft?.connections?.forEachIndexed { index, connection ->
+        draft.connections.forEachIndexed { index, connection ->
             CapabilityRow(
                 capability = connection.capability,
                 count = connection.models.size,
-                showDivider = index < (state.draft?.connections?.size ?: 0) - 1,
+                showDivider = index < draft.connections.size - 1,
                 onClick = { onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.Models)) },
             )
         }
-        if (state.draft?.connections?.isEmpty() != false) {
+        if (draft.connections.isEmpty()) {
             PreferenceSectionNote(stringResource(R.string.modelsettings_no_capabilities))
         }
     }
@@ -548,6 +784,48 @@ private fun ServiceDetailEmptyStatePreview() {
     GimiTheme {
         ServiceDetailScreen(
             state = ModelServiceDetailUiState(isLoading = false),
+            onAction = {},
+            onOpenUrl = {},
+        )
+    }
+}
+
+@Preview(name = "服务详情 · 浅色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
+@Preview(
+    name = "服务详情 · 深色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ServiceDetailPopulatedPreview() {
+    GimiTheme {
+        ServiceDetailScreen(
+            state = ModelServiceDetailUiState(
+                isLoading = false,
+                template = PreviewDrafts.builtInTemplate(),
+                draft = PreviewDrafts.builtIn(),
+            ),
+            onAction = {},
+            onOpenUrl = {},
+        )
+    }
+}
+
+@Preview(name = "接口配置子页 · 浅色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
+@Preview(
+    name = "接口配置子页 · 深色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ServiceDetailConnectionsSubpagePreview() {
+    GimiTheme {
+        ServiceDetailScreen(
+            state = ModelServiceDetailUiState(
+                isLoading = false,
+                page = ServiceEditorPage.Connections,
+                template = PreviewDrafts.builtInTemplate(),
+                draft = PreviewDrafts.builtIn(),
+                connections = PreviewDrafts.connectionEditors(),
+            ),
             onAction = {},
             onOpenUrl = {},
         )

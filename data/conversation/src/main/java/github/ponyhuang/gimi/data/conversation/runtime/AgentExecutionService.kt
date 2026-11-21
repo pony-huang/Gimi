@@ -132,6 +132,15 @@ class AgentExecutionService : Service() {
     private fun createNotification(contentText: String): Notification {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val task = (runtimeGate.state.value as? AgentRuntimeState.Busy)?.tasks?.lastOrNull()
+            if (task?.source == github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource.CHATBOT) {
+                // 模式值与 ChatMode 枚举名对齐（MainActivity 按枚举 name 匹配），避免魔法串漂移。
+                putExtra(
+                    github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_MODE,
+                    github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT.name,
+                )
+                putExtra(github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest.EXTRA_SESSION, task.sessionId)
+            }
         }
         val pendingIntent = launchIntent?.let {
             PendingIntent.getActivity(

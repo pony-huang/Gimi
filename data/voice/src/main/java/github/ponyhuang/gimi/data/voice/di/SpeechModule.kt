@@ -9,22 +9,26 @@ import github.ponyhuang.gimi.data.voice.remote.VoiceCapabilityRegistry
 import github.ponyhuang.gimi.data.voice.repository.DefaultSpeechRecognitionRepository
 import github.ponyhuang.gimi.data.voice.repository.DefaultSpeechSynthesisRepository
 import github.ponyhuang.gimi.data.voice.repository.DefaultTtsVoiceRepository
-import github.ponyhuang.gimi.data.voice.repository.RealtimeVoiceModePreferences
-import github.ponyhuang.gimi.data.voice.repository.SimpleChatPromptPreferences
+import github.ponyhuang.gimi.data.voice.repository.DefaultVoiceConfigLookup
 import github.ponyhuang.gimi.data.voice.repository.SpeechSettingsPreferences
+import github.ponyhuang.gimi.data.voice.repository.VoiceGlobalDefaultsPreferences
+import github.ponyhuang.gimi.data.voice.repository.VoiceMemoryPreferences
+import github.ponyhuang.gimi.data.voice.repository.VoiceOverridePreferences
 import github.ponyhuang.gimi.data.voice.runtime.AndroidRealtimeVoiceCallForeground
 import github.ponyhuang.gimi.data.voice.runtime.InMemoryRealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallForeground
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceModeRepository
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceRepository
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigLookup
+import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalDefaultsRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceMemoryRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
 import javax.inject.Singleton
 
 /**
@@ -77,17 +81,30 @@ abstract class SpeechModule {
         implementation: SpeechSettingsPreferences,
     ): SpeechSettingsRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindSimpleChatPromptRepository(
-        implementation: SimpleChatPromptPreferences,
-    ): SimpleChatPromptRepository
 
     @Binds
     @Singleton
-    abstract fun bindRealtimeVoiceModeRepository(
-        implementation: RealtimeVoiceModePreferences,
-    ): RealtimeVoiceModeRepository
+    abstract fun bindVoiceGlobalDefaultsRepository(
+        implementation: VoiceGlobalDefaultsPreferences,
+    ): VoiceGlobalDefaultsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindVoiceOverrideRepository(
+        implementation: VoiceOverridePreferences,
+    ): VoiceOverrideRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindVoiceMemoryRepository(
+        implementation: VoiceMemoryPreferences,
+    ): VoiceMemoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindVoiceConfigLookup(
+        implementation: DefaultVoiceConfigLookup,
+    ): VoiceConfigLookup
 
     @Binds
     @Singleton

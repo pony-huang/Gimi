@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.modelaccess.deepseek.speech
 
 import github.ponyhuang.gimi.data.modelaccess.shared.awaitSpeechRecognitionBody
-import github.ponyhuang.gimi.data.modelaccess.shared.encodePcm16Wav
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest

@@ -13,6 +13,7 @@ CODE = re.compile(r'^(releaseVersionCode=)(\d+)([ \t]*)$', re.M)
 
 
 def increment_properties(properties, base_code):
+    """把 gradle.properties 文本中的 versionCode 提升到 max(基线+1, 现值)：恰好一个声明、越界即拒绝；现值不低于基线时保持不变，保证同一 PR 反复更新幂等。"""
     matches = list(CODE.finditer(properties))
     if len(matches) != 1:
         raise ValueError('Exactly one releaseVersionCode is required')
@@ -24,6 +25,7 @@ def increment_properties(properties, base_code):
 
 
 def api(endpoint, body=None):
+    """调用 gh api；带 body 时发 PUT（contents 提交用），返回解析后的 JSON。"""
     command = ['gh', 'api', endpoint]
     if body is not None:
         command += ['--method', 'PUT', '--input', '-']
@@ -33,14 +35,17 @@ def api(endpoint, body=None):
 
 
 def contents(repo, branch, path):
+    """按分支读取仓库文件的 contents API 响应（含 sha 与 base64 内容）。"""
     return api(f'repos/{repo}/contents/{path}?ref={quote(branch, safe="")}')
 
 
 def decode(file):
+    """解码 contents API 返回的 base64 内容为 UTF-8 文本。"""
     return base64.b64decode(file['content']).decode('utf-8')
 
 
 def prepare(number, repo, base_version, base_code):
+    """为单个版本 PR 分配 versionCode：校验 PR 形态（open/目标 main/本仓库）与版本推进，按分支现值计算新 code 后经 contents API 以 sha 防并发提交；值无变化时不产生新提交。"""
     pr = api(f'repos/{repo}/pulls/{number}')
     if pr['state'] != 'open' or pr['base']['ref'] != 'main' or pr['head']['repo']['full_name'] != repo:
         raise ValueError('Expected an open same-repository version PR targeting main')

@@ -21,7 +21,8 @@ internal fun Message.toClaudeLlmResponse(): LlmResponse = LlmResponse(
     ),
     modelVersion = model().asString(),
     partial = false,
-    usageMetadata = usage().toUsageMetadata()
+    usageMetadata = usage().toUsageMetadata(),
+    finishReason = toAdkFinishReason()
 )
 
 private fun Usage.toUsageMetadata() = UsageMetadata(

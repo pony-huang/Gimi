@@ -8,5 +8,6 @@ internal fun ChatAttachmentValidationFailure.toChatNotice(): ChatNotice = when (
     ChatAttachmentValidationFailure.ModelUnavailable -> ChatNotice.ChatModelUnavailable
     ChatAttachmentValidationFailure.CategoryUnsupported -> ChatNotice.AttachmentCategoryUnsupported
     is ChatAttachmentValidationFailure.UnsupportedOrTooLarge -> ChatNotice.AttachmentUnsupportedOrTooLarge(displayName)
+    is ChatAttachmentValidationFailure.VendorMismatch -> ChatNotice.AttachmentVendorMismatch(displayName)
     ChatAttachmentValidationFailure.DocumentTotalSizeLimitExceeded -> ChatNotice.DocumentTotalSizeLimitExceeded
 }

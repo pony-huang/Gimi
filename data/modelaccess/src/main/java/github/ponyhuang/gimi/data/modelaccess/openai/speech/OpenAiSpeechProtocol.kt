@@ -26,7 +26,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import github.ponyhuang.gimi.data.modelaccess.shared.encodePcm16Wav
+import github.ponyhuang.gimi.core.audio.encodePcm16Wav
 import github.ponyhuang.gimi.data.modelaccess.shared.awaitSpeechRecognitionBody
 
 /** OpenAI 专用语音端点的服务标识；与模型目录中的服务 ID 一致。 */
@@ -36,7 +36,8 @@ internal const val OPENAI_SPEECH_SERVICE_ID = "openai"
  * OpenAI 专用语音端点解析。
  *
  * 合成（`/audio/speech`）与识别（`/audio/transcriptions`）挂在同一套 API 的一个基址下。
- * 生产链路的基址由 [speechRequestBaseUrl] 解析为官方唯一地址（厂商自有、不可自定义）；
+ * 生产链路的基址由 [github.ponyhuang.gimi.domain.voice.repository.speechRequestBaseUrl]
+ * 解析为官方唯一地址（厂商自有、不可自定义）；
  * 测试直接传入 MockWebServer 地址覆盖。基址为空或不是 HTTP(S) 地址时回落官方默认地址。
  */
 internal object OpenAiSpeechEndpoints {

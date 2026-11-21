@@ -10,8 +10,10 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToolName
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.NATIVE_REALTIME_TRANSCRIPT_METADATA_KEY
 import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -152,6 +154,7 @@ object EventMapper {
             id = event.id,
             invocationId = event.invocationId,
             author = "user",
+            isNativeRealtimeTranscript = event.customMetadata?.get(NATIVE_REALTIME_TRANSCRIPT_METADATA_KEY) == true,
             a2uiInteraction = github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.decode(firstText),
             role = MessageRole.User,
             textParts = if (firstText.isEmpty() || github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.decode(firstText) != null) emptyList() else listOf(textPartFor(event, 0, firstText, thought = false)),
@@ -191,6 +194,15 @@ object EventMapper {
             if (mimeType == null || reference == null) {
                 Log.w(TAG, "Dropping file attachment without mime/reference: ${file.displayName.orEmpty()}")
                 return null
+            }
+            // 厂商 file 引用（gimi-file://）：本地无副本，按引用附件映射，重放直通 file_id。
+            VendorFileReference.parse(reference)?.let { (vendor, fileId) ->
+                return FileAttachment.fromVendorReference(
+                    vendor = vendor,
+                    fileId = fileId,
+                    mimeType = mimeType,
+                    displayName = file.displayName.orEmpty(),
+                )
             }
             val payload = File(reference.removePrefix("file://"))
             val attachment = runCatching {

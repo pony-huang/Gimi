@@ -10,10 +10,11 @@ import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRoleRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
@@ -34,19 +35,29 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** 级联模型测试用隔离存储，真实恢复与重试由 ChatbotConversationWriterTest 覆盖。 */
+private fun stubSimpleVoice(): javax.inject.Provider<ChatbotConversationWriter> = javax.inject.Provider {
+    mockk { every { bind(any()) } returns mockk(relaxed = true) }
+}
+
 /** 聊天模式 Agent 会话与 TTS 管线的组合行为：增量字幕、按句合成、事件顺序与收尾。 */
 class AgentSessionPipelineTest {
     private val pcm = byteArrayOf(1, 0, 2, 0)
     private val selection = ModelSelection("service", "group", "model")
-    private val configuration = RealtimeVoiceConfiguration(RealtimeVoiceMode.Chat, "conv", selection)
+    private val configuration = RealtimeVoiceConfiguration(
+        style = VoiceConversationStyle.ASSISTANT,
+        pipeline = VoicePipeline.CASCADED,
+        conversationId = "conv",
+        modelSelection = selection,
+    )
 
-    private fun emptySimpleChatPrompts(): SimpleChatPromptRepository = object : SimpleChatPromptRepository {
-        override val presets = MutableStateFlow(emptyList<SimpleChatPromptPreset>())
-        override val builtInPresets = emptyList<SimpleChatPromptPreset>()
-        override val selectedPresetId = MutableStateFlow<String?>(null)
-        override fun upsertPreset(preset: SimpleChatPromptPreset) {}
+    private fun emptySimpleChatPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
+        override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
+        override val builtInPresets = emptyList<ChatbotRolePreset>()
+        override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
+        override fun upsertPreset(preset: ChatbotRolePreset) {}
         override fun deletePreset(presetId: String) {}
-        override fun selectPreset(presetId: String?) {}
+        override fun selectPreset(conversationId: String, presetId: String?) {}
     }
 
     /** 聊天模式走完整 Agent；不触碰实时助手工具桥。 */
@@ -107,7 +118,7 @@ class AgentSessionPipelineTest {
         val agentVoice = VoiceAgentConversation(
             scriptedRunner(execution), mockk(), mockk(relaxed = true), mockk(),
         )
-        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools())
+        return AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
     }
 
     @Test
@@ -149,7 +160,7 @@ class AgentSessionPipelineTest {
                 modelText("今天天气不错。", partial = true),
             ))), mockk(), mockk(relaxed = true), mockk(),
         )
-        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools())
+        val backend = AdkVoiceAudioBackend(mockk(), recognition, synthesis, emptySimpleChatPrompts(), { agentVoice }, unusedAssistantTools(), stubSimpleVoice())
         val session = backend.open(configuration)
         val events = withTimeout(10_000) { session.respond("你好", "").toList() }
         assertEquals(listOf("你好。", "今天天气不错。"),

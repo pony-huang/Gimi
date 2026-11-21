@@ -9,6 +9,7 @@ package github.ponyhuang.gimi.feature.memory
  * @property hasStoredToken 是否已有安全保存的 Token。
  * @property tokenError Token 是否缺失。
  * @property saving 是否正在保存。
+ * @property notice 待呈现的一次性通知；Route 呈现后经 [MemorySettingsAction.ConsumeNotice] 清除。
  */
 data class MemorySettingsUiState(
     val memoryEnabled: Boolean = true,
@@ -17,6 +18,7 @@ data class MemorySettingsUiState(
     val hasStoredToken: Boolean = false,
     val tokenError: Boolean = false,
     val saving: Boolean = false,
+    val notice: MemorySettingsNotice? = null,
 )
 
 sealed interface MemorySettingsAction {
@@ -31,12 +33,16 @@ sealed interface MemorySettingsAction {
 
     /** 保存当前设置。 */
     data object Save : MemorySettingsAction
+
+    /** 确认一次性通知已呈现，清空 [MemorySettingsUiState.notice]。 */
+    data object ConsumeNotice : MemorySettingsAction
 }
 
-sealed interface MemorySettingsEffect {
+/** 设置页一次性通知；以 UiState 字段承载，由 Route 呈现后消费清除。 */
+sealed interface MemorySettingsNotice {
     /** 配置已经安全保存。 */
-    data object Saved : MemorySettingsEffect
+    data object Saved : MemorySettingsNotice
 
     /** 安全存储写入失败。 */
-    data object SaveFailed : MemorySettingsEffect
+    data object SaveFailed : MemorySettingsNotice
 }

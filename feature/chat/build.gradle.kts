@@ -10,6 +10,12 @@ android {
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    // ADK LoggerFactory 与 android.util.Log 在 JVM 单测里没有实现，返回默认值即可。
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
     // Baseline 记录现存 lint 问题（如 ChatComposer 录音权限检查），lint 继续对新问题报错。
     lint {
         baseline = file("lint-baseline.xml")
@@ -32,6 +38,8 @@ dependencies {
     implementation(project(":domain:appupdate"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
+    // Chatbot 形态的端点判定（官方 DeepSeek 端点）由 modelaccess 领域契约提供。
+    implementation(project(":domain:modelaccess"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:a2a"))
     implementation(project(":domain:memory"))

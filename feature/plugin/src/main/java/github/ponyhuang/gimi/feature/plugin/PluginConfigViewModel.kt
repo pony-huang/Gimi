@@ -10,11 +10,8 @@ import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.feature.plugin.R
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -25,8 +22,7 @@ class PluginConfigViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(PluginConfigUiState())
     val state: StateFlow<PluginConfigUiState> = _state.asStateFlow()
-    private val mutableEffects = MutableSharedFlow<PluginConfigEffect>()
-    val effects: SharedFlow<PluginConfigEffect> = mutableEffects.asSharedFlow()
+
 
     /**
      * 按 pluginId 载入配置描述、已存值与动作。每次进入配置页都从 repository 重新读，
@@ -74,13 +70,12 @@ class PluginConfigViewModel @Inject constructor(
                     field.key to sanitizeFieldValue(field, field.value)
                 }
                 repository.updateConfig(_state.value.pluginId, values)
-                viewModelScope.launch {
-                    mutableEffects.emit(PluginConfigEffect.ShowToast(messageRes = R.string.plugin_config_saved))
-                }
+                _state.update { it.copy(notice = PluginConfigNotice.ShowToast(messageRes = R.string.plugin_config_saved)) }
             }
             is PluginConfigAction.RunAction -> runAction(action.actionId)
             is PluginConfigAction.ReceiveActionCallback -> receiveActionCallback(action.actionId, action.values)
             PluginConfigAction.DismissActionCallback -> _state.update { it.copy(callback = null) }
+            PluginConfigAction.ConsumeNotice -> _state.update { it.copy(notice = null) }
         }
     }
 
@@ -120,7 +115,7 @@ class PluginConfigViewModel @Inject constructor(
                 val execution = repository.runAction(_state.value.pluginId, actionId)
                 when (execution) {
                     is PluginActionExecution.Completed -> {
-                        mutableEffects.emit(PluginConfigEffect.ShowToast(message = execution.outcome.message))
+                        _state.update { it.copy(notice = PluginConfigNotice.ShowToast(message = execution.outcome.message)) }
                     }
                     is PluginActionExecution.AwaitingCallback -> {
                         val request = execution.request
@@ -140,9 +135,7 @@ class PluginConfigViewModel @Inject constructor(
                 throw cancelled
             } catch (error: Exception) {
                 // 动作失败不能静默：不抛出（launch 内异常会崩宿主），以失败提示收尾。
-                mutableEffects.emit(
-                    PluginConfigEffect.ShowToast(message = error.message ?: error.toString()),
-                )
+                _state.update { it.copy(notice = PluginConfigNotice.ShowToast(message = error.message ?: error.toString())) }
             } finally {
                 // 无论成败/取消都必须复位 running 位，否则动作按钮永久禁用。
                 _state.update { state ->
@@ -165,13 +158,11 @@ class PluginConfigViewModel @Inject constructor(
                     actionId = actionId,
                     callback = PluginActionCallback(values),
                 )
-                outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
+                outcome?.let { _state.update { state -> state.copy(notice = PluginConfigNotice.ShowToast(message = it.message)) } }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                mutableEffects.emit(
-                    PluginConfigEffect.ShowToast(message = error.message ?: error.toString()),
-                )
+                _state.update { it.copy(notice = PluginConfigNotice.ShowToast(message = error.message ?: error.toString())) }
             } finally {
                 // 回调页只在回传动作完结（成功/失败/取消）后关闭，失败时不丢失交互现场。
                 _state.update { it.copy(callback = null) }

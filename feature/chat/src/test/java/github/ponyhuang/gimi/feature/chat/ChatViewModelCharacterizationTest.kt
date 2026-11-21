@@ -1,7 +1,16 @@
 package github.ponyhuang.gimi.feature.chat
 
 import android.util.Log
-import app.cash.turbine.test
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUpload
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileContentResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileListResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileObjectResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUploadResult
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
@@ -32,6 +41,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionR
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
@@ -213,13 +223,11 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
         val drafts = listOf(documentDraft("a.pdf", 26L * 1024 * 1024),
             documentDraft("b.pdf", 26L * 1024 * 1024))
-        fixture.viewModel.effects.test {
-            val results = mutableListOf<ChatSubmissionResult>()
-            fixture.viewModel.send("文档请求", drafts, results::add)
-            assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.DocumentTotalSizeLimitExceeded), awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("文档请求", drafts, results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        assertEquals(ChatNotice.DocumentTotalSizeLimitExceeded, fixture.viewModel.uiState.value.notice)
         coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
         coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
@@ -232,11 +240,9 @@ class ChatViewModelCharacterizationTest {
         val document = documentDraft("a.pdf", 100)
         val image = document.copy(reference = "/drafts/a.png", mimeType = "image/png",
             category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.IMAGE)
-        fixture.viewModel.effects.test {
-            fixture.viewModel.send("混合附件", listOf(document, image))
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.MixedAttachmentCategories), awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+        fixture.viewModel.send("混合附件", listOf(document, image))
+        advanceUntilIdle()
+        assertEquals(ChatNotice.MixedAttachmentCategories, fixture.viewModel.uiState.value.notice)
         coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
@@ -313,6 +319,7 @@ class ChatViewModelCharacterizationTest {
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
             a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+            profile: AgentProfile,
             ): ChatAgentExecution = object : ChatAgentExecution {
             override suspend fun sendInteraction(
                 interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
@@ -368,6 +375,7 @@ class ChatViewModelCharacterizationTest {
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
             a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+            profile: AgentProfile,
             ): ChatAgentExecution = object : ChatAgentExecution {
             override suspend fun sendInteraction(
                 interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
@@ -429,6 +437,7 @@ class ChatViewModelCharacterizationTest {
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
             a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+            profile: AgentProfile,
             ): ChatAgentExecution = object : ChatAgentExecution {
             override suspend fun sendInteraction(
                 interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
@@ -592,48 +601,56 @@ class ChatViewModelCharacterizationTest {
         val failures = MutableSharedFlow<MemoryRuntimeFailure>(extraBufferCapacity = 2)
         val fixture = fixture(configured = true, memoryFailures = failures)
 
-        fixture.viewModel.effects.test {
-            runCurrent()
-            failures.emit(MemoryRuntimeFailure(MemoryOperation.SEARCH))
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.MemorySearchFailed), awaitItem())
-            failures.emit(MemoryRuntimeFailure(MemoryOperation.WRITE))
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.MemoryWriteFailed), awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+        advanceUntilIdle()  // 先让 VM 的失败流收集器完成订阅，否则 emit 落入无订阅缓冲被丢弃。
+        failures.emit(MemoryRuntimeFailure(MemoryOperation.SEARCH))
+        advanceUntilIdle()
+        assertEquals(ChatNotice.MemorySearchFailed, fixture.viewModel.uiState.value.notice)
+        failures.emit(MemoryRuntimeFailure(MemoryOperation.WRITE))
+        // 通知改由状态承载：未消费前再次发送会覆盖，只保留最新一条。
+        advanceUntilIdle()
+        assertEquals(ChatNotice.MemoryWriteFailed, fixture.viewModel.uiState.value.notice)
     }
 
     @Test
     fun send_withoutConfiguredChatModel_emitsActionableNoticeWithoutRunningAgent() = runTest {
         val fixture = fixture(configured = false)
 
-        fixture.viewModel.effects.test {
-            fixture.viewModel.send("你好")
-            advanceUntilIdle()
+        fixture.viewModel.send("你好")
+        advanceUntilIdle()
 
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.ConfigureChatModel),
-                awaitItem(),
-            )
-            assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-            coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertEquals(ChatNotice.ConfigureChatModel, fixture.viewModel.uiState.value.notice)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
     fun newConversationWithoutConfiguredModelEmitsNoticeWithoutCrashing() = runTest {
         val fixture = fixture(configured = false)
 
-        fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(ChatAction.NewConversation)
-            advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
 
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.ConfigureChatModel), awaitItem())
-            assertTrue(fixture.viewModel.uiState.value.sessionId.isBlank())
-            assertFalse(fixture.viewModel.uiState.value.isInitializing)
-            coVerify(exactly = 0) { fixture.conversations.createConversation(any(), any(), any()) }
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertEquals(ChatNotice.ConfigureChatModel, fixture.viewModel.uiState.value.notice)
+        assertTrue(fixture.viewModel.uiState.value.sessionId.isBlank())
+        assertFalse(fixture.viewModel.uiState.value.isInitializing)
+        coVerify(exactly = 0) { fixture.conversations.createConversation(any(), any(), any()) }
+    }
+
+    @Test
+    fun newConversationWhenCurrentSessionIsAlreadyNewEmitsAlreadyNewNoticeWithoutCreatingSession() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1", "session-2"))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
+        assertTrue(fixture.viewModel.uiState.value.messages.isEmpty())
+
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+
+        assertEquals(ChatNotice.AlreadyNewConversation, fixture.viewModel.uiState.value.notice)
+        assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
+        // 首次 RestoreOrCreateSession 创建了 session-1，随后的 NewConversation 被拦截，不得创建 session-2
+        coVerify(exactly = 1) { fixture.conversations.createConversation(any(), any(), any()) }
     }
 
     @Test
@@ -644,16 +661,10 @@ class ChatViewModelCharacterizationTest {
         }
         val fixture = fixture(configured = true, sessionResolverOverride = failingResolver)
 
-        fixture.viewModel.effects.test {
-            fixture.viewModel.send("你好")
-            advanceUntilIdle()
+        fixture.viewModel.send("你好")
+        advanceUntilIdle()
 
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.Message("disk boom")),
-                awaitItem(),
-            )
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertEquals(ChatNotice.Message("disk boom"), fixture.viewModel.uiState.value.notice)
     }
 
     @Test
@@ -805,6 +816,7 @@ class ChatViewModelCharacterizationTest {
             configured = true,
             sessionIds = listOf("session-a", "session-b"),
         )
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(Messages.fromUser("hello"))
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.NewConversation)
@@ -1030,22 +1042,16 @@ class ChatViewModelCharacterizationTest {
             advanceUntilIdle()
         }
 
-        fixture.viewModel.effects.test {
-            fixture.viewModel.send("task-4")
-            runCurrent()
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.ParallelTaskLimitReached),
-                awaitItem(),
-            )
-            assertEquals(3, fixture.viewModel.uiState.value.conversationTaskStatuses.size)
+        fixture.viewModel.send("task-4")
+        runCurrent()
+        assertEquals(ChatNotice.ParallelTaskLimitReached, fixture.viewModel.uiState.value.notice)
+        assertEquals(3, fixture.viewModel.uiState.value.conversationTaskStatuses.size)
 
-            listOf("s1", "s2", "s3").forEach { sessionId ->
-                fixture.viewModel.onAction(ChatAction.SwitchSession(sessionId))
-                advanceUntilIdle()
-                fixture.viewModel.onAction(ChatAction.StopStreaming)
-                runCurrent()
-            }
-            cancelAndIgnoreRemainingEvents()
+        listOf("s1", "s2", "s3").forEach { sessionId ->
+            fixture.viewModel.onAction(ChatAction.SwitchSession(sessionId))
+            advanceUntilIdle()
+            fixture.viewModel.onAction(ChatAction.StopStreaming)
+            runCurrent()
         }
     }
 
@@ -1421,30 +1427,21 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
 
-        fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(ChatAction.DeleteConversation("session-a"))
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked),
-                awaitItem(),
-            )
-            coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
+        fixture.viewModel.onAction(ChatAction.DeleteConversation("session-a"))
+        assertEquals(ChatNotice.ActiveConversationDeleteBlocked, fixture.viewModel.uiState.value.notice)
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
 
-            val otherModel = ModelSelection("service", "chat", "other")
-            fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
-            advanceUntilIdle()
-            coVerify { fixture.conversations.setConversationModel("session-b", any()) }
+        val otherModel = ModelSelection("service", "chat", "other")
+        fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
+        advanceUntilIdle()
+        coVerify { fixture.conversations.setConversationModel("session-b", any()) }
 
-            fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
-            advanceUntilIdle()
-            fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.ModelSwitchBlocked),
-                awaitItem(),
-            )
-            fixture.viewModel.onAction(ChatAction.StopStreaming)
-            runCurrent()
-            cancelAndIgnoreRemainingEvents()
-        }
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
+        assertEquals(ChatNotice.ModelSwitchBlocked, fixture.viewModel.uiState.value.notice)
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        runCurrent()
     }
 
     @Test
@@ -1464,15 +1461,9 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
-        fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(ChatAction.DeleteConversation("session-1"))
-            assertEquals(
-                ChatEffect.ShowNotice(ChatNotice.CurrentConversationDeleteProtected),
-                awaitItem(),
-            )
-            coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
-            cancelAndIgnoreRemainingEvents()
-        }
+        fixture.viewModel.onAction(ChatAction.DeleteConversation("session-1"))
+        assertEquals(ChatNotice.CurrentConversationDeleteProtected, fixture.viewModel.uiState.value.notice)
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
     }
 
     @Test
@@ -1586,6 +1577,7 @@ class ChatViewModelCharacterizationTest {
         val catalog = toolFunctionCatalog()
         val fixture = fixture(configured = true, sessionIds = listOf("session-a", "session-b"),
             officialCatalogOverride = catalog)
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(Messages.fromUser("hello"))
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.NewConversation)
@@ -1621,6 +1613,7 @@ class ChatViewModelCharacterizationTest {
         coEvery { catalog.listFunctions("web_search") } coAnswers { response.await() }
         val fixture = fixture(configured = true, sessionIds = listOf("session-a", "session-b"),
             officialCatalogOverride = catalog)
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(Messages.fromUser("hello"))
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         runCurrent()
         assertTrue(fixture.viewModel.uiState.value.officialToolDescriptors.single().isLoadingFunctions)
@@ -1844,6 +1837,7 @@ class ChatViewModelCharacterizationTest {
             selection: ModelSelection,
             toolConfiguration: ConversationToolConfiguration?,
             a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+            profile: AgentProfile,
         ): ChatAgentExecution = object : ChatAgentExecution {
             override suspend fun sendInteraction(
                 interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
@@ -1924,11 +1918,9 @@ class ChatViewModelCharacterizationTest {
         fixture.recent(RecentConversationsAction.StartSelection("failed"))
         fixture.recent(RecentConversationsAction.ToggleSelection("success"))
         fixture.recent(RecentConversationsAction.RequestDeletion)
-        fixture.viewModel.effects.test {
-            fixture.recent(RecentConversationsAction.ConfirmDeletion)
-            advanceUntilIdle()
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.ConversationDeleteFailed), awaitItem())
-        }
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        assertEquals(ChatNotice.ConversationDeleteFailed, fixture.viewModel.uiState.value.notice)
         coVerify(exactly = 1) { fixture.conversations.deleteConversation("success") }
         coVerify(exactly = 0) { fixture.attachments.deleteSession("failed") }
         assertEquals(setOf("failed"), fixture.viewModel.uiState.value.recentConversations.selectedIds)
@@ -1946,11 +1938,9 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
-        fixture.viewModel.effects.test {
-            fixture.recent(RecentConversationsAction.ConfirmDeletion)
-            advanceUntilIdle()
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked), awaitItem())
-        }
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        assertEquals(ChatNotice.ActiveConversationDeleteBlocked, fixture.viewModel.uiState.value.notice)
         coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
         coVerify(exactly = 1) { fixture.conversations.deleteConversation("other") }
     }
@@ -1975,6 +1965,7 @@ class ChatViewModelCharacterizationTest {
     fun batchDeletionRechecksBackgroundTaskStartedAfterSelection() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent, sessionIds = listOf("session-a", "session-b"))
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(Messages.fromUser("hello"))
         fixture.setRecentConversations("session-a", "session-b")
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
@@ -1988,11 +1979,9 @@ class ChatViewModelCharacterizationTest {
         runCurrent()
         fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
         advanceUntilIdle()
-        fixture.viewModel.effects.test {
-            fixture.recent(RecentConversationsAction.ConfirmDeletion)
-            advanceUntilIdle()
-            assertEquals(ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked), awaitItem())
-        }
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        assertEquals(ChatNotice.ActiveConversationDeleteBlocked, fixture.viewModel.uiState.value.notice)
         coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
         fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
         advanceUntilIdle()
@@ -2158,6 +2147,8 @@ class ChatViewModelCharacterizationTest {
                 speechPlaybackController = playback,
                 speechSettings = speechSettings,
                 attachments = attachments,
+                fileUploadGateway = FakeVendorFileUploadGateway(),
+                fileUploadRegistry = FakeUploadedFileRegistry(),
                 prepareChatSend = PrepareChatSendUseCase(sessionResolver, conversations, prepareChatTurn, agent),
                 validateChatAttachments = ValidateChatAttachmentsUseCase(),
                 toolAuthorization = toolAuthorization,
@@ -2215,6 +2206,7 @@ class ChatViewModelCharacterizationTest {
             selection: ModelSelection,
             toolConfiguration: ConversationToolConfiguration?,
             a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
+            profile: AgentProfile,
         ): ChatAgentExecution = object : ChatAgentExecution {
             override suspend fun sendInteraction(
                 interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
@@ -2329,4 +2321,62 @@ private class FakeToolApprovalRepository : ToolApprovalRepository {
 
     override fun isAutoApproved(toolName: String): Boolean =
         _fullAccess.value || toolName in _alwaysAllowedToolNames.value
+}
+
+
+/** 特征测试用的上传网关 fake：恒返回失败（特征链路不依赖上传成功路径）。 */
+private class FakeVendorFileUploadGateway : VendorFileGateway {
+    override suspend fun upload(
+        vendor: String,
+        protocol: ApiProtocol,
+        endpoint: String,
+        apiKey: String,
+        request: VendorFileUpload,
+    ): VendorFileUploadResult = VendorFileUploadResult.Failure(VendorFileFailureReason.VENDOR_ERROR)
+
+    override suspend fun listFiles(
+        vendor: String,
+        protocol: ApiProtocol,
+        endpoint: String,
+        apiKey: String,
+        limit: Int?,
+        cursor: String?,
+    ): VendorFileListResult = VendorFileListResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun getFile(
+        vendor: String,
+        protocol: ApiProtocol,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileObjectResult = VendorFileObjectResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun deleteFile(
+        vendor: String,
+        protocol: ApiProtocol,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileDeleteResult = VendorFileDeleteResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+
+    override suspend fun getContent(
+        vendor: String,
+        protocol: ApiProtocol,
+        endpoint: String,
+        apiKey: String,
+        fileId: String,
+    ): VendorFileContentResult = VendorFileContentResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR)
+}
+
+/** 特征测试用的注册表 fake：内存记录。 */
+private class FakeUploadedFileRegistry : UploadedFileRegistry {
+    private val entries = mutableListOf<UploadedFileEntry>()
+    override suspend fun record(entry: UploadedFileEntry) {
+        entries.add(entry)
+    }
+    override fun entriesFor(vendor: String): Flow<List<UploadedFileEntry>> =
+        MutableStateFlow(entries.filter { it.vendor == vendor })
+    override suspend fun remove(vendor: String, fileId: String) {
+        entries.removeAll { it.vendor == vendor && it.fileId == fileId }
+    }
 }

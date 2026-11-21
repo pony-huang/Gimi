@@ -10,17 +10,21 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.LiveConnectConfig
 import com.google.adk.kt.types.Modality
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.agent.AgentPrompts
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.data.agent.AgentPrompts
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
+import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
+import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceDuplexSession
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRoleRepository
+import github.ponyhuang.gimi.domain.conversation.repository.contentFor
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
@@ -28,7 +32,8 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackend
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioEvent
-import github.ponyhuang.gimi.domain.voice.repository.isRealtimeEngine
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
@@ -40,7 +45,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
@@ -53,13 +57,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import github.ponyhuang.gimi.data.modelaccess.VoiceLiveModelFactory
-import github.ponyhuang.gimi.data.modelaccess.VoiceSentenceBuffer
-import github.ponyhuang.gimi.data.modelaccess.VoiceAudioMarkers
-import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeConnectionProbe
-import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
-import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
 
 /**
  * 应用会话与语音后端的唯一转换层；设备、AEC 和播放仍由 data:speech 拥有。
@@ -71,19 +68,26 @@ class AdkVoiceAudioBackend @Inject constructor(
     private val models: VoiceLiveModelFactory,
     private val recognition: SpeechRecognitionRepository,
     private val synthesis: SpeechSynthesisRepository,
-    private val simpleChatPrompts: SimpleChatPromptRepository,
+    private val simpleChatPrompts: ChatbotRoleRepository,
     private val agentVoice: Provider<VoiceAgentConversation>,
     private val assistantTools: RealtimeAssistantTools,
+    private val simpleVoice: Provider<ChatbotConversationWriter>,
 ) : VoiceAudioBackend {
     override fun open(configuration: RealtimeVoiceConfiguration): VoiceAudioBackendSession =
-        if (configuration.mode == RealtimeVoiceMode.Chat) AgentSession(configuration) else SimpleSession(configuration)
+        // open 只承载级联链路；助手方式接入完整 agent，Chatbot 走内存上下文 + 可选预设。
+        if (configuration.style == VoiceConversationStyle.ASSISTANT) {
+            AgentSession(configuration)
+        } else {
+            SimpleSession(configuration)
+        }
 
     override suspend fun openDuplex(configuration: RealtimeVoiceConfiguration): RealtimeVoiceDuplexSession {
-        check(configuration.mode.isRealtimeEngine) { "openDuplex 仅支持 Realtime 模式" }
-        // 轻聊使用预设；实时助手使用助手指令与共用语音表达契约。
-        // 实时助手：会话开启前解析授权可执行的工具桥（可能探测 MCP，移到 IO 执行，
-        // 不阻塞主线程）；解析失败退化为无工具的实时轻聊。实时轻聊恒无工具。
-        val tools = if (configuration.mode == RealtimeVoiceMode.RealtimeAssistant) {
+        check(configuration.pipeline == VoicePipeline.NATIVE_REALTIME) { "openDuplex 仅支持原生实时链路" }
+        // Chatbot 使用预设；助手使用助手指令与共用语音表达契约。
+        // 助手：会话开启前解析授权可执行的工具桥（可能探测 MCP，移到 IO 执行，
+        // 不阻塞主线程）；解析失败退化为无工具的实时 Chatbot。Chatbot 恒无工具。
+        val assistantMode = configuration.style == VoiceConversationStyle.ASSISTANT
+        val tools = if (assistantMode) {
             // 空声明与无工具等价：门面按 tools != null 装配工具轮，空桥仍会为幻觉调用写回。
             withContext(Dispatchers.IO) { assistantTools.resolve(configuration.modelSelection) }
                 ?.takeIf { it.declarations.isNotEmpty() }
@@ -94,21 +98,29 @@ class AdkVoiceAudioBackend @Inject constructor(
         // 绝对能力声明：一次工具面解析故障会把它固化成模型人设，用户一问工具就得到
         // 「我没有工具」；即便后续工具恢复，该指令仍压着模型。空声明时改用中性约束，
         // 只禁止虚构「已执行外部动作」，不替模型断言自己有没有工具。
-        val assistantMode = configuration.mode == RealtimeVoiceMode.RealtimeAssistant
         val hasDeclarations = !tools?.declarations.isNullOrEmpty()
-        val instructions = realtimeInstructions(selectedPresetContent(), assistantMode, hasDeclarations)
+        // 原生实时 Chatbot 不调用 acquire()（不重放历史），所以必须在这里提前把可空的
+        // conversationId 解析为真实会话：否则轮终稿 flush() 会在空 ID 上失败，
+        // 被 RealtimeChatbotTranscript 吞掉后静默丢失整通转写。
+        val chatbotWriter = if (assistantMode) null else simpleVoice.get().bind(configuration.conversationId)
+        // 助手模式没有 Chatbot 写入，会话 ID 仍可空（预设解析接受 null）；只有 Chatbot 必须解析出真实 ID。
+        val conversationId = if (assistantMode) configuration.conversationId else chatbotWriter!!.resolve()
+        val instructions = realtimeInstructions(selectedPresetContent(conversationId), assistantMode, hasDeclarations)
         Log.i(
             TAG,
-            "实时会话配置: mode=${configuration.mode}, 工具声明=${tools?.declarations?.size ?: 0}, " +
-                "assistantMode=$assistantMode",
+            "实时会话配置: style=${configuration.style}, pipeline=${configuration.pipeline}, " +
+                "工具声明=${tools?.declarations?.size ?: 0}, assistantMode=$assistantMode",
         )
         return NativeRealtimeDuplexSession(
             models = models,
             selection = configuration.modelSelection,
             instructions = instructions,
+            instructionProvider = { realtimeInstructions(selectedPresetContent(conversationId), assistantMode, hasDeclarations) },
             // 会话音色的自定义覆盖；null 表示用所选模型在该厂商下的缺省音色。
             voice = configuration.realtimeVoice,
             tools = tools,
+            // Chatbot 写入 Chatbot 分区当前会话（轮终稿落盘、上下文不重放）；实时助手行为不变不落库。
+            persistence = chatbotWriter,
             // 门面构造非挂起，上行契约在首个事件/首帧上行时惰性解析；未知 Realtime
             // 服务无原生适配器，此处显式失败而不是静默走错协议。
             uplinkProvider = {
@@ -122,25 +134,32 @@ class AdkVoiceAudioBackend @Inject constructor(
      * 当前选中的预设正文；选中官方预设或用户自建预设都从这里解析，未选中时为 null。
      * 官方预设与自建预设共用同一套 id 空间，命中顺序是先官方后自建。
      */
-    private fun selectedPresetContent(): String? {
-        val id = simpleChatPrompts.selectedPresetId.value ?: return null
-        return simpleChatPrompts.builtInPresets.firstOrNull { it.id == id }?.content
-            ?: simpleChatPrompts.presets.value.firstOrNull { it.id == id }?.content
-    }
+    private fun selectedPresetContent(conversationId: String?): String? = simpleChatPrompts.contentFor(conversationId)
 
-    /** 简单聊天：级联模型 + 内存上下文，无工具、无持久化。 */
+    /** Chatbot 写入 Chatbot 分区当前会话（不绑定聊天页传入的助手会话 ID），恢复历史并保存已听回复，级联请求始终不装配工具。 */
     private inner class SimpleSession(private val configuration: RealtimeVoiceConfiguration) : VoiceAudioBackendSession {
         private val mutex = Mutex()
-        private val heardHistory = ArrayDeque<Pair<String, String>>()
-        private var pendingInput: String? = null
+        private val heardHistory = ArrayDeque<Pair<Content, String>>()
+        // Chatbot 语音显式绑定顶部当前会话，防止切换历史后写入其他会话。
+        private val conversation = simpleVoice.get().bind(configuration.conversationId)
+        private var restoredHistory = emptyList<Content>()
+        private val playedSegments = linkedMapOf<String, String>()
+        private var pendingInput: Content? = null
         @Volatile private var closed = false
 
         /** 每轮读取当前选中的简单聊天预设；指令按轮重建，中途切换预设下一轮即生效。 */
-        private fun simpleChatInstruction(): String? = selectedPresetContent()
+        private fun simpleChatInstruction(): String? = selectedPresetContent(configuration.conversationId)
 
         override suspend fun isAvailable(): Boolean {
             check(!closed)
-            return models.isAvailable(configuration.modelSelection)
+            val available = if (configuration.pipeline == VoicePipeline.SEMI_CASCADED) {
+                models.isSemiCascadedAvailable(configuration.modelSelection, configuration.synthesisModel)
+            } else {
+                models.isAvailable(configuration.modelSelection)
+            }
+            if (!available) return false
+            conversation.acquire().takeIf { it.isNotEmpty() }?.let { restoredHistory = it }
+            return true
         }
 
         override fun transcribe(pcm16: ByteArray): Flow<RecognitionEvent> = flow {
@@ -148,14 +167,30 @@ class AdkVoiceAudioBackend @Inject constructor(
             emitAll(recognition.transcribeStreaming(pcm16))
         }
 
-        override fun respond(text: String, previousSpokenText: String): Flow<VoiceAudioEvent> = flow {
-            require(text.isNotBlank())
+        override fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment>): Flow<VoiceAudioEvent> = flow {
+            require(text.isNotBlank() || attachments.isNotEmpty())
             mutex.withLock {
                 check(!closed)
+                conversation.acquire().takeIf { it.isNotEmpty() }?.let { restoredHistory = it }
+                finishTurnLocked()
                 pendingInput?.let { heardHistory.addLast(it to previousSpokenText) }
                 while (heardHistory.size > 32) heardHistory.removeFirst()
-                pendingInput = text
-                val model = models.create(configuration.modelSelection)
+                pendingInput = voiceManualContent(text, attachments)
+                synchronized(playedSegments) { playedSegments.clear() }
+                conversation.enqueue(requireNotNull(pendingInput))
+                conversation.flush()
+                val model = if (configuration.pipeline == VoicePipeline.SEMI_CASCADED) {
+                    models.createSemiCascaded(
+                        configuration.modelSelection,
+                        synthesisVoice = configuration.synthesisVoice,
+                        synthesisModel = configuration.synthesisModel,
+                    )
+                } else {
+                    models.create(
+                        configuration.modelSelection,
+                        synthesisVoice = configuration.synthesisVoice,
+                    )
+                }
                 // 简单聊天可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
                 // 「无工具」声明始终叠加（级联链路确实无任何工具）。
                 val instruction = (simpleChatInstruction() ?: VOICE_INSTRUCTION) + VOICE_OUTPUT_RULES + VOICE_NO_TOOLS_RULE
@@ -175,12 +210,13 @@ class AdkVoiceAudioBackend @Inject constructor(
                 val pendingTranscript = StringBuilder()
                 try {
                     connection.sendHistory(buildList {
+                        addAll(restoredHistory)
                         for ((input, spoken) in heardHistory) {
-                            add(Content.fromText(Role.USER, input))
+                            add(input)
                             if (spoken.isNotBlank()) add(Content.fromText(Role.MODEL, spoken))
                         }
                         // 官方 sendHistory 会回答末尾 USER；把当前问题一起初始化，避免旧的未听轮先触发回答。
-                        add(Content.fromText(Role.USER, text))
+                        add(voiceManualContent(text, attachments))
                     })
                     var completed = false
                     var interrupted = false
@@ -251,17 +287,33 @@ class AdkVoiceAudioBackend @Inject constructor(
             }
         }.flowOn(Dispatchers.IO)
 
-        override fun confirmPlayback(segmentId: String, text: String) {}
+        override fun confirmPlayback(segmentId: String, text: String) {
+            synchronized(playedSegments) { playedSegments.putIfAbsent(segmentId, text) }
+        }
 
-        override suspend fun finishTurn() {}
+        override suspend fun finishTurn() = mutex.withLock { finishTurnLocked() }
 
-        override suspend fun retryPersistence() {}
+        private suspend fun finishTurnLocked() {
+            val spoken = synchronized(playedSegments) {
+                playedSegments.values.joinToString("").also { playedSegments.clear() }
+            }
+            if (spoken.isNotBlank()) conversation.enqueue(Content.fromText(Role.MODEL, spoken))
+            conversation.flush()
+        }
+
+        override suspend fun retryPersistence() = finishTurn()
 
         override suspend fun close() {
             mutex.withLock {
-                closed = true
-                heardHistory.clear()
-                pendingInput = null
+                if (closed) return@withLock
+                try {
+                    finishTurnLocked()
+                } finally {
+                    closed = true
+                    conversation.release()
+                    heardHistory.clear()
+                    pendingInput = null
+                }
             }
         }
     }
@@ -293,18 +345,18 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         // channelFlow 而非 flow：文本增量与音频片段分别来自生成/播放两个并发端，
         // flow 构建器的单协程发射不变量会在第一句正文处直接失败。
-        override fun respond(text: String, previousSpokenText: String): Flow<VoiceAudioEvent> = channelFlow {
-            require(text.isNotBlank())
+        override fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment>): Flow<VoiceAudioEvent> = channelFlow {
+            require(text.isNotBlank() || attachments.isNotEmpty())
             mutex.withLock {
                 check(!closed)
-                val tts = synthesis.openSession()
+                val tts = synthesis.openSession(configuration.synthesisVoice)
                 var completed = false
                 try {
                     if (tts != null) {
-                        respondWithSessionTts(tts, text) { send(it) }
+                        respondWithSessionTts(tts, text, attachments) { send(it) }
                         completed = true
                     } else {
-                        respondWithOneShotTts(text) { send(it) }
+                        respondWithOneShotTts(text, attachments) { send(it) }
                         completed = true
                     }
                 } finally {
@@ -340,6 +392,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         private suspend fun respondWithSessionTts(
             tts: SpeechSynthesisSession,
             text: String,
+            attachments: List<FileAttachment>,
             emit: suspend (VoiceAudioEvent) -> Unit,
         ) = coroutineScope {
             val emitLock = Mutex()
@@ -347,7 +400,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             val clientSentences = ArrayDeque<String>()
             val buffer = VoiceSentenceBuffer()
             val generation = async {
-                agent.runTurn(text) { delta ->
+                agent.runTurn(text, attachments) { delta ->
                     deliver(VoiceAudioEvent.Text(delta))
                     buffer.append(delta).forEach { sentence ->
                         synchronized(clientSentences) { clientSentences.addLast(sentence) }
@@ -374,7 +427,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         }
 
         /** 一次性合成回退：整句合成，句间没有流式衔接。 */
-        private suspend fun respondWithOneShotTts(text: String, emit: suspend (VoiceAudioEvent) -> Unit) = coroutineScope {
+        private suspend fun respondWithOneShotTts(text: String, attachments: List<FileAttachment>, emit: suspend (VoiceAudioEvent) -> Unit) = coroutineScope {
             val emitLock = Mutex()
             val deliver: suspend (VoiceAudioEvent) -> Unit = { event -> emitLock.withLock { emit(event) } }
             val sentences = Channel<String>(1)
@@ -382,7 +435,7 @@ class AdkVoiceAudioBackend @Inject constructor(
                 for (sentence in sentences) {
                     deliver(VoiceAudioEvent.Audio(
                         MutableStateFlow(sentence),
-                        flow { synthesis.synthesize(sentence).collect { emit(it) } }.catch { cause ->
+                        flow { synthesis.synthesize(sentence, configuration.synthesisVoice).collect { emit(it) } }.catch { cause ->
                             if (cause is CancellationException) throw cause
                             throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                         },
@@ -392,7 +445,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             }
             try {
                 val buffer = VoiceSentenceBuffer()
-                agent.runTurn(text) { delta ->
+                agent.runTurn(text, attachments) { delta ->
                     deliver(VoiceAudioEvent.Text(delta))
                     buffer.append(delta).forEach { sentences.send(it) }
                 }
@@ -443,7 +496,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             " when enumerating, connect naturally with \"first..., then...\"."
 
         /**
-         * 无工具声明（不可替换层末段）：仅用于级联链路与实时轻聊——它们确实永远没有
+         * 无工具声明（不可替换层末段）：仅用于级联链路与实时 Chatbot——它们确实永远没有
          * 可执行工具，明确告知模型不做外部动作承诺，避免虚构「已执行」的结果。
          */
         internal const val VOICE_NO_TOOLS_RULE = " You have no tools and cannot perform external actions; you can only help through conversation."
@@ -468,7 +521,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         /**
          * 实时会话指令拼装（纯函数，便于单测锁定能力声明边界）。
          * 三态：有工具声明 → 工具播报节奏；助手模式但本次无声明 → 中性约束；
-         * 轻聊/级联 → 明确「无工具」。
+         * Chatbot/级联 → 明确「无工具」。
          */
         internal fun realtimeInstructions(
             preset: String?,
@@ -497,28 +550,4 @@ class AdkVoiceAudioBackend @Inject constructor(
 abstract class VoiceAudioModule {
     @Binds
     abstract fun bindVoiceAudioBackend(implementation: AdkVoiceAudioBackend): VoiceAudioBackend
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindOpenAiRealtimeConnectionProbe(
-        implementation: OpenAiRealtimeConnectionProbe,
-    ): github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindQwenRealtimeConnectionProbe(
-        implementation: QwenRealtimeConnectionProbe,
-    ): github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindOpenAiRealtimeVoiceSupport(
-        implementation: OpenAiRealtimeVoiceSupport,
-    ): github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
-
-    @Binds
-    @dagger.multibindings.IntoSet
-    abstract fun bindQwenRealtimeVoiceSupport(
-        implementation: QwenRealtimeVoiceSupport,
-    ): github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
 }

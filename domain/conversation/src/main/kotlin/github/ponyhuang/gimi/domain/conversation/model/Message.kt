@@ -51,7 +51,12 @@ data class Message(
     val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
     /** 子任务进度作为时间线活动，不作为另一条助手正文。 */
     val subtaskBatch: SubtaskBatch? = null,
+    /** 原生实时通话的用户转写，无法通过文本重试恢复原回合。 */
+    val isNativeRealtimeTranscript: Boolean = false,
 )
+
+/** 原生实时用户转写在持久化事件中的来源标记。 */
+const val NATIVE_REALTIME_TRANSCRIPT_METADATA_KEY = "native_realtime_transcript"
 
 /**
  * A validated image, audio, or document attached to a chat message.
@@ -74,13 +79,17 @@ data class FileAttachment(
     val payloadReference: String? = null,
     val inlineData: ByteArray? = null,
     val isMissing: Boolean = false,
+    /** 厂商 Files API 签发的 file_id；仅"上传引用"类附件非空（见 [VendorFileReference]）。 */
+    val fileId: String? = null,
+    /** [fileId] 归属的厂商模板 ID（如 `deepseek`）；与 [fileId] 同时设置。 */
+    val fileVendor: String? = null,
     val category: AttachmentCategory = requireNotNull(
         AttachmentCategory.from(mimeType, displayName),
     ) { "Unsupported attachment type: $mimeType ($displayName)" },
 ) {
     init {
-        require(payloadReference != null || inlineData != null) {
-            "Attachment $displayName has neither a payload reference nor inline data"
+        require(payloadReference != null || inlineData != null || fileId != null) {
+            "Attachment $displayName has neither a payload reference, inline data nor a vendor file id"
         }
     }
 
@@ -96,6 +105,8 @@ data class FileAttachment(
         if (sizeBytes != other.sizeBytes) return false
         if (payloadReference != other.payloadReference) return false
         if (isMissing != other.isMissing) return false
+        if (fileId != other.fileId) return false
+        if (fileVendor != other.fileVendor) return false
         if (category != other.category) return false
         // Usually null, so the full-payload comparison is skipped outright.
         if (!inlineData.contentEquals(other.inlineData)) return false
@@ -110,6 +121,8 @@ data class FileAttachment(
         result = 31 * result + sizeBytes.hashCode()
         result = 31 * result + (payloadReference?.hashCode() ?: 0)
         result = 31 * result + isMissing.hashCode()
+        result = 31 * result + (fileId?.hashCode() ?: 0)
+        result = 31 * result + (fileVendor?.hashCode() ?: 0)
         result = 31 * result + category.hashCode()
         result = 31 * result + (inlineData?.contentHashCode() ?: 0)
         return result
@@ -145,6 +158,27 @@ data class FileAttachment(
             sizeBytes = data.size.toLong(),
             displayName = displayName,
             inlineData = data,
+        )
+
+        /**
+         * 描述一个已上传到厂商文件服务的附件：本地无副本（厂商文件不可下载），会话内以
+         * [VendorFileReference] 私有引用传递，历史重放直通 file_id。
+         *
+         * @param bytes 厂商响应的文件大小；未知时为 0。
+         */
+        fun fromVendorReference(
+            vendor: String,
+            fileId: String,
+            mimeType: String,
+            displayName: String,
+            bytes: Long = 0L,
+        ): FileAttachment = FileAttachment(
+            mimeType = mimeType,
+            id = "vendor-$fileId",
+            sizeBytes = bytes,
+            displayName = displayName,
+            fileId = fileId,
+            fileVendor = vendor,
         )
 
         /**

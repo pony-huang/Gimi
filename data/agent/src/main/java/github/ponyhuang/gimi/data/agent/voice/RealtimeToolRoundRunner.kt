@@ -4,9 +4,11 @@ package github.ponyhuang.gimi.data.agent.voice
 
 import android.util.Log
 import com.google.adk.kt.types.FunctionCall
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 
 /**
  * 一轮 Realtime 工具调用的执行器：串行执行模型发起的全部 function_call，
@@ -55,6 +57,7 @@ internal class RealtimeToolRoundRunner(
         } finally {
             // 服务端只在收到 response.create 后才开始二轮推理。少了这一帧，会话层的
             // toolNotice 永不清除，TurnCompleted 也会把 phase 一直钉在 Thinking。
+            currentCoroutineContext().ensureActive()
             sink.sendResponseTrigger()
         }
     }

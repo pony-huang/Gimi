@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -44,29 +43,28 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.theme.GimiTheme
+import github.ponyhuang.gimi.ui.theme.LocalGimiDarkTheme
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
 import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardDark
 import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardLight
 
 /**
- * 设置页画布色：浅色为 One UI 式浅灰画布，深色沿用全局底色。
- * 通过背景亮度判定深浅主题，与两套 ColorScheme 保持自洽，供页面容器与 Scaffold 共用。
+ * 设置页画布色：浅色为宣纸浅灰画布（`surfaceContainerLow`），深色沿用全局墨黑底色（`surface`）。
+ * 统一读取 [LocalGimiDarkTheme]，不再通过背景亮度手工分支。
  */
 @Composable
 fun preferenceCanvasColor(): Color {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    return if (isDark) PreferenceCanvasDark else PreferenceCanvasLight
+    return if (LocalGimiDarkTheme.current) PreferenceCanvasDark else PreferenceCanvasLight
 }
 
 /**
- * 设置分组卡片底色：浅色纯白、深色为比画布略亮的表面。
+ * 设置分组卡片底色：浅色纯白（`surfaceContainerLowest`）、深色为比画布略亮一档的表面（`surfaceContainerLow`）。
  * 供 [PreferenceGroupCard] 与需要同语言卡片的浮层（如聊天抽屉）共用。
  */
 @Composable
 fun preferenceGroupCardColor(): Color {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    return if (isDark) PreferenceGroupCardDark else PreferenceGroupCardLight
+    return if (LocalGimiDarkTheme.current) PreferenceGroupCardDark else PreferenceGroupCardLight
 }
 
 @Composable
@@ -142,7 +140,7 @@ fun PreferenceGroupCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(if (LocalPreferenceStyle.current == PreferenceStyle.Compact) 16.dp else 24.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(preferenceGroupCardColor()),
         content = content,
     )
@@ -178,8 +176,8 @@ fun PreferenceListItem(
     checked: Boolean? = null,
     onCheckedChange: ((Boolean) -> Unit)? = null,
     rowEnabled: Boolean = true,
-    iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
-    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
+    iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.secondaryContainer,
+    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
     iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
     subtitleMaxLines: Int = 2,
@@ -277,10 +275,10 @@ fun PreferenceListItem(
             }
         }
         if (showDivider) {
-            // 分隔线对齐文字左缘，品牌图标与普通图标共用槽位和间距。
+            // 分隔线对齐文字左缘，品牌图标与普通图标共用槽位和间距；直接取 M3 outlineVariant 令牌。
             HorizontalDivider(
                 modifier = Modifier.padding(start = GimiListDefaults.HorizontalPadding + containerSize + GimiListDefaults.ContentSpacing, end = GimiListDefaults.HorizontalPadding),
-                color = if (compact) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.outlineVariant,
             )
         }
     }
@@ -321,7 +319,7 @@ fun PreferenceSwitchRow(
         iconTint = when {
             compact && !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
             compact -> MaterialTheme.colorScheme.onSurfaceVariant
-            else -> MaterialTheme.colorScheme.onPrimary
+            else -> MaterialTheme.colorScheme.onSecondaryContainer
         },
         showDivider = showDivider,
         leadingIcon = leadingIcon,

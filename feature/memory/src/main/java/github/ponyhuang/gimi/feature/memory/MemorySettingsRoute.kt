@@ -23,14 +23,15 @@ fun MemorySettingsRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            val message = when (effect) {
-                MemorySettingsEffect.Saved -> R.string.memory_saved
-                MemorySettingsEffect.SaveFailed -> R.string.memory_save_failed
-            }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
+    val noticeMessage = when (state.notice) {
+        MemorySettingsNotice.Saved -> stringResource(R.string.memory_saved)
+        MemorySettingsNotice.SaveFailed -> stringResource(R.string.memory_save_failed)
+        null -> null
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        val message = noticeMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.onAction(MemorySettingsAction.ConsumeNotice)
     }
     PreferenceScaffold(
         style = PreferenceStyle.Compact,

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import github.ponyhuang.gimi.ui.components.GimiSheetTitleRow
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 语音设置抽屉的设置条目归属；决定二级页内容与写入目标。 */
@@ -95,12 +97,12 @@ internal fun List<ModelServiceInstance>.voiceModelRows(
     }
 }
 
-/** 当前选中模型在候选行里的展示名；找不到时返回 null（未配置或已失效）。 */
-internal fun List<VoiceModelRow>.selectionName(selection: ModelSelection?): String? =
-    selection?.let { target -> firstOrNull { it.selection() == target }?.model?.name }
-
-/** 模型选择抽屉的一个条目；`row == null` 表示 Realtime 选择器的「不使用」首项。 */
-private data class VoiceModelOption(val row: VoiceModelRow?)
+/**
+ * 当前选中模型在候选行里的完整行；展示名与厂商品牌图标都从这一行取。
+ * 找不到时返回 null（未配置、凭据失效或模型已从目录移除），调用方回落占位。
+ */
+internal fun List<VoiceModelRow>.selectionRow(selection: ModelSelection?): VoiceModelRow? =
+    selection?.let { target -> firstOrNull { it.selection() == target } }
 
 /**
  * 模型选择页：可搜索的候选列表，**抽屉内的一页**而非独立模态抽屉。
@@ -110,18 +112,15 @@ private data class VoiceModelOption(val row: VoiceModelRow?)
  * 抽屉保持打开、当前值随数据流原地更新。
  *
  * 候选规则与默认模型设置页一致（分组、能力标注、未接入置灰）；
- * Realtime 选择器通过 [allowNone] 提供一等「不使用」项（用于清除默认配置）。
+ * 只列真实模型，没有候选时展示空态，不提供「不使用 Realtime」占位项。
  */
 @Composable
 internal fun VoiceModelPickerPage(
     title: String,
     rows: List<VoiceModelRow>,
     currentSelection: ModelSelection?,
-    onPick: (ModelSelection?) -> Unit,
+    onPick: (ModelSelection) -> Unit,
     onBack: () -> Unit,
-    /** Realtime 选择器固定首项「不使用」；其余选择器不传。 */
-    allowNone: Boolean = false,
-    onPickNone: (() -> Unit)? = null,
 ) {
     // 列表在抽屉主体内滚动：Column 里的 LazyColumn 需要显式上限，否则会拿到无限高度。
     val listMaxHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.6f).coerceAtMost(520.dp)
@@ -140,7 +139,6 @@ internal fun VoiceModelPickerPage(
         ModelCapability.ASR to stringResource(R.string.voice_capability_not_supported, asrLabel),
         ModelCapability.TTS to stringResource(R.string.voice_capability_not_supported, ttsLabel),
     )
-    val noneTitle = stringResource(R.string.voice_settings_pick_realtime_none)
 
     Column(Modifier.fillMaxWidth()) {
         GimiSheetTitleRow(
@@ -155,19 +153,10 @@ internal fun VoiceModelPickerPage(
             searchPlaceholder = stringResource(R.string.voice_settings_search_model),
         )
         // 写入后由宿主翻回来源设置页；抽屉本身不关闭，也不再叠出第二个遮罩。
-        val commit: (VoiceModelOption) -> Unit = { option ->
-            val row = option.row
-            if (row == null) onPickNone?.invoke() else onPick(row.selection())
-            onBack()
-        }
-        // 「不使用」始终可被搜到（关键词含 realtime），否则一搜就被过滤掉。
-        val options = buildList {
-            if (allowNone) add(VoiceModelOption(null))
-            rows.sortedBy { it.capability?.ordinal ?: 0 }.forEach { add(VoiceModelOption(it)) }
-        }
+        val options = rows.sortedBy { it.capability?.ordinal ?: 0 }
         val normalizedQuery = query.trim()
         val visible = options.filter { option ->
-            normalizedQuery.isEmpty() || option.searchText(noneTitle)
+            normalizedQuery.isEmpty() || option.searchText()
                 .contains(normalizedQuery, ignoreCase = true)
         }
         // 每个实例的语音连接单层展示，副标题不再按连接细分。
@@ -198,23 +187,32 @@ internal fun VoiceModelPickerPage(
                 modifier = Modifier.fillMaxWidth().heightIn(max = listMaxHeight),
                 contentPadding = PaddingValues(bottom = 8.dp),
             ) {
-                items(visible, key = { option ->
-                    option.row?.let { "${it.instance.id}/${it.connection.id}/${it.model.id}" } ?: "none"
+                items(visible, key = {
+                    "${it.instance.id}/${it.connection.id}/${it.model.id}"
                 }) { option ->
                     GimiPickerItemRow(
-                        title = option.row?.model?.name ?: noneTitle,
+                        title = option.model.name,
                         subtitle = voiceModelSubtitle(
-                            row = option.row,
+                            row = option,
                             capabilityLabels = capabilityLabels,
                             unsupportedNotes = unsupportedNotes,
                         ),
-                        selected = when (val row = option.row) {
-                            null -> currentSelection == null
-                            else -> row.selection() == currentSelection
+                        selected = option.selection() == currentSelection,
+                        enabled = option.isSupported,
+                        onClick = {
+                            onPick(option.selection())
+                            onBack()
                         },
-                        enabled = option.row?.isSupported != false,
-                        onClick = { commit(option) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        // 与聊天模型选择页同一套品牌图标：模板 ID 决定厂商，
+                        // 自建服务没有模板 ID，回落组件内置占位图。
+                        leading = {
+                            LLMModelServiceIcon(
+                                serviceId = option.instance.templateId.orEmpty(),
+                                modifier = Modifier.size(28.dp),
+                                contentPadding = 3.dp,
+                            )
+                        },
                     )
                 }
             }
@@ -222,22 +220,15 @@ internal fun VoiceModelPickerPage(
     }
 }
 
-/** 候选行的搜索文本：「不使用」项也带上 realtime 关键词。 */
-private fun VoiceModelOption.searchText(noneTitle: String): String = when (val row = row) {
-    null -> "$noneTitle realtime"
-    else -> "${row.model.name} ${row.model.id} ${row.instance.name}"
-}
+/** 候选行的搜索文本：模型名、模型 ID 与服务名。 */
+private fun VoiceModelRow.searchText(): String = "${model.name} ${model.id} ${instance.name}"
 
-/**
- * 候选行的副标题：能力标注、服务（或服务 · 组）名与「未接入」说明；
- * 「不使用」项返回空串，由 [GimiPickerItemRow] 省略副标题行。
- */
+/** 候选行的副标题：能力标注、服务（或服务 · 组）名与「未接入」说明。 */
 private fun voiceModelSubtitle(
-    row: VoiceModelRow?,
+    row: VoiceModelRow,
     capabilityLabels: Map<ModelCapability, String>,
     unsupportedNotes: Map<ModelCapability, String>,
 ): String {
-    if (row == null) return ""
     return buildList {
         row.capability?.let { capabilityLabels[it] }?.let(::add)
         add(row.instance.name)
@@ -258,7 +249,8 @@ private fun previewModelRow(
     val instance = ModelServiceInstance(
         id = instanceId,
         name = instanceName,
-        templateId = instanceId,
+        // 预览用真实模板 ID，品牌图标才不会整屏回落占位图。
+        templateId = instanceId.removePrefix("instance-"),
         isEnabled = true,
         isOfficialToolsEnabled = true,
         sharedApiKey = "preview-key",
@@ -281,7 +273,7 @@ private fun previewModelRow(
 }
 
 @Composable
-private fun VoiceModelPickerPagePreviewHost(allowNone: Boolean) {
+private fun VoiceModelPickerPagePreviewHost() {
     val rows = listOf(
         previewModelRow("instance-minimax", "MiniMax", "speech-02", "Speech-02", ModelCapability.STT),
         previewModelRow("instance-qwen", "千问", "qwen3-asr-flash", "Qwen3 ASR Flash", ModelCapability.ASR),
@@ -296,8 +288,6 @@ private fun VoiceModelPickerPagePreviewHost(allowNone: Boolean) {
                     currentSelection = ModelSelection("instance-minimax", "instance-minimax-connection", "speech-02"),
                     onPick = {},
                     onBack = {},
-                    allowNone = allowNone,
-                    onPickNone = {},
                 )
             }
         }
@@ -314,11 +304,24 @@ private fun VoiceModelPickerPagePreviewHost(allowNone: Boolean) {
 )
 @Composable
 private fun VoiceModelPickerPagePreview() {
-    VoiceModelPickerPagePreviewHost(allowNone = false)
+    VoiceModelPickerPagePreviewHost()
 }
 
-@Preview(name = "模型选择页 · Realtime 含「不使用」", showBackground = true, widthDp = 390, heightDp = 700)
+/** 没有候选模型就是没有：空态不提供任何占位选项。 */
+@Preview(name = "模型选择页 · 无候选", showBackground = true, widthDp = 390, heightDp = 700)
 @Composable
-private fun VoiceModelPickerPageWithNonePreview() {
-    VoiceModelPickerPagePreviewHost(allowNone = true)
+private fun VoiceModelPickerPageEmptyPreview() {
+    GimiTheme {
+        Surface(color = preferenceCanvasColor()) {
+            PreferenceStyleScope(PreferenceStyle.Compact) {
+                VoiceModelPickerPage(
+                    title = "选择 Realtime 模型",
+                    rows = emptyList(),
+                    currentSelection = null,
+                    onPick = {},
+                    onBack = {},
+                )
+            }
+        }
+    }
 }

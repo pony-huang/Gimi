@@ -2,7 +2,7 @@
 
 # 模型配置操作约束
 
-审阅日期为 2026-11-14，面向开发人员。
+面向开发人员。
 
 本文是统一模型服务配置改造落地的**操作约束与新增指引**（2026-11-14 已实现）：术语与范围、领域模型规则、存储规则、适配分派规则，以及新增厂商、厂商工具、语音适配时必须执行的步骤。后续开发与新增按本文执行。
 
@@ -31,7 +31,8 @@
 
 - 一条 `ServiceConnection` 对应一个 `ServiceCapability`（Conversation / Recognition / Synthesis / Realtime），一一对应，不合并。
 - 识别连接同时容纳专用转写（STT）与音频理解（ASR）模型；协议适配按模型声明的能力分派，实例不可只按整批判定。
-- 双协议厂商（OpenAI 兼容 + Anthropic 兼容）的模板连接必须**成对给出两个协议的默认端点**（MiniMax / MiMo 曾漏配 Anthropic 路径，切换协议时端点会错误回落）。
+- 仍开放双协议的厂商（MiMo / Kimi / GLM，OpenAI 兼容 + Anthropic 兼容）的模板连接必须**成对给出两个协议的默认端点**（MiniMax / MiMo 曾漏配 Anthropic 路径，切换协议时端点会错误回落）。
+- **DeepSeek / MiniMax 对话固定 Anthropic Messages**：模板 `protocols` 只含 `ApiProtocol.Anthropic`，默认端点分别是官方 `https://api.deepseek.com/anthropic` 与 `https://api.minimaxi.com/anthropic`，接口页只展示只读协议值、不提供切换。旧 OpenAI 兼容地址（`https://api.deepseek.com`、`https://api.minimaxi.com/v1`）仅作为迁移识别用的默认端点保留（不在 `protocols` 中，因此不可选）。语音连接走厂商自有端点，不参与对话协议约束，不受收紧影响。协议约束在四处共同生效：模板定义、Room 模板行合并（`mergeTemplateCatalogs` 以内置清单为准）、启动对账/保存归一（旧快照强制回落并回贴官方端点，用户自建中转地址不动）、`resolveChatModel` 运行时兜底。注意：非模板默认域名的地址（自建中转、MiniMax 国际站 `api.minimax.io` 等）不会被自动回贴，协议强制后需把端点改成对应的 `/anthropic` 路径，否则 Messages 请求仍会打到 `/v1`。
 
 ### 凭据收敛
 
@@ -59,6 +60,7 @@
 - 语音适配按**模板 ID** 注册（`CapabilityAdapter.serviceIds`）；`VoiceCapabilityRegistry` 解析不到即显式失败，不得借用其它厂商协议兜底。连接测试：对话连接走模型目录探测，语音连接按模板握手探测（未实现探测的报告 Unsupported）。
 - Realtime 装配按 `templateId` 分派（现有分支：qwen / openai），未接入原生适配器的模板不得出现在 Realtime 候选里。
 - 厂商工具矩阵在 `OfficialToolSupport.all`，按 `templateId + protocol + 模型家族` 匹配；`ModelConfig` / `ModelRuntimeMetadata` 携带 `templateId` 并经 RunConfig metadata（`gimi.model.template_id`）往返；DeepSeek Anthropic 参考工具加载按模板身份加官方端点判定。
+- 文件请求使用对话连接显式声明的 `ApiProtocol`、端点和生效凭据，`VendorFileGateway` 据此选择 Files 协议客户端。Anthropic 客户端在配置基址后拼接 `/v1/files`，包括自建中转前缀。厂商标识只参与厂商特定字段处理。DeepSeek 在 `file` 前设置 `purpose`，发送 `files-api-2025-04-14` beta 头，分页使用 `after_id` / `has_more` / `last_id`，文件元数据使用 `size_bytes` 和 RFC 3339 时间。新增兼容厂商声明连接协议与文件上传能力即可。
 - 端点策略：`VendorManaged`（百炼 WebSocket、OpenAI Realtime 等厂商自有端点）由模板给定；其余沿用用户/模板配置端点。语音请求基址统一走 `speechRequestBaseUrl`（百炼业务空间 ID 参与专属域名改写）。
 
 ## 操作指引

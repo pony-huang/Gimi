@@ -63,7 +63,11 @@ data class ChatUiState(
     val recentConversations: RecentConversationsState = RecentConversationsState(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
+    /** 待呈现的一次性提示；Route 呈现后经 [ChatAction.ConsumeNotice] 清除。 */
+    val notice: ChatNotice? = null,
     val availableLLMModelSettings: List<ModelServiceInstance> = emptyList(),
+    /** 输入框文档草稿的厂商上传状态；键为草稿 reference，见 [ChatFileUploadCoordinator]。 */
+    val draftUploadStates: Map<String, DraftUploadState> = emptyMap(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
     val toolConfiguration: ConversationToolConfiguration? = null,
@@ -90,7 +94,10 @@ data class ChatUiState(
      * 转发自 `AppUpdateRepository.hasUnseenUpdate`，仅用于在设置图标/抽屉入口上显示提醒点。
      */
     val hasUpdateBadge: Boolean = false,
-)
+) {
+    /** 会话历史里的厂商 file 引用锁定的厂商模板 ID；null 表示未锁定。 */
+    val lockedVendor: String? get() = detectConversationVendorLock(messages)
+}
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()
@@ -138,3 +145,7 @@ data class OfficialToolDescriptor(
     val isLoadingFunctions: Boolean = false,
     val loadError: String? = null,
 )
+
+/** 会话厂商锁定派生；无状态用例，UiState 派生属性共享同一实例。 */
+private val detectConversationVendorLock =
+    github.ponyhuang.gimi.domain.conversation.usecase.DetectConversationVendorLockUseCase()

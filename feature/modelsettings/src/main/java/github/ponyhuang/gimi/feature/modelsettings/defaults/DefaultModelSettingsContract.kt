@@ -40,6 +40,8 @@ data class DefaultModelSettingsUiState(
     val ttsVoiceIdTemplate: String? = null,
     /** 开放自由填写厂商的官方音色列表页；null 表示不展示。 */
     val ttsVoiceDocsUrl: String? = null,
+    /** 待呈现的一次性通知；Route 呈现后经 [DefaultModelSettingsAction.ConsumeNotice] 清除。 */
+    val notice: DefaultModelSettingsNotice? = null,
     val chatModels: List<SelectableModelRow> = emptyList(),
     val speechModels: List<SelectableModelRow> = emptyList(),
     val ttsModels: List<SelectableModelRow> = emptyList(),
@@ -47,14 +49,6 @@ data class DefaultModelSettingsUiState(
     val realtimeSelection: ModelSelection? = null,
     /** Realtime 候选模型；只包含已接入原生 Realtime 适配器的模板。 */
     val realtimeModels: List<SelectableModelRow> = emptyList(),
-    /** 厂商内置的 Realtime 会话音色表；为空表示该厂商走自由输入。 */
-    val realtimeVoiceOptions: List<TtsVoice> = emptyList(),
-    /** 所选 Realtime 模型在该厂商下的缺省会话音色 ID。 */
-    val realtimeDefaultVoice: String = "",
-    /** 当前生效的自定义音色 ID；null 表示使用 [realtimeDefaultVoice]。 */
-    val realtimeVoiceId: String? = null,
-    /** 该厂商是否允许填写内置音色之外的自定义 voice_id（声音复刻）。 */
-    val realtimeCustomVoiceAllowed: Boolean = false,
     val dialog: DefaultModelDialog? = null,
     val isMutationBlocked: Boolean = false,
 )
@@ -66,7 +60,6 @@ enum class DefaultModelDialog {
     Tts,
     TtsVoice,
     RealtimeModel,
-    RealtimeVoice,
 }
 
 sealed interface DefaultModelSettingsAction {
@@ -76,15 +69,19 @@ sealed interface DefaultModelSettingsAction {
         val selection: ModelSelection,
     ) : DefaultModelSettingsAction
     data class SelectVoice(val voiceId: String) : DefaultModelSettingsAction
-    /** 选择 Realtime 默认模型；null 表示取消配置（Realtime 模式随之不可进入）。 */
+    /**
+     * 选择 Realtime 默认模型；null 表示未配置（Realtime 模式随之不可进入）。
+     * 选择器只发非空选择，null 仅供配置归一化/清除路径使用。
+     */
     data class SelectRealtimeModel(val selection: ModelSelection?) : DefaultModelSettingsAction
-    /** 设置 Realtime 会话音色；null 表示回到所选模型的缺省音色。 */
-    data class SelectRealtimeVoice(val voiceId: String?) : DefaultModelSettingsAction
     data object DismissDialog : DefaultModelSettingsAction
+
+    /** 确认一次性通知已呈现，清空 [DefaultModelSettingsUiState.notice]。 */
+    data object ConsumeNotice : DefaultModelSettingsAction
 }
 
-/** 一次性 UI 反馈（Toast 等），由 Route 经 effects 通道消费。 */
-sealed interface DefaultModelSettingsEffect {
-    /** @param messageRes 文案的 string resource id。 */
-    data class ShowToast(@StringRes val messageRes: Int) : DefaultModelSettingsEffect
+/** 默认模型页一次性通知；以 UiState 字段承载，由 Route 呈现后消费清除。 */
+sealed interface DefaultModelSettingsNotice {
+    /** 呈现一条本地化提示。 @param messageRes 文案的 string resource id。 */
+    data class ShowToast(@StringRes val messageRes: Int) : DefaultModelSettingsNotice
 }

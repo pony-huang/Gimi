@@ -34,9 +34,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
@@ -48,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +67,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
@@ -80,17 +82,19 @@ import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
+import github.ponyhuang.gimi.feature.chat.realtime.RoleChipsRestingHeight
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 聊天界面 Scaffold：
- * - 顶部浮动操作：左胶囊（[onOpenDrawer] + 语音通话）+ 右胶囊（[onNewConversation] + 自动播报）
- * - 底部输入卡片：文本、附件、模型选择与语音/发送操作。
+ * - 顶部浮动操作：左胶囊 [onOpenDrawer] + 中间模式分段 + 右侧 [onNewConversation]
+ * - 底部输入卡片：文本、附件、模型选择与语音输入/发送操作。
  * - LazyColumn：消息流 + 流式输入自动跟随滚动 + 用户离开底部时显示「回到最新」FAB
  * - ChatInputBar：草稿由聊天页面共享保存，发送按钮在流式期间被禁用。
  *
@@ -123,8 +127,7 @@ fun ChatScaffold(
     onTranscribeVoice: VoiceTranscriptionRequest,
     onCancelVoiceTranscription: () -> Unit = {},
     onToggleSpeechPlayback: (String, String) -> Unit,
-    onToggleAutoSpeak: () -> Unit,
-    onOpenVoice: () -> Unit = {},
+    onOpenVoice: (() -> Unit)? = null,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onToggleTimeline: (groupId: String) -> Unit = {},
     onToolConfirmation: (Boolean) -> Unit,
@@ -148,12 +151,33 @@ fun ChatScaffold(
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
     onRetryA2ui: (String) -> Unit = {},
+    /** 上传失败的 chip 原地重试。 */
+    onRetryAttachmentUpload: (github.ponyhuang.gimi.domain.conversation.model.DraftAttachment) -> Unit = {},
+    /** 新导入的文档草稿触发厂商上传。 */
+    onDocumentDraftImported: (github.ponyhuang.gimi.domain.conversation.model.DraftAttachment) -> Unit = {},
+    /** 抽屉"上传的文件"回填请求流；把 file 引用草稿插入输入框。 */
+    uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
+    onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    onUploadedFileDelete: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    /** 草稿附件变化后回收不再被引用的上传状态（取消在途任务）；由宿主转发给 ViewModel。 */
+    onUploadedFilePrune: (Collection<String>) -> Unit = {},
+    attachFileRequests: Flow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = kotlinx.coroutines.flow.emptyFlow(),
+    chatMode: github.ponyhuang.gimi.domain.conversation.model.ChatMode? = null,
+    roleChips: (@Composable () -> Unit)? = null,
+    onChatModeChange: (github.ponyhuang.gimi.domain.conversation.model.ChatMode) -> Unit = {},
+    /** 顶栏由宿主在分页容器之上统一渲染时置 false；内部保留同高占位维持正文 padding。 */
+    headerVisible: Boolean = true,
+    initialDraft: MessageData? = null,
+    onDraftChanged: (MessageData) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
     // 草稿属于输入槽位而非会话，必须放在 session key 与挂起操作面板之外保存。
-    var composerDraft by rememberSaveable(stateSaver = MessageData.Saver) {
-        mutableStateOf(MessageData())
+    var composerDraft by rememberSaveable(if (initialDraft != null) state.sessionId else "assistant-draft", stateSaver = MessageData.Saver) {
+        mutableStateOf(initialDraft ?: MessageData())
+    }
+    LaunchedEffect(composerDraft, state.sessionId) {
+        if (initialDraft != null) onDraftChanged(composerDraft)
     }
     val scope = rememberCoroutineScope()
     val listItems = state.listItems
@@ -173,6 +197,52 @@ fun ChatScaffold(
             ?.findModel(selection)
             ?.multimodal
             ?: MultimodalCapabilities()
+    }
+    // 实例级"文件上传"开关推导出的 FILE_REFERENCE 能力决定上传链路与发送门控。
+    val isFileUploadEnabled = attachmentCapabilities.documentInput?.ingestMode ==
+        github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE
+    // 抽屉"文件"行的厂商图标：与 uploadedFiles 数据源按同一方式解析当前实例模板。
+    val currentVendorTemplateId = remember(state.availableLLMModelSettings, state.currentModelSelection) {
+        state.availableLLMModelSettings
+            .firstOrNull { it.id == state.currentModelSelection?.instanceId }?.templateId
+    }
+    // 抽屉复用请求：把已上传文件回填为 file 引用草稿（file_id 就绪态，零上传）。
+    LaunchedEffect(Unit) {
+        attachFileRequests.collect { entry ->
+            val draft = github.ponyhuang.gimi.domain.conversation.model.DraftAttachment(
+                reference = github.ponyhuang.gimi.domain.conversation.model.VendorFileReference.uri(
+                    entry.vendor,
+                    entry.fileId,
+                ),
+                displayName = entry.displayName,
+                mimeType = entry.mimeType,
+                sizeBytes = entry.bytes,
+                category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.from(
+                    entry.mimeType,
+                    entry.displayName,
+                ) ?: return@collect,
+                fileId = entry.fileId,
+                fileVendor = entry.vendor,
+            )
+            val current = composerDraft
+            if (current.attachments.none { it.reference == draft.reference }) {
+                composerDraft = current.copy(attachments = current.attachments + draft)
+            }
+        }
+    }
+    // 上传完成即把草稿替换为携带 file 引用的副本；发送门控据此放行。
+    LaunchedEffect(state.draftUploadStates) {
+        val ready = state.draftUploadStates.mapNotNull { (reference, uploadState) ->
+            (uploadState as? DraftUploadState.Ready)?.let { reference to it }
+        }.toMap()
+        if (ready.isEmpty()) return@LaunchedEffect
+        val current = composerDraft
+        val updated = current.copy(
+            attachments = current.attachments.map { draft ->
+                ready[draft.reference]?.let { draft.copy(fileId = it.fileId, fileVendor = it.vendor) } ?: draft
+            },
+        )
+        if (updated != current) composerDraft = updated
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by rememberSaveable(state.sessionId) { mutableStateOf(true) }
@@ -260,51 +330,40 @@ fun ChatScaffold(
             }
     }
 
-    val statusBarProtectionColor = MaterialTheme.colorScheme.surface
-    val statusBarProtectionBrush = remember(statusBarProtectionColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                statusBarProtectionColor.copy(alpha = 0.72f),
-                statusBarProtectionColor.copy(alpha = 0.36f),
-                Color.Transparent,
-            ),
-        )
+    val visibleRoleChips = roleChips.takeIf { state.pendingComposerAction == null }
+    val latestMessageButton: @Composable () -> Unit = {
+        AnimatedVisibility(
+            // 推荐面板被键盘挤到可滚动时也会触发 canScrollForward，
+            // 但空会话里没有"最新消息"可回，这时不该冒出这个按钮。
+            visible = listState.canScrollForward && !showsRecommendations,
+        ) {
+            ChatScrollToLatestButton(
+                onClick = {
+                    shouldFollowLatest = true
+                    scope.launch {
+                        listState.animateScrollToItem(renderedItemCount)
+                    }
+                },
+            )
+        }
     }
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 与底部输入区对称：正文滚到悬浮顶栏后方时柔和淡出，状态栏保留额外遮罩。
-            val background = MaterialTheme.colorScheme.background
-            val fadeBrush = remember(background) {
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to background,
-                        0.55f to background.copy(alpha = 0.9f),
-                        0.8f to background.copy(alpha = 0.4f),
-                        1.0f to Color.Transparent,
-                    ),
-                )
-            }
-            Box {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(fadeBrush),
-                )
-                ChatHeaderActions(
-                    autoSpeakEnabled = state.autoSpeakEnabled,
+            if (headerVisible) {
+                ChatFloatingTopBar(
                     onOpenDrawer = onOpenDrawer,
                     onNewConversation = onNewConversation,
-                    onToggleAutoSpeak = onToggleAutoSpeak,
-                    onOpenVoice = onOpenVoice,
+                    chatMode = chatMode,
+                    onChatModeChange = onChatModeChange,
                 )
-                Box(
-                    modifier = Modifier
+            } else {
+                Spacer(
+                    Modifier
                         .fillMaxWidth()
-                        .windowInsetsTopHeight(WindowInsets.statusBars)
-                        .background(statusBarProtectionBrush),
+                        .statusBarsPadding()
+                        .height(ChatFloatingTopBarContentHeight),
                 )
             }
         },
@@ -360,9 +419,18 @@ fun ChatScaffold(
                             )
 
                             null -> ChatComposer(
+                                onOpenVoice = onOpenVoice,
                                 modifier = Modifier,
                                 messageData = composerDraft,
-                                onMessageDataChange = { composerDraft = it },
+                                onMessageDataChange = {
+                                    composerDraft = it
+                                    // 附件移除后清理对应上传状态（取消在途任务）；
+                                    // 上传完成后的 Ready 态在 chip 换成厂商引用时也在此回收。
+                                    onUploadedFilePrune(
+                                        state.draftUploadStates.keys -
+                                            it.attachments.map(DraftAttachment::reference).toSet(),
+                                    )
+                                },
                                 onSendClick = { data, onResult ->
                                     onSend(data.text, data.attachments) { result ->
                                         // 回执可能在切换会话后到达；只消费提交快照，不覆盖后续编辑。
@@ -390,8 +458,18 @@ fun ChatScaffold(
                                     } else {
                                         null
                                     },
+                                    vendorTemplateId = currentVendorTemplateId,
+                                    allowMcp = chatMode != github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT,
                                 ),
                                 attachmentCapabilities = attachmentCapabilities,
+                                uploadedFiles = uploadedFiles,
+                                onAttachUploadedFile = onAttachUploadedFile,
+                                onUploadedFileDelete = onUploadedFileDelete,
+                                attachmentUploadStates = state.draftUploadStates,
+                                isFileUploadEnabled = isFileUploadEnabled,
+                                showPermissionOption = chatMode != github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT,
+                                onRetryAttachmentUpload = onRetryAttachmentUpload,
+                                onDocumentDraftImported = onDocumentDraftImported,
                                 onMcpServerEnabledChange = onMcpServerEnabledChange,
                                 onFullAccessChange = onFullAccessChange,
                                 onOfficialToolOpened = onOfficialToolOpened,
@@ -417,6 +495,8 @@ fun ChatScaffold(
                                         reasoningEnabled = !isAgentRunning,
                                         onReasoningEffortChange = onReasoningEffortChange,
                                         onThinkingEnabledChange = onThinkingEnabledChange,
+                                        lockedVendor = state.lockedVendor,
+                                        modelSwitchCreatesNewSession = chatMode == github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT && state.messages.isNotEmpty(),
                                     )
                                 },
                             )
@@ -425,22 +505,7 @@ fun ChatScaffold(
                 }
             }
         },
-        floatingActionButton = {
-            AnimatedVisibility(
-                // 推荐面板被键盘挤到可滚动时也会触发 canScrollForward，
-                // 但空会话里没有"最新消息"可回，这时不该冒出这个按钮。
-                visible = listState.canScrollForward && !showsRecommendations,
-            ) {
-                ChatScrollToLatestButton(
-                    onClick = {
-                        shouldFollowLatest = true
-                        scope.launch {
-                            listState.animateScrollToItem(renderedItemCount)
-                        }
-                    },
-                )
-            }
-        },
+        floatingActionButton = { if (visibleRoleChips == null) latestMessageButton() },
     ) { innerPadding ->
         val layoutDirection = LocalLayoutDirection.current
         val listContentPadding = PaddingValues(
@@ -449,7 +514,8 @@ fun ChatScaffold(
             end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
             // 推荐面板要紧贴胶囊，省掉消息流才需要的那点呼吸位。
             bottom = innerPadding.calculateBottomPadding() +
-                    if (showsRecommendations) 0.dp else 8.dp,
+                (if (visibleRoleChips == null) 0.dp else RoleChipsRestingHeight) +
+                (if (showsRecommendations) 0.dp else 8.dp),
         )
 
         AnimatedContent(
@@ -465,6 +531,16 @@ fun ChatScaffold(
                 ) {
                     CircularProgressIndicator()
                 }
+            } else if (chatMode == github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT &&
+                listItems.isEmpty() && recommendations.isEmpty()
+            ) {
+                // Chatbot 空会话首屏：讲解模式定位；出现消息或推荐内容后不再展示。
+                ChatbotModeIntro(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
+                )
             } else {
                 // 消息列表
                 LazyColumn(
@@ -593,6 +669,19 @@ fun ChatScaffold(
             }
 
         }
+        if (visibleRoleChips != null) {
+            Box(
+                Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Box(Modifier.align(Alignment.End).padding(end = 16.dp, bottom = 4.dp)) {
+                        latestMessageButton()
+                    }
+                    key(state.sessionId) { visibleRoleChips() }
+                }
+            }
+        }
 
     }
 }
@@ -626,17 +715,74 @@ private fun ChatScrollToLatestButton(onClick: () -> Unit) {
     }
 }
 
+/** 悬浮顶栏内容区高度：48dp 按钮 + 上下各 8dp 留白；宿主层占位与此保持一致。 */
+private val ChatFloatingTopBarContentHeight = 64.dp
+
 /**
- * 顶栏浮动操作：左胶囊（抽屉｜语音通话）+ 右胶囊（新建会话｜自动播报）。
- * 设置与版本更新提醒统一由侧边抽屉承载，顶栏不再重复放入口。
+ * 悬浮顶栏：正文滚到其后时柔和淡出，状态栏保留额外遮罩。
+ * 宿主可在 HorizontalPager 之上只渲染一份，模式切换时分段控件不随页面销毁，
+ * 滑块动画得以连续播放；页内 Scaffold 用同高占位维持正文 contentPadding。
+ */
+@Composable
+internal fun ChatFloatingTopBar(
+    onOpenDrawer: () -> Unit,
+    onNewConversation: () -> Unit,
+    chatMode: github.ponyhuang.gimi.domain.conversation.model.ChatMode?,
+    onChatModeChange: (github.ponyhuang.gimi.domain.conversation.model.ChatMode) -> Unit,
+) {
+    val statusBarProtectionColor = MaterialTheme.colorScheme.surface
+    val statusBarProtectionBrush = remember(statusBarProtectionColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                statusBarProtectionColor.copy(alpha = 0.72f),
+                statusBarProtectionColor.copy(alpha = 0.36f),
+                Color.Transparent,
+            ),
+        )
+    }
+    val background = MaterialTheme.colorScheme.background
+    val fadeBrush = remember(background) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to background,
+                0.55f to background.copy(alpha = 0.9f),
+                0.8f to background.copy(alpha = 0.4f),
+                1.0f to Color.Transparent,
+            ),
+        )
+    }
+    Box {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(fadeBrush),
+        )
+        ChatHeaderActions(
+            onOpenDrawer = onOpenDrawer,
+            onNewConversation = onNewConversation,
+            chatMode = chatMode,
+            onChatModeChange = onChatModeChange,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(statusBarProtectionBrush),
+        )
+    }
+}
+
+/**
+ * 顶栏浮动操作：左侧抽屉菜单、中间模式分段与右侧新建会话。
+ * 历史会话统一从抽屉选择，文字与实时语音切换放在底部输入区。
+ * 自动播报开关仍留在侧边抽屉。
  */
 @Composable
 internal fun ChatHeaderActions(
-    autoSpeakEnabled: Boolean,
     onOpenDrawer: () -> Unit,
     onNewConversation: () -> Unit,
-    onToggleAutoSpeak: () -> Unit,
-    onOpenVoice: () -> Unit = {},
+    chatMode: github.ponyhuang.gimi.domain.conversation.model.ChatMode? = null,
+    onChatModeChange: (github.ponyhuang.gimi.domain.conversation.model.ChatMode) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -646,7 +792,7 @@ internal fun ChatHeaderActions(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 与输入胶囊共用容器色和描边，浅色主题下靠描边勾出边界；各自保留 48dp 点击区。
+        // 与输入胶囊共用容器色和描边，浅色主题下靠描边勾出边界；保留 48dp 点击区。
         Box(contentAlignment = Alignment.Center) {
             Surface(
                 modifier = Modifier.matchParentSize().padding(vertical = 2.dp),
@@ -654,32 +800,23 @@ internal fun ChatHeaderActions(
                 color = chatCapsuleColor(),
                 border = chatCapsuleBorder(),
             ) {}
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onOpenDrawer,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = stringResource(R.string.chat_open_drawer),
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                ChatHeaderDivider()
-                // 语音通话与「新建会话」对换：常用通话留在抽屉组，右侧胶囊统一为「新会话｜播报」。
-                IconButton(
-                    onClick = onOpenVoice,
-                    modifier = Modifier.size(48.dp)
-                        .testTag("chat_header_voice_call"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Call,
-                        contentDescription = stringResource(R.string.voice_open_call),
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = stringResource(R.string.chat_open_drawer),
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (chatMode != null) {
+            // 分段控件按两档文字实际宽度自适应并居中，比撑满中段轻量、比砍半宽更稳。
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                ChatModeSwitch(chatMode, onChatModeChange, Modifier.padding(horizontal = 6.dp))
             }
         }
 
@@ -691,60 +828,22 @@ internal fun ChatHeaderActions(
                 border = chatCapsuleBorder(),
             ) {}
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 新建会话：与语音页右胶囊使用同一枚列表加号图标，两页入口视觉一致。
+                // 新建会话：与抽屉「新对话」行共用同一枚加号图标，两处入口视觉一致。
                 IconButton(
                     onClick = onNewConversation,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                        imageVector = Icons.Default.Add,
                         contentDescription = stringResource(R.string.chat_new_conversation),
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                ChatHeaderDivider()
-                // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。
-                IconButton(
-                    onClick = onToggleAutoSpeak,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("chat_header_auto_speak"),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = stringResource(
-                            if (autoSpeakEnabled) {
-                                R.string.chat_auto_speak_on
-                            } else {
-                                R.string.chat_auto_speak_off
-                            },
-                        ),
-                        modifier = Modifier.size(24.dp),
-                        tint = if (autoSpeakEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
+
             }
         }
     }
-}
-
-/**
- * 顶栏胶囊内按钮间的竖分隔线：1dp 细线，高度约两倍图标，颜色与胶囊描边同源弱化。
- * 语音页顶栏胶囊（新会话｜通话设备）复用同一分隔样式。
- */
-@Composable
-internal fun ChatHeaderDivider() {
-    Box(
-        modifier = Modifier
-            .padding(vertical = 13.dp)
-            .size(width = 1.dp, height = 22.dp)
-            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-    )
 }
 
 /**
@@ -858,6 +957,48 @@ private fun previewChatRecommendations(): List<AgentRecommendation> = listOf(
     ),
 )
 
+/**
+ * Chatbot 模式空会话首屏讲解：说明 Chatbot 直连厂商模型服务的定位与能力边界，
+ * 并提示需要工具编排时切换 Assistant。纯展示块，出现消息或推荐内容后不再渲染。
+ */
+@Composable
+private fun ChatbotModeIntro(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.chatbot_intro_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.chatbot_intro_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.chatbot_intro_hint, stringResource(R.string.chat_mode_assistant)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Preview(name = "Chatbot 空会话讲解 · 浅色", showBackground = true, widthDp = 390, heightDp = 700, locale = "zh-rCN")
+@Preview(name = "Chatbot 空会话讲解 · 深色", showBackground = true, widthDp = 390, heightDp = 700, uiMode = 0x20, locale = "zh-rCN")
+@Composable
+private fun ChatbotModeIntroPreview() {
+    GimiTheme {
+        ChatbotModeIntro(Modifier.fillMaxSize())
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ChatScaffoldEmptyPreview() {
@@ -869,7 +1010,6 @@ private fun ChatScaffoldEmptyPreview() {
             onStop = {},
             onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
-            onToggleAutoSpeak = {},
             onOpenDocument = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},
@@ -921,7 +1061,6 @@ private fun ChatScaffoldWithMessagesPreview() {
             onStop = {},
             onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
-            onToggleAutoSpeak = {},
             onOpenDocument = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},
@@ -969,25 +1108,8 @@ private fun ChatScrollToLatestButtonPreview() {
 private fun ChatHeaderActionsPreview() {
     GimiTheme {
         ChatHeaderActions(
-            autoSpeakEnabled = true,
             onOpenDrawer = {},
             onNewConversation = {},
-            onToggleAutoSpeak = {},
-        )
-    }
-}
-
-@Preview(name = "顶部操作 · 语音入口 · 浅色", showBackground = true)
-@Preview(name = "顶部操作 · 语音入口 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun ChatHeaderVoiceEntryPreview() {
-    GimiTheme {
-        ChatHeaderActions(
-            autoSpeakEnabled = false,
-            onOpenDrawer = {},
-            onNewConversation = {},
-            onToggleAutoSpeak = {},
-            onOpenVoice = {},
         )
     }
 }
@@ -1060,7 +1182,6 @@ private fun ChatScaffoldFailedTurnPreview() {
             onStop = {},
             onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
-            onToggleAutoSpeak = {},
             onOpenDocument = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},

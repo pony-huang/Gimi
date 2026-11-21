@@ -18,6 +18,11 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.TemplateConnection
  * （语音协议、厂商工具矩阵、品牌图标）的分派键。
  *
  * 自定义 LLM 服务没有模板：协议、端点与模型全部由用户填写，只建一条对话连接。
+ *
+ * 对话连接的 `protocols` 只含一个协议时即为「锁定协议」：接口页显示只读值、保存与
+ * 启动对账把旧快照强制回落到该协议、`resolveChatModel` 再做一次运行期兜底。收紧前
+ * 的官方地址可留在 `defaultEndpoints` 中作迁移识别（不在 `protocols` 中，不可选）。
+ * 当前锁定为 Anthropic Messages 的厂商：DeepSeek、MiniMax。
  */
 object ModelServiceTemplates {
 
@@ -101,10 +106,15 @@ object ModelServiceTemplates {
         homepageUrl = "https://www.minimaxi.com/",
         keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
         connections = listOf(
+            // 对话固定走 Anthropic Messages 协议，与 DeepSeek 同：官方 /anthropic 端点
+            // 承载思维链与厂商声明式工具，不开放 OpenAI 兼容协议切换。旧 /v1 地址
+            // 仅作为迁移识别用的默认端点保留，不在 protocols 中，因此不可选。
             chatConnection(
-                defaultEndpoint = "https://api.minimaxi.com/v1",
-                additionalEndpoints = mapOf(ApiProtocol.Anthropic to "https://api.minimaxi.com/anthropic"),
+                defaultEndpoint = "https://api.minimaxi.com/anthropic",
+                protocols = listOf(ApiProtocol.Anthropic),
+                additionalEndpoints = mapOf(ApiProtocol.OpenaiChatcompletions to "https://api.minimaxi.com/v1"),
             ),
+            // 语音仍走厂商自有的 /v1 基址，是独立的 VendorManaged 连接，不参与对话协议约束。
             vendorSpeechConnection(
                 ServiceCapability.Recognition,
                 "https://api.minimaxi.com/v1",
@@ -161,9 +171,19 @@ object ModelServiceTemplates {
         id = "qwen",
         name = "Qwen",
 
+        // 注意密钥来源分域：对话端点在千问 AI 平台（maas.qianwenaiapi.com），
+        // 语音连接走 DashScope（SpeechEndpoints.QWEN_AUDIO_CN）。模板级 keyHelpUrl
+        // 指向百炼控制台服务语音侧；对话侧的千问平台密钥获取页待确认后单列，
+        // 在此之前用户按 keyHelpUrl 申请的百炼 key 不保证可用于 chat 连接。
         homepageUrl = "https://bailian.console.aliyun.com/",
         keyHelpUrl = "https://bailian.console.aliyun.com/?tab=model#/api-key",
         connections = listOf(
+            // 对话开放双协议（与 Kimi/GLM/MiMo 同款形态）：MaaS 端点同时提供
+            // OpenAI 兼容 Completions 与 Anthropic Messages 两种对话协议。
+            chatConnection(
+                defaultEndpoint = "https://maas.qianwenaiapi.com/compatible-mode/v1",
+                additionalEndpoints = mapOf(ApiProtocol.Anthropic to "https://maas.qianwenaiapi.com/apps/anthropic"),
+            ),
             vendorSpeechConnection(
                 ServiceCapability.Recognition,
                 SpeechEndpoints.QWEN_AUDIO_CN,
@@ -211,9 +231,13 @@ object ModelServiceTemplates {
         homepageUrl = "https://www.deepseek.com/",
         keyHelpUrl = "https://platform.deepseek.com/api_keys",
         connections = listOf(
+            // 对话固定走 Anthropic Messages 协议：官方 /anthropic 端点承载思维链与工具调用，
+            // 不开放 OpenAI 兼容协议切换。旧协议地址只作为迁移识别用的默认端点保留，
+            // 不在 protocols 中，因此 UI、保存校验与运行期分派都不会再放行该协议。
             chatConnection(
-                defaultEndpoint = "https://api.deepseek.com",
-                additionalEndpoints = mapOf(ApiProtocol.Anthropic to "https://api.deepseek.com/anthropic"),
+                defaultEndpoint = "https://api.deepseek.com/anthropic",
+                protocols = listOf(ApiProtocol.Anthropic),
+                additionalEndpoints = mapOf(ApiProtocol.OpenaiChatcompletions to "https://api.deepseek.com"),
             ),
             // 语音走固定的 /v1/tools/asr、/v1/tools/tts 端点，请求不带模型参数；
             // 目录里的模型 ID 只是选择器占位（https://api-docs.deepseek.com/zh-cn/guides/asr.md）。

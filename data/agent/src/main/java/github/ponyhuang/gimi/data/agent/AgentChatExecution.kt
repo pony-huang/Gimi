@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
+import com.google.adk.kt.agents.ToolExecutionMode
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.runners.InMemoryRunner
@@ -12,8 +13,11 @@ import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
+import github.ponyhuang.gimi.domain.conversation.model.CONVERSATION_TITLE_STATE_KEY
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
+import github.ponyhuang.gimi.domain.modelaccess.CONVERSATION_TITLE_METADATA_KEY
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +41,9 @@ class AgentChatExecution internal constructor(
     private val runner: InMemoryRunner,
     private val customMetadata: Map<String, Any>,
     private val mobileUseController: MobileUseController? = null,
+    /** Chatbot 形态：流正常收尾后把标题插件写入会话状态的 AI 标题补发成一次事件。 */
+    private val emitSessionTitle: Boolean = false,
+    private val toolExecutionMode: ToolExecutionMode = ToolExecutionMode.PARALLEL,
 ) {
     private val pendingConfirmationIds = linkedSetOf<String>()
     private val confirmationResponses = linkedMapOf<String, FunctionResponse>()
@@ -56,12 +63,17 @@ class AgentChatExecution internal constructor(
         val parts = if (resumeInvocationId != null) emptyList() else buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             fileAttachments.forEach { attachment ->
+                // 厂商 file 引用（上传直发/抽屉复用）与本地路径共用 FileData 通道：
+                // FILE_REFERENCE 模式下 file 引用在解析边界直通，本地文档路径降级占位。
+                val vendorUri = attachment.fileVendor?.let { vendor ->
+                    attachment.fileId?.let { VendorFileReference.uri(vendor, it) }
+                }
                 add(
                     Part(
                         fileData = FileData(
                             mimeType = attachment.mimeType,
                             displayName = attachment.displayName,
-                            fileUri = requireNotNull(attachment.payloadReference) {
+                            fileUri = vendorUri ?: requireNotNull(attachment.payloadReference) {
                                 "Managed attachment reference is missing"
                             },
                         ),
@@ -83,6 +95,7 @@ class AgentChatExecution internal constructor(
             runConfig = RunConfig(
                 streamingMode = StreamingMode.SSE,
                 customMetadata = customMetadata,
+                toolExecutionMode = toolExecutionMode,
             ),
         ).withAsyncA2uiCreates().transform { event ->
             captureConfirmations(event)
@@ -91,7 +104,43 @@ class AgentChatExecution internal constructor(
             if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
                 throw IllegalStateException(event.errorMessage ?: event.errorCode)
             }
-        }.flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+        }.withSessionTitleOnCompletion().flushSessionOnCompletion().flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+    }
+
+    /**
+     * Chatbot 形态的标题收尾：标题插件在 afterAgent 里完成标题生成（快模型总结）并写入
+     * 会话状态，此时事件流已经关闭，宿主拿不到。流正常收尾后读状态补发一次标题事件，
+     * 走既有的 `conversationTitle` 通道；厂商内联标题（DeepSeek）在轮内已带出，状态键
+     * 相同，因此补发是幂等的。失败/取消不补发。
+     */
+    private fun Flow<Event>.withSessionTitleOnCompletion(): Flow<Event> = if (!emitSessionTitle) {
+        this
+    } else {
+        onCompletion { cause ->
+            if (cause != null) return@onCompletion
+            val session = runner.sessionService.getSession(
+                SessionKey(AgentChatRunner.APP_NAME, userId, sessionId),
+            ) ?: return@onCompletion
+            val title = (session.state[CONVERSATION_TITLE_STATE_KEY] as? String)
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?: return@onCompletion
+            emit(Event(customMetadata = mapOf(CONVERSATION_TITLE_METADATA_KEY to title)))
+        }
+    }
+
+    /**
+     * ADK 1.6.0 写入缓冲刷新：回合结束（无论成功、异常或取消）后主动触发 SessionService.flush，
+     * 保证 OrderedEventWriter 队列和缓冲写入全部落盘，防止应用异常退出或切换时事件丢失。
+     */
+    private fun Flow<Event>.flushSessionOnCompletion(): Flow<Event> = onCompletion {
+        withContext(NonCancellable) {
+            try {
+                runner.sessionService.flush(SessionKey(AgentChatRunner.APP_NAME, userId, sessionId))
+            } catch (_: Throwable) {
+                // 忽略刷新异常，避免遮蔽上游真实故障
+            }
+        }
     }
 
     /**
@@ -170,6 +219,7 @@ class AgentChatExecution internal constructor(
             runConfig = RunConfig(
                 streamingMode = StreamingMode.SSE,
                 customMetadata = customMetadata,
+                toolExecutionMode = toolExecutionMode,
             ),
         ).withAsyncA2uiCreates().transform { event ->
             captureConfirmations(event)
@@ -177,7 +227,7 @@ class AgentChatExecution internal constructor(
             if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
                 throw IllegalStateException(event.errorMessage ?: event.errorCode)
             }
-        }.flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+        }.flushSessionOnCompletion().flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
     }
 
     private fun captureConfirmations(event: Event) {

@@ -15,6 +15,7 @@ PLUGIN_CATALOG = Path('data/plugin/src/main/assets/plugin_catalog.json')
 
 
 def plugin_catalog(root):
+    """校验内置插件目录：schema 版本、条目键/包名/接口版本、zh/en 文案、标签齐全，且禁止预填分发字段（apkUrl/sha256 等只能由发布产物回填）；返回解析后的目录。"""
     catalog = json.loads((root / PLUGIN_CATALOG).read_text(encoding='utf-8'))
     if not isinstance(catalog, dict) or type(catalog.get('schemaVersion')) is not int or \
             catalog['schemaVersion'] != 1 or not isinstance(catalog.get('entries'), list):
@@ -53,6 +54,7 @@ def plugin_catalog(root):
 
 
 def localized_text(value, key):
+    """要求 zh/en 两个 locale 均为非空字符串，否则按插件键报错。"""
     if not isinstance(value, dict) or any(
         not isinstance(value.get(locale), str) or not value[locale].strip() for locale in ('zh', 'en')
     ):
@@ -60,6 +62,7 @@ def localized_text(value, key):
 
 
 def write_plugin_subscription(root, destination, repository, version, version_code):
+    """按本次验证过的 APK 生成 plugin-subscription.json：逐插件核验 APK 存在、大小与命名前缀，回填 apkUrl/sha256/sizeBytes/versionCode/versionName，编辑字段原样保留。"""
     version_key(version)
     if type(version_code) is not int or not 0 < version_code <= 2100000000:
         raise ValueError('Invalid plugin APK versionCode')
@@ -87,10 +90,12 @@ def write_plugin_subscription(root, destination, repository, version, version_co
 
 
 def run(*args):
+    """执行命令并返回 strip 后的标准输出；非零退出由 check_output 直接抛错。"""
     return subprocess.check_output(args, text=True).strip()
 
 
 def version_key(version):
+    """解析 X.Y.Z[-beta.N|-rc.N] 为可比较元组：beta < rc < 正式版，数字段按数值比较。"""
     match = VERSION.fullmatch(version)
     if not match:
         raise ValueError('Version must be X.Y.Z, X.Y.Z-beta.N or X.Y.Z-rc.N')
@@ -103,6 +108,7 @@ def version_key(version):
 
 
 def config(root=ROOT):
+    """读取并交叉校验 version.txt、release-please manifest 与 gradle.properties 的 versionCode 三方一致；返回 (版本名, versionCode)。"""
     version = (root / 'version.txt').read_text(encoding='utf-8').strip()
     version_key(version)
     codes = re.findall(r'^releaseVersionCode=(\d+)\s*$', (root / 'gradle.properties').read_text(encoding='utf-8'), re.M)
@@ -115,6 +121,7 @@ def config(root=ROOT):
 
 
 def notes(text, version):
+    """从 CHANGELOG.md 提取指定版本的章节正文，作为 GitHub Release 与应用内更新弹窗的共同文案；章节缺失、重复或为空都拒绝。"""
     # release-please uses both linked and plain SemVer headings, sometimes with dates.
     sections = list(re.finditer(r'^## (?:\[)?(\d+\.\d+\.\d+(?:-(?:beta|rc)\.[1-9]\d*)?)(?:\]|\s|$).*$', text, re.M))
     matches = [(i, item) for i, item in enumerate(sections) if item[1] == version]
@@ -128,11 +135,13 @@ def notes(text, version):
 
 
 def releases():
+    """经 gh api 分页拉取仓库全部 Release 并摊平为列表。"""
     pages = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{os.environ["GITHUB_REPOSITORY"]}/releases'))
     return [release for page in pages for release in page]
 
 
 def current_release(items, tag):
+    """查找 tag 对应的 Release；若已发布（非草稿）即抛错——发布不可变，重试只能覆盖草稿。"""
     matches = [item for item in items if item['tag_name'] == tag]
     if matches and not matches[0]['draft']:
         raise ValueError('Published releases are immutable; create a new version')
@@ -140,11 +149,13 @@ def current_release(items, tag):
 
 
 def latest_release(items):
+    """取语义版本最高的非草稿 Release（beta/rc 参与排序），作为递增校验的基线；无候选返回 None。"""
     candidates = [item for item in items if not item['draft'] and VERSION.fullmatch(item['tag_name'].removeprefix('v'))]
     return max(candidates, key=lambda item: version_key(item['tag_name'].removeprefix('v')), default=None)
 
 
 def validate(tag):
+    """发布前置校验：tag 与版本文件一致、检出即 tag 提交、tag 在 main 历史内、版本必须超过全部已发布版本；并把 Release 正文写入 temp/release/notes.md 供 publish 使用。"""
     version, code = config()
     if tag != f'v{version}':
         raise ValueError('Tag does not match version.txt')
@@ -163,6 +174,7 @@ def validate(tag):
 
 
 def apk_metadata(aapt, path):
+    """用 aapt badging 解析 APK 的 (包名, versionCode, versionName) 三元组。"""
     output = run(aapt, 'dump', 'badging', str(path))
     match = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", output)
     if not match:
@@ -171,6 +183,7 @@ def apk_metadata(aapt, path):
 
 
 def package(aapt, apksigner):
+    """核验并打包发版产物：逐 APK 校验元数据与签名证书、对比上一分发 APK 确保 versionCode 递增，生成订阅目录与 SHA256SUMS，产物落 temp/release/dist。"""
     version, code = config()
     repo = os.environ['GITHUB_REPOSITORY'].split('/')[-1]
     fingerprint = os.environ['RELEASE_CERT_SHA256'].lower().replace(':', '')
@@ -218,6 +231,7 @@ def package(aapt, apksigner):
 
 
 def publish(tag):
+    """发布流程：确认远端 tag 未被移动，创建/更新草稿并上传附件，逐附件核对名称与大小后才转正；预发布带 --prerelease 且不成为 latest。"""
     version, _ = config()
     if tag != f'v{version}':
         raise ValueError('Tag does not match version.txt')
@@ -255,7 +269,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.command == 'check':
         plugin_catalog(ROOT)
-        version, _ = config()
+        version, code = config()
         notes((ROOT / 'CHANGELOG.md').read_text(encoding='utf-8'), version)
         if args.base_ref and subprocess.run(
             ['git', 'cat-file', '-e', f'{args.base_ref}:version.txt'],
@@ -265,7 +279,7 @@ if __name__ == '__main__':
             if base_version != version:
                 base_properties = run('git', 'show', f'{args.base_ref}:gradle.properties')
                 base_code = int(re.search(r'^releaseVersionCode=(\d+)\s*$', base_properties, re.M)[1])
-                if version_key(version) <= version_key(base_version) or config()[1] <= base_code:
+                if version_key(version) <= version_key(base_version) or code <= base_code:
                     raise ValueError('Version PR must increment both versionName and releaseVersionCode')
     elif args.command == 'validate':
         validate(args.tag)

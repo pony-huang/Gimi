@@ -30,6 +30,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import github.ponyhuang.gimi.domain.modelaccess.ModelConfig
 import github.ponyhuang.gimi.data.modelaccess.shared.QwenRealtimeVoiceSupport
 import github.ponyhuang.gimi.data.modelaccess.shared.OpenAiRealtimeVoiceSupport
 import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeModel
@@ -40,7 +41,7 @@ import github.ponyhuang.gimi.data.modelaccess.openai.realtime.OpenAiRealtimeMode
  * [ModelCapability.Realtime] 标记与模板身份；端点由厂商自有，千问按业务空间 ID 改写。
  */
 class VoiceLiveModelFactoryTest {
-    private val models = mockk<AgentLLMModelFactory>()
+    private val models = mockk<DefaultAgentLLMModelFactory>()
     private val configuration = mockk<AgentModelConfigurationSource>()
     private val modelCatalog = mockk<ModelCatalogRepository>()
     private val recognition = mockk<SpeechRecognitionRepository> {

@@ -17,30 +17,42 @@ class ExportConversationsUseCaseTest {
     private val repository = mockk<ConversationExportRepository>(relaxed = true)
     private val gate = FakeAgentRuntimeGate()
     private val exporter = ExportConversationsUseCase(repository, gate)
-    private val request = ConversationExportRequest(listOf("one"), "time", "one.jsonl", "application/x-ndjson", false)
+    private val target = ConversationExportSession("user-default", "one")
+    private val request = ConversationExportRequest("user-default", "one", "time", "one.jsonl", "application/x-ndjson")
 
     @Test
-    fun singleExportAllowsOtherSessionsButAllExportIsBlocked() = runTest {
-        gate.state.value = AgentRuntimeState.Busy(listOf(ActiveAgentTask(AgentTaskSource.CHAT, "other", AgentTaskPhase.GENERATING)))
-        coEvery { repository.prepare("one") } returns request
-        assertEquals(AgentMutationResult.Applied(request), exporter.prepare("one"))
-        assertEquals(AgentMutationResult.BlockedByActiveAgent, exporter.prepare())
-        coVerify(exactly = 0) { repository.prepare(null) }
+    fun exportAllowsOtherSessionsButTargetSessionIsBlocked() = runTest {
+        gate.state.value = AgentRuntimeState.Busy(
+            listOf(ActiveAgentTask(AgentTaskSource.CHAT, "other", AgentTaskPhase.GENERATING)),
+        )
+        coEvery { repository.prepare(target) } returns request
+        assertEquals(AgentMutationResult.Applied(request), exporter.prepare(target))
+        gate.state.value = AgentRuntimeState.Busy(
+            listOf(ActiveAgentTask(AgentTaskSource.CHATBOT, "one", AgentTaskPhase.GENERATING)),
+        )
+        assertEquals(AgentMutationResult.BlockedByActiveAgent, exporter.prepare(target))
+        coVerify(exactly = 1) { repository.prepare(target) }
     }
 
     @Test
     fun savingRechecksTasksStartedWhileChoosingDestination() = runTest {
-        coEvery { repository.prepare("one") } returns request
-        exporter.prepare("one")
-        gate.state.value = AgentRuntimeState.Busy(listOf(ActiveAgentTask(AgentTaskSource.CHAT, "one", AgentTaskPhase.WAITING_FOR_CONFIRMATION)))
+        coEvery { repository.prepare(target) } returns request
+        exporter.prepare(target)
+        gate.state.value = AgentRuntimeState.Busy(
+            listOf(ActiveAgentTask(AgentTaskSource.CHAT, "one", AgentTaskPhase.WAITING_FOR_CONFIRMATION)),
+        )
         assertEquals(AgentMutationResult.BlockedByActiveAgent, exporter.save(request, "content://export"))
         coVerify(exactly = 0) { repository.export(any(), any()) }
     }
 
     @Test
-    fun allExportWithOnlyOneSessionStillChecksGlobalActivityWhenSaving() = runTest {
-        gate.state.value = AgentRuntimeState.Busy(listOf(ActiveAgentTask(AgentTaskSource.CHAT, "other", AgentTaskPhase.EXECUTING_TOOL)))
-        assertEquals(AgentMutationResult.BlockedByActiveAgent, exporter.save(request.copy(allSessions = true), "content://export"))
-        coVerify(exactly = 0) { repository.export(any(), any()) }
+    fun savingPassesThroughWhenTargetStaysIdle() = runTest {
+        coEvery { repository.prepare(target) } returns request
+        exporter.prepare(target)
+        gate.state.value = AgentRuntimeState.Busy(
+            listOf(ActiveAgentTask(AgentTaskSource.CHAT, "other", AgentTaskPhase.EXECUTING_TOOL)),
+        )
+        assertEquals(AgentMutationResult.Applied(Unit), exporter.save(request, "content://export"))
+        coVerify(exactly = 1) { repository.export(request, "content://export") }
     }
 }

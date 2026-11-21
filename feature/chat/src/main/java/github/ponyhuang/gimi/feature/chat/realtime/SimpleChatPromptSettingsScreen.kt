@@ -37,7 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
+import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
@@ -63,7 +63,7 @@ fun SimpleChatPromptSettingsScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item { PreferenceSectionTitle(stringResource(R.string.voice_prompt_settings_section)) }
-            item { PreferenceSectionNote(stringResource(R.string.voice_prompt_settings_note)) }
+            item { PreferenceSectionNote(stringResource(if (state.canSelect) R.string.voice_prompt_settings_note else R.string.voice_role_management_note)) }
             item {
                 PreferenceGroupCard {
                     PreferenceListItem(
@@ -71,13 +71,13 @@ fun SimpleChatPromptSettingsScreen(
                         title = stringResource(R.string.voice_prompt_preset_none),
                         subtitle = stringResource(R.string.voice_prompt_preset_none_detail),
                         showDivider = state.builtInPresets.isNotEmpty(),
-                        onClick = { onAction(SimpleChatPromptAction.Select(null)) },
+                        onClick = if (state.canSelect) ({ onAction(SimpleChatPromptAction.Select(null)) }) else null,
                         trailingContent = {
                             // 单选状态由仓库持有，圆钮本身不响应点击，统一走行点击。
                             // 不可点击的圆钮没有 48dp 最小触摸目标，会比下方可点击圆钮的圆心偏右；
                             // 补一个等宽容器让所有圆钮的圆心落在同一条竖线上。
                             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                                RadioButton(selected = state.selectedPresetId == null, onClick = null)
+                                if (state.canSelect) RadioButton(selected = state.selectedPresetId == null, onClick = null)
                             }
                         },
                     )
@@ -88,7 +88,7 @@ fun SimpleChatPromptSettingsScreen(
                             title = preset.name,
                             subtitle = preset.description.ifBlank { preset.content },
                             showDivider = index != state.builtInPresets.lastIndex,
-                            onClick = { onAction(SimpleChatPromptAction.Select(preset.id)) },
+                            onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { menuOpen = true }) {
@@ -103,9 +103,9 @@ fun SimpleChatPromptSettingsScreen(
                                             },
                                         )
                                     }
-                                    RadioButton(
+                                    if (state.canSelect) RadioButton(
                                         selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(SimpleChatPromptAction.Select(preset.id)) },
+                                        onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
                                     )
                                 }
                             },
@@ -124,7 +124,7 @@ fun SimpleChatPromptSettingsScreen(
                             title = preset.name,
                             subtitle = preset.content,
                             showDivider = true,
-                            onClick = { onAction(SimpleChatPromptAction.Select(preset.id)) },
+                            onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { menuOpen = true }) {
@@ -146,9 +146,9 @@ fun SimpleChatPromptSettingsScreen(
                                             },
                                         )
                                     }
-                                    RadioButton(
+                                    if (state.canSelect) RadioButton(
                                         selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(SimpleChatPromptAction.Select(preset.id)) },
+                                        onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
                                     )
                                 }
                             },
@@ -168,6 +168,7 @@ fun SimpleChatPromptSettingsScreen(
         SimpleChatPromptEditDialog(
             initialName = editing.name,
             initialContent = editing.content,
+            initialDescription = editing.description,
             creating = editing.id.isBlank(),
             onAction = onAction,
         )
@@ -185,24 +186,33 @@ fun SimpleChatPromptSettingsScreen(
 private fun SimpleChatPromptEditDialog(
     initialName: String,
     initialContent: String,
+    initialDescription: String,
     creating: Boolean,
     onAction: (SimpleChatPromptAction) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var content by remember { mutableStateOf(initialContent) }
+    var description by remember { mutableStateOf(initialDescription) }
     AlertDialog(
         onDismissRequest = { onAction(SimpleChatPromptAction.DismissEdit) },
         title = { Text(stringResource(if (creating) R.string.voice_prompt_preset_create else R.string.voice_prompt_preset_edit_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                github.ponyhuang.gimi.ui.preference.PreferenceTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.voice_prompt_preset_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                github.ponyhuang.gimi.ui.preference.PreferenceTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.voice_prompt_preset_description)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                github.ponyhuang.gimi.ui.preference.PreferenceTextField(
                     value = content,
                     onValueChange = { content = it },
                     label = { Text(stringResource(R.string.voice_prompt_preset_content)) },
@@ -214,7 +224,7 @@ private fun SimpleChatPromptEditDialog(
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank() && content.isNotBlank(),
-                onClick = { onAction(SimpleChatPromptAction.Save(name, content)) },
+                onClick = { onAction(SimpleChatPromptAction.Save(name, content, description)) },
             ) { Text(stringResource(R.string.voice_prompt_preset_save)) }
         },
         dismissButton = {
@@ -251,7 +261,7 @@ private fun SimpleChatPromptDeleteDialog(
 /** 官方预设正文只读展示：完整提示词较长，弹层内可滚动查看。 */
 @Composable
 private fun SimpleChatPromptViewDialog(
-    preset: SimpleChatPromptPreset,
+    preset: ChatbotRolePreset,
     onAction: (SimpleChatPromptAction) -> Unit,
 ) {
     AlertDialog(
@@ -274,22 +284,27 @@ private fun SimpleChatPromptViewDialog(
                 Text(stringResource(R.string.voice_prompt_preset_view_close))
             }
         },
+        dismissButton = {
+            TextButton(onClick = { onAction(SimpleChatPromptAction.CopyViewedPreset) }) {
+                Text(stringResource(R.string.voice_prompt_preset_copy))
+            }
+        },
     )
 }
 
 private val PreviewPresets = listOf(
-    SimpleChatPromptPreset("p1", "简洁速答", "直接给结论，单句回答，不超过两句话。"),
-    SimpleChatPromptPreset("p2", "口语陪练", "全程使用简单日常的英语与我对话，我答错时温和纠正。"),
+    ChatbotRolePreset("p1", "简洁速答", "直接给结论，单句回答，不超过两句话。"),
+    ChatbotRolePreset("p2", "口语陪练", "全程使用简单日常的英语与我对话，我答错时温和纠正。"),
 )
 
 private val PreviewBuiltInPresets = listOf(
-    SimpleChatPromptPreset(
+    ChatbotRolePreset(
         id = "builtin.tieba_roast",
         name = "贴吧嘴臭老哥",
         description = "模仿贴吧老哥的嘴臭风格，犀利吐槽、情绪宣泄，适合闲聊发泄。",
         content = "# Role and Objective\n\n你是「贴吧嘴臭老哥」……",
     ),
-    SimpleChatPromptPreset(
+    ChatbotRolePreset(
         id = "builtin.emotional_companion",
         name = "情感陪伴师",
         description = "温柔细腻的情绪支持与陪伴，会共情、能恋爱式互动，适合低落时寻求慰藉。",
@@ -304,6 +319,7 @@ private fun SimpleChatPromptPagePreview(dark: Boolean, empty: Boolean = false) {
             state = SimpleChatPromptUiState(
                 presets = if (empty) emptyList() else PreviewPresets,
                 builtInPresets = if (empty) emptyList() else PreviewBuiltInPresets,
+                canSelect = true,
                 selectedPresetId = if (empty) null else "p2",
             ),
             onAction = {},
@@ -345,6 +361,7 @@ private fun SimpleChatPromptEditDialogPreview() {
             state = SimpleChatPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
+                canSelect = true,
                 selectedPresetId = "p1",
                 editing = PreviewPresets[0],
             ),
@@ -361,6 +378,7 @@ private fun SimpleChatPromptDeleteDialogPreview() {
             state = SimpleChatPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
+                canSelect = true,
                 selectedPresetId = "p1",
                 confirmDelete = PreviewPresets[1],
             ),
@@ -377,6 +395,7 @@ private fun SimpleChatPromptViewDialogPreview() {
             state = SimpleChatPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
+                canSelect = true,
                 selectedPresetId = "builtin.tieba_roast",
                 viewing = PreviewBuiltInPresets[0],
             ),

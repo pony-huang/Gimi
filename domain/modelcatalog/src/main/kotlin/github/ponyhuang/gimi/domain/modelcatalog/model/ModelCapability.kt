@@ -38,6 +38,13 @@ enum class ModelCapability {
      * 拾取携带该标记的模型；实时语音的入口（模型选择、会话创建）以该标记为准。
      */
     Realtime,
+
+    /**
+     * 全模态对话大模型（LLM 的细分能力）：可直接接收音频等输入模态并生成文本。
+     *
+     * 该能力从属于对话大模型范畴，模型同时具备 [LLM] 能力。
+     */
+    Omni,
 }
 
 /** 是否为语音识别类能力（把音频转成文本的两种协议语义）。 */
@@ -61,3 +68,25 @@ val Model.recognitionCapability: ModelCapability?
         ModelCapability.ASR in capabilities -> ModelCapability.ASR
         else -> null
     }
+
+/**
+ * 程序内置硬编码的全模态（Omni）大模型标识集合。
+ */
+object OmniModels {
+    val KNOWN_OMNI_MODEL_IDS: Set<String> = setOf(
+        "mimo-v2.6-pro",
+        "mimo-v2.6-flash",
+        "mimo-v2.6-pro-ultraspeed",
+        "qwen3.8-omni-flash",
+    )
+
+    /**
+     * 校验给定的模型 ID 是否匹配硬编码的全模态模型白名单（忽略大小写）。
+     */
+    fun isOmniModel(modelId: String): Boolean =
+        modelId.trim().lowercase() in KNOWN_OMNI_MODEL_IDS
+}
+
+/** 是否为全模态 LLM（属于 [ModelCapability.LLM] 且具备 [ModelCapability.Omni] 或命中硬编码白名单）。 */
+val Model.isOmniLlm: Boolean
+    get() = ModelCapability.LLM in capabilities && (ModelCapability.Omni in capabilities || OmniModels.isOmniModel(id))

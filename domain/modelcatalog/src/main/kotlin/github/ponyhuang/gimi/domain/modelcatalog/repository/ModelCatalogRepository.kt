@@ -105,6 +105,12 @@ interface ModelCatalogRepository {
     /** 独立启停；停用保留配置与默认引用，仅标记不可用。 */
     suspend fun setInstanceEnabled(instanceId: String, enabled: Boolean): Boolean
 
+    /**
+     * 独立设置实例级"文件上传"开关；对该厂商实例下的全部对话模型统一生效，默认关。
+     * 关闭不影响已含厂商 file 引用附件的旧会话（准入语义只管新附件）。
+     */
+    suspend fun setFileUploadEnabled(instanceId: String, enabled: Boolean): Boolean
+
     /** 删除实例，并在同一提交内清理受影响默认分配与绑定音色。 */
     suspend fun deleteInstance(instanceId: String): Boolean
 

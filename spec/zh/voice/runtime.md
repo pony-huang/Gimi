@@ -2,203 +2,111 @@
 
 [English](../../en/voice/runtime.md) · 简体中文
 
-> [实时语音系统](realtime-voice-system.md)的深入篇：状态机与三层代次、音频设备
-> 路由、后台存活（前台服务与结束通话），以及可靠性规则——超时、刻意不重试、背压、
-> 取消传播。
+> [实时语音系统](realtime-voice-system.md)的姊妹篇。本文只保留代码讲不清的东西：
+> 状态与三层代次为何要拆开、路由与生命周期上的坑，以及可靠性契约。类名、迁移表、
+> 通道类型和精确超时值一律刻意略去——这些请直接读代码。
+
+Audience: 参与 Gimi 实时语音功能开发的编码智能体。
 
 ## 状态机
 
-`RealtimeVoicePhase` 迁移：
+`RealtimeVoicePhase` 的迁移请直接看代码。有两点值得记牢：
 
-| 起点 | 事件 | 终点 |
-|---|---|---|
-| `Idle` | `start()` 成功（录音已启动） | `Listening` |
-| `Listening` | 切出一句话（开口瞬间已从 `Speaking` 切回） | `Transcribing` |
-| `Transcribing` | 识别为空 | `Listening` |
-| `Transcribing` | 识别出非空文本 | `Thinking`（话轮代次 +1） |
-| `Thinking` | 首个音频块真正写入 `AudioTrack` | `Speaking` |
-| `Speaking` | **该片段播完（无例外，每段都走）** | `Thinking` |
-| `Thinking` | 段流已结束且最后一段也已播完 | `Listening` |
-| 任意（含 `Speaking`） | 本地开口 / 后端 `Interrupted` / 播放代次失效 | `Listening` |
-| 任意 | `fail(failure)` | `Failed`（会话存活、音频已停） |
-| `Failed` | `retry()` | 重新 `start()` → `Listening` |
-| 任意 | `close()` | `Closed`（终态） |
+- `Thinking` 与 `Speaking` 是**按片段交替**，不是一轮只走一次。每播完一段都会把
+  phase 写回 `Thinking`，只有段流结束才写 `Listening`——走的是
+  `Speaking → Thinking → Listening` 两跳，不会直接跳过去。
+- 三种打断（本地开口 / 后端 `Interrupted` / 播放代次校验）归一成同一个动作：
+  停播、取消生成、清字幕、回到 `Listening`，只是触发来源不同。
 
-读这张表要抓住一条环：**`Thinking` 与 `Speaking` 按片段交替**，不是一次性
-`Thinking → Speaking`。代码里 `playSegment()` 播完总会把 phase 写回 `Thinking`，
-只有 `reply()` 在 `playback.join()` 返回（段流关闭）之后才写 `Listening`。所以
-「最后一段播完」走的是 `Speaking → Thinking → Listening` 两跳，不是直接从
-`Speaking` 跳到 `Listening`。
+`listening` 与 `phase` **正交**且独立存储：播放时必须继续收音才能支持打断。
+`speechStarted()` 只校验 `closed`/`started`/`muted`，从不看 `phase`。别拿
+`phase != Speaking` 去推断麦克风是否在收音。
 
-三个打断源在表里合并成一行，是因为它们的作用完全相同：停播 + 取消生成 + 清字幕 +
-回到 `Listening`。区别只在触发位置（本地 VAD / 后端事件 / 播放器代次校验）。
+## 三层代次，不要混用
 
-### 为什么 `listening` 与 `phase` 分开
+| 计数器（代码名） | 防的是 |
+|---|---|
+| `inputRevision`（会话私有 `Long`） | 过期的**识别**结果 |
+| `state.revision`（「话轮代次」） | 过期的**生成 / 播放 / 字幕**结果 |
+| `RealtimePcmPlayer.generation`（「播放代次」） | 尚未写入播放器的旧音频 |
 
-领域注释直接给了答案：「播报与推理的阶段；监听状态独立保存，因为播放时仍需收音以
-支持打断」。代码事实也印证：`speechStarted()` 只校验 `closed` / `started` / `muted`，
-**不校验 phase**——这是 `Speaking` 期间还能被打断的前提（当然，前提是未静音）。
+本文说的「话轮代次」一律指 `state.revision`，不是播放器的 `generation`；
+`inputRevision` 又只管识别侧。三层各守一段，混用就会写错守卫条件。三者合起来
+让取消之后迟到的异步结果被静默丢弃，不会把上一轮的字幕或音频漏进新一轮。
 
-所以不要用 `phase != Speaking` 去推断「是否在收音」，两者是正交的。
-
-### 三层代次，不要混用
-
-| 计数器 | 递增时机 | 丢弃什么 |
-|---|---|---|
-| `inputRevision`（会话私有 `Long`） | 开口、静音切换、失败、`finishPendingTurn`、`close` | 过期的**识别**结果 |
-| `state.revision`（状态快照内，即「话轮代次」） | 每轮识别成功、进入 `Thinking` 时 `+1` | 过期的**生成 / 播放 / 字幕**结果 |
-| `RealtimePcmPlayer.generation`（播放器内部，即「播放代次」） | `stop()` / 新 `play()` 时递增 | 旧轮**尚未写入**的音频 |
-
-术语提醒：文档里的**「话轮代次」专指 `state.revision`**，与播放器的 `generation`
-不是同一个东西；`inputRevision` 又只作用于识别侧。三层各管一段，混用会让守卫条件
-写错。三层合起来保证：取消之后迟到的异步结果只会被静默丢弃，不会把旧回答的字幕或
-音频漏进新一轮。
-
-另外 `recognize()` 在开新一轮前会 `replyJob?.cancelAndJoin()`——必须等旧轮真正
-取消并完成文字提交，下一轮才允许取得后端所有权。这不是性能取舍，是正确性要求。
+`recognize()` 在开新一轮前会 `replyJob?.cancelAndJoin()`：必须等旧轮真正取消、
+文字提交完毕，下一轮才允许接管后端。这是正确性要求，不是性能优化。
 
 ## 音频设备与路由
 
 枚举来源是 `AudioManager.availableCommunicationDevices`（通话路由设备集，
-不是全量输出设备）。类型映射到六类：扬声器 / 听筒 / 蓝牙（含 BLE、助听器）/
-有线 / USB / 其他。
+不是全量输出）。选择是纯函数（`VoiceAudioDeviceSelection`）——规则请读代码。
+其中「耳机」指蓝牙 / 有线 / USB，**不含**扬声器与听筒。
 
-选择是纯函数（`VoiceAudioDeviceSelection`）：
+容易踩的坑：
 
-```text
-手动指定命中 → 连接顺序倒序里的耳机 → 扬声器 → 列表第一个
-```
-
-这里的「耳机」指蓝牙 / 有线 / USB 三类，**不含扬声器与听筒**。
-
-「连接顺序」是控制器自己记的首次出现顺序，不是平台列表顺序——平台顺序不稳定，
-会让「自动模式」在设备插拔后跳到非预期设备。
-
-几个容易出错的时序：
-
-- 路由变化会**重置 DSP**（`echoCanceller.reset()` / `detector.reset()` /
-  `segmenter.reset()`），且重置投递到 IO 线程。在主线程持 `inputLock` 做这件事会
-  与录音线程的逐帧 DSP 争抢，表现为卡顿。
-- `devicesChanged()` 刷新两次：立即一次，**1000 ms 后再一次**。蓝牙通话端点可能晚于
+- 「连接顺序」是控制器自己记的首次出现顺序，**不是**平台列表顺序（后者不稳定，
+  会让「自动模式」在插拔设备后跳到非预期设备）。
+- 路由变化会重置 DSP，且重置投递到 **IO 线程**；若在主线程持 `inputLock` 做这件事，
+  会与逐帧收音的 DSP 争抢，表现为卡顿。
+- `devicesChanged()` 刷新两次：立即一次，1000 ms 后再一次——蓝牙通话端点可能晚于
   物理设备通知出现。
-- 切换有 30 秒确认超时。届时仍未生效就清空偏好、标记 `selectionFailed`、
+- 切换带确认超时；超时未生效就清空偏好、标记 `selectionFailed`、调用
   `clearCommunicationDevice()`。
-- 断开与切换失败**靠 `noticeRevision` 单调递增区分通知类型**，`selectionFailed`
-  只是最近一次的标签。用 Long 而不是布尔，是为了让连续两次蓝牙断开都能各弹一次提示。
+- 断开与切换失败靠**单调递增的 `noticeRevision`** 区分（用 Long，连续两次蓝牙
+  断开才能各弹一次通知）；`selectionFailed` 只是最近一次的标签。
 - `close()` 会把 `start()` 时快照的通话设备设回去，忽略迟到回调。
-
-代码里没有 `startBluetoothSco()` / `setSpeakerphoneOn()`，蓝牙只靠
-`setCommunicationDevice` + `MODE_IN_COMMUNICATION`。实际 A2DP/SCO 切换行为只能真机
-验证。
+- 代码里没有 `startBluetoothSco()` / `setSpeakerphoneOn()`，蓝牙只靠
+  `setCommunicationDevice` + `MODE_IN_COMMUNICATION`。真实 A2DP/SCO 行为只能真机验证。
 
 ## 后台与生命周期
 
-### 为什么离开页面不中断
+通话之所以能在离开页面后继续，是因为 `RealtimeVoiceCallController` 是
+`@Singleton`，会话与整套清理链都挂在它自己的应用级协程上；页面销毁、导航跳转、
+前后台切换都不会取消它们。`ViewModel` 只做 UI 派生，**不持有会话**。
 
-`RealtimeVoiceCallController` 是 `@Singleton`，自建
-`SupervisorJob + Dispatchers.Main.immediate` 的 scope。会话、状态收集、清理链全挂在
-应用级协程上，所以页面销毁、导航跳转、前后台切换都不会取消录音/生成/播放。
-
-反过来，`RealtimeVoiceViewModel` 只在 `viewModelScope` 里做 UI 派生，**不持有
-session**。
-
-### 前台服务
+前台服务：
 
 - 类型 `microphone`（Android 14 起后台持续用麦克风必须如此）。
-- `START_NOT_STICKY`：进程死亡后不恢复。没有跨进程可恢复的音频会话，空转的服务
-  反而会白占麦克风。
-- 通知渠道 `realtime_voice_call_v2`（`IMPORTANCE_DEFAULT`）。渠道重要性创建后不可
-  变，所以从旧的 `realtime_voice_call` 升级必须换 ID，并在创建时删除旧渠道。
-- 通知快照只折叠成 `VoiceCallNotificationContent`（阶段、静音、结束中、标题、
-  是否后台）。麦克风电平、流式字幕**不触发**通知刷新。
-- 唤醒锁 `PARTIAL_WAKE_LOCK`，10 分钟过期，每 5 分钟续期。续期失败**没有**特殊处理：
-  不会结束通话，但息屏后可能被系统冻结。这是当前已知的薄弱点。
+- `START_NOT_STICKY`：没有跨进程可恢复的音频会话，重启的空转服务只会白占麦克风。
+- 通知渠道 ID 创建后不可变——要提高重要性必须换**新 ID**，并在创建时删掉旧渠道。
+- 提升前台有两个顺序约束：(1) 必须在**决定退出之前**完成，否则
+  `startForegroundService` 超时；(2) **每次 `onStartCommand`** 都要尝试，而不只是
+  `onCreate`，这样才能从首次失败或系统降级中恢复。
+- 唤醒锁续期失败没有特殊处理：通话继续，但息屏后进程可能被冻结——已知的薄弱点。
 
-两个必须遵守的顺序约束：
-
-1. **先提升前台再判断退出**。否则 `startForegroundService` 超时会抛
-   `ForegroundServiceDidNotStartInTimeException`。
-2. **每次 `onStartCommand` 都尝试提升前台**，不只在 `onCreate`。回到前台时
-   `ensureForeground()` 对已运行的服务只会走到 `onStartCommand`；提升不可重入就
-   无法从首次失败或系统降级中恢复。
-
-### 结束通话
-
-只有两个入口，都收敛到 `RealtimeVoiceCallController.end()`：
-
-- 页内的「结束通话」（需先回到语音页：文字聊天的语音按钮或点通知）；
-- 状态栏通知的「结束通话」。
-
-`end()` 是幂等的，且 `ending` 状态一直保持到 `close()` 返回——前台服务与唤醒锁
-必须覆盖整个资源释放过程。清理协程放在 `NonCancellable` 里：退出页面或新会话启动
-都不能截断旧麦克风所有权的释放。
-
-会话层 `close()` 的释放顺序（顺序本身是契约）：
-
-```text
-停播(player.stop → generation++)
-  → 停止并 join 录音(recorder.releaseAndJoin)
-  → 取消识别 / join 回答任务
-  → 持 inputLock 释放 DSP
-  → session.close()（失败降级为 Persistence，但不阻止后续释放）
-  → 恢复音频焦点与路由、复原 audio.mode
-  → phase = Closed，取消 scope
-```
-
-录音必须先 `cancel()` + `stop()` 让阻塞的 `read()` 返回，再在 IO 线程仍停在 `read`
-时 `release()`——那是设备相关的崩溃路径。
-
-音频焦点**不注册丢失监听**：后台被其他应用短暂抢占就关会话会造成意外中断，所以
-焦点变化只当建议性提示。
+结束通话：所有挂断路径都收敛到控制器的 `end()`，导航要等 `ending` 清除后再换绑。
+`end()` 幂等；`ending` 一直保持到 `close()` 返回，清理又放在 `NonCancellable` 里，
+所以任何操作都不能截断旧麦克风所有权的释放。`close()` 的**释放顺序本身就是契约**
+（详见代码）：停播 → 停止并 join 录音 → 取消识别并 join 回答任务 → 释放 DSP →
+`session.close()` → 恢复音频焦点、路由与 mode → `Closed`、取消 scope。录音必须先
+`cancel()` + `stop()` 让阻塞的 `read()` 返回，再在 IO 线程仍停在 `read` 时
+`release()`——那是设备相关的崩溃路径。音频焦点**不注册丢失监听**：别的应用短暂
+抢焦点就挂断会造成意外中断，所以焦点变化只当建议性提示。
 
 ## 可靠性
 
-### 超时
+超时分布在 DashScope/MiniMax 各握手、路由确认和连接探测上（位置与精确值见代码）：
 
-| 位置 | 超时 | 目的 |
-|---|---|---|
-| DashScope 等 `task-started` | 15 s | 心跳保活下服务端「半死」不会表现为断连 |
-| DashScope 合成 `task-started` | 15 s | 同上 |
-| MiniMax bidi `task_started` | 15 s | 超时关连接 |
-| MiniMax bidi `task_flushed` | 10 s | 超时抛 `IOException` |
-| MiniMax bidi 收尾 | 3 s | 等 `task_finished` |
-| 路由确认 | 30 s | 未生效则回退 |
-| 连接探测 | 15 s | 握手 / `GET /models` |
+| 位置 | 为什么要设限时 |
+|---|---|
+| 识别与合成 `task-started` | 有心跳时服务端「半死」不会表现为断连 |
+| 双向 `task_started` / `task_flushed` / 收尾 | 限制建连、flush 与结束等待 |
+| 路由确认 | 切换迟迟不生效就回退 |
+| 连接探测 | 限制握手 / `GET /models` |
 
-所有限时都刻意放在 `withContext(Dispatchers.IO)` 里：注释写明「限时在真实调度器上
-执行（而非调用方的虚拟时间测试调度器）」，保证无论调用方处于什么上下文，超时都按
-真实时钟兜底。
+**每个超时都必须跑在真实调度器上**，不能用调用方的虚拟时间测试调度器——
+它们都包在 `withContext(Dispatchers.IO)` 里，确保按真实时钟兜底。
 
-### 不重试是刻意的
+不重试是刻意的：识别按**音频时长**计费，合成按**字符**计费，重放就是重复计费。
+WS/HTTP 客户端都关掉了连接失败重试；所谓「重连」不过是每轮新建连接。唯一用户可见
+的重试是 `Failed` 状态下的 `Session.retry()`，它会重建录音流和 DSP，而非简单恢复播放。
 
-识别和合成**一律不重试**，理由写在代码注释里且值得保留：
+背压（记理由——通道类型见代码）：入帧用无界队列，因为丢弃会静默丢音频帧，比积压
+更难排查；上行音频在超过阈值后加延迟，避免堆积；段间交付与级联 `emit`/`await` 串行化，
+`emit` 返回才算消费方接收，防止合成抢跑或攒下一堆付费请求。
 
-- 识别按**音频时长**计费，重放会产生重复费用；
-- 合成按**字符**计费，重放同一段文本同样重复计费。
-
-所以 WS 客户端整体 `retryOnConnectionFailure(false)`，HTTP 客户端也逐个关掉。唯一的
-「自动重连」其实是每轮新建连接。
-
-用户可见的重试只有 `RealtimeVoiceSession.retry()`，且**仅 `Failed` 状态可用**。它会
-重建录音流、重开 DSP，而不是简单恢复播放。
-
-### 背压
-
-| 层 | 机制 | 理由 |
-|---|---|---|
-| WS 收帧 | `Channel(UNLIMITED)` | 有界+丢弃会静默丢音频帧，比积压更难排查 |
-| WS 发音频 | 队列 > 1 MB 时 `delay(10)` | 防止上行堆积 |
-| 简单模式音频段 | `Channel(RENDEZVOUS)` | 开始收集才授权生产，取消播放能唤醒被阻塞的连接 |
-| 会话层段间 | `Channel(1)` | 段与段之间真正的串行播放 |
-| 播放写入 | 非阻塞 + `delay(5)` | 取消后不再灌入旧音频 |
-| Cascaded 交付 | `Channel(RENDEZVOUS)` + `await` | `emit` 返回才表示消费方接受，避免合成抢跑或攒付费请求 |
-
-### 取消必须原样传播
-
-`CancellationException` 一律不映射为业务失败。三处具体做法：
-
-- `core:common/cancellationAwareRunCatching` 先 catch 取消再 catch 通用异常。
-- `CascadedVoiceModel` 用继承 `CancellationException` 的 `TurnInterrupted` /
-  `ConnectionClosed` 表达打断，并在 `catch` 里先 `ensureActive()` 再发
-  `interrupted` 事件——避免把「真取消」误判成「服务端打断」。
-- 所有 `close()` 收尾都在 `NonCancellable` 里，取消不能截断资源释放。
+取消必须原样传播：绝不要把 `CancellationException` 映射成业务失败。三处做法——
+先 catch 取消再 catch 通用异常（`cancellationAwareRunCatching`）；用
+`CancellationException` 子类表达打断，并在发打断事件前先 `ensureActive()`（避免把真取消
+误判为服务端打断）；所有 `close()` 收尾都放在 `NonCancellable` 里。

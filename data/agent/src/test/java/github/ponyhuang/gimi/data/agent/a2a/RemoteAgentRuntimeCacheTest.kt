@@ -38,7 +38,7 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 
 /**
  * 远程 A2A agent 运行时缓存的装配/降级/缓存边界：经真实 [AndroidA2AHttpClient] 对

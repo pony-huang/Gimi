@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AssistantConversationPartition
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
@@ -35,6 +36,7 @@ internal class ChatRunLifecycleCoordinator(
     private val uiState: StateFlow<ChatUiState>,
     private val scope: CoroutineScope,
     private val agentRuntimeGate: AgentRuntimeGate,
+    @AssistantConversationPartition
     private val repository: ConversationRepository,
     private val toolApproval: ToolApprovalRepository,
     private val appNotificationManager: AppNotificationManager,

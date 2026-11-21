@@ -10,7 +10,10 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioDeviceKind
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioRouting
 import java.util.concurrent.Executor
 
-/** 会话拥有的 Android 通话路由；所有访问和回调均在主线程，关闭后停止设备监听。 */
+/**
+ * 会话拥有的 Android 通话路由；通话设备固定自动路由，不提供手动选择。
+ * 所有访问和回调均在主线程，关闭后停止设备监听。
+ */
 internal class VoiceAudioRoutingController(
     private val audio: AudioManager,
     private val onState: (VoiceAudioRouting) -> Unit,
@@ -24,7 +27,7 @@ internal class VoiceAudioRoutingController(
     private val timeout = Runnable {
         if (active && requestedId != audio.communicationDevice?.id) {
             requestedId = null
-            snapshot = snapshot.copy(preferredDeviceId = null, switching = false,
+            snapshot = snapshot.copy(switching = false,
                 noticeRevision = snapshot.noticeRevision + 1, selectionFailed = true)
             audio.clearCommunicationDevice()
             publish()
@@ -50,18 +53,6 @@ internal class VoiceAudioRoutingController(
         refreshDevices()
     }
 
-    fun select(deviceId: Int?) {
-        if (!active) return
-        if (deviceId != null && snapshot.devices.none { it.id == deviceId }) {
-            snapshot = snapshot.copy(noticeRevision = snapshot.noticeRevision + 1, selectionFailed = true)
-            publish()
-            return
-        }
-        snapshot = snapshot.copy(preferredDeviceId = deviceId)
-        requestedId = null
-        refreshDevices()
-    }
-
     private fun devicesChanged() {
         if (!active) return
         refreshDevices()
@@ -76,16 +67,15 @@ internal class VoiceAudioRoutingController(
         val ids = available.map { it.id }.toSet()
         val disconnected = snapshot.devices.any { it.id !in ids && it.kind in setOf(
             VoiceAudioDeviceKind.Bluetooth, VoiceAudioDeviceKind.Wired, VoiceAudioDeviceKind.Usb,
-        ) && (it.id == snapshot.currentDeviceId || it.id == requestedId || it.id == snapshot.preferredDeviceId) }
+        ) && (it.id == snapshot.currentDeviceId || it.id == requestedId) }
         connectionOrder.retainAll(ids)
         available.forEach { if (it.id !in connectionOrder) connectionOrder.add(it.id) }
         snapshot = snapshot.copy(
             devices = available.map { VoiceAudioDevice(it.id, kind(it.type), it.productName.toString()) },
-            preferredDeviceId = snapshot.preferredDeviceId?.takeIf { it in ids },
             noticeRevision = snapshot.noticeRevision + if (disconnected) 1 else 0,
             selectionFailed = if (disconnected) false else snapshot.selectionFailed,
         )
-        val target = selectVoiceAudioDevice(snapshot.devices, connectionOrder, snapshot.preferredDeviceId)
+        val target = selectVoiceAudioDevice(snapshot.devices, connectionOrder)
         if (target != null && requestedId != target.id) {
             handler.removeCallbacks(timeout)
             requestedId = target.id
@@ -95,7 +85,7 @@ internal class VoiceAudioRoutingController(
                 val accepted = try { audio.setCommunicationDevice(device) } catch (_: IllegalArgumentException) { false }
                 if (accepted) handler.postDelayed(timeout, 30_000) else {
                     requestedId = null
-                    snapshot = snapshot.copy(preferredDeviceId = null,
+                    snapshot = snapshot.copy(
                         noticeRevision = snapshot.noticeRevision + 1, selectionFailed = true)
                 }
             }

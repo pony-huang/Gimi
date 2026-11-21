@@ -32,11 +32,15 @@ private fun SandboxSettingsRoute(onBack: () -> Unit, viewModel: SandboxSettingsV
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            val message = when (effect) { SandboxSettingsEffect.SAVED -> R.string.sandbox_saved; SandboxSettingsEffect.SAVE_FAILED -> R.string.sandbox_save_failed }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
+    val noticeMessage = when (state.notice) {
+        SandboxSettingsNotice.SAVED -> stringResource(R.string.sandbox_saved)
+        SandboxSettingsNotice.SAVE_FAILED -> stringResource(R.string.sandbox_save_failed)
+        null -> null
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        val message = noticeMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.onAction(SandboxSettingsAction.ConsumeNotice)
     }
     PreferenceScaffold(
         style = PreferenceStyle.Compact,

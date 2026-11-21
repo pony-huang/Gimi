@@ -1,61 +1,43 @@
 简体中文 · [English](../../en/ui/brand-styling.md)
 
-# Gimi 品牌造型：单色灰与蓝色主题
+# Gimi 品牌造型：M3 黑白墨灰（Monochrome Ink-Gray）主题
 
-制定日期：2026-11-10。读者：设计 Gimi UI、预览、插画、示意图及其他品牌视觉产物的代理与开发者。
+读者：设计 Gimi UI、预览、插画、示意图及其他品牌视觉产物的代理与开发者。
 
-> 本版是目标品牌与主题规范。核心色板在 `core/designsystem` 生效：`Color.kt` 提供品牌与中性常量，`Theme.kt` 的两套 `ColorScheme` 按核心色板表生效，`UserBubbleTheme` 的用户气泡色按本文校准；当前可执行行为以 `GimiTheme` 的生效赋值为准。新增界面以本文表格为准，出现差异时显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。界面改动按[预览优先的 UI 设计评审](preview-first-design-review.md)维护浅色、深色和交互状态预览。
+> 本版是目标品牌与主题规范。核心色板在 `core/designsystem` 生效：`Color.kt` 提供黑白墨灰常量，`Shape.kt` 提供 `GimiShapes`，`Type.kt` 提供完整的 M3 `Typography`，`Theme.kt` 的两套 `ColorScheme` 按核心色板表生效，`UserBubbleTheme` 的用户气泡色按本文校准；当前可执行行为以 `GimiTheme` 的生效赋值为准。新增界面以本文表格为准，出现差异时显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。界面改动按[预览优先的 UI 设计评审](preview-first-design-review.md)维护浅色、深色和交互状态预览。
 
 ## 适用范围与视觉方向
 
-采用“黑白画布、无彩色层级、品牌蓝单一强调”的视觉语言。对话内容始终是视觉中心；蓝色只用于主要操作、当前选中、键盘焦点、链接和有意义的品牌强调。通过明度、字重、间距、形状和图标建立层级，不依赖增加更多颜色。
+采用 Material Design 3 **黑白墨灰（Monochrome Ink-Gray）** 视觉语言：以宣纸白与徽墨黑为底，构建 5 级墨灰 `surfaceContainer` 容器色阶，主操作色在浅色下使用浓墨黑（`#18181B`）、深色下使用宣纸白（`#F4F4F6`），与 Gimi 昼夜反转的扁平黑白品牌图标形成完全统一的视觉语言。对话内容始终是视觉中心；通过明度、M3 容器色阶、字重、间距、圆角和图标建立层级，不依赖额外的高饱和彩色装饰。
 
 本方案仅定义 Gimi 自身的产品视觉语言，不构成与任何第三方品牌的联名、隶属或官方授权声明。保留 Gimi 名称、产品标志和既有组件几何，不以第三方服务名称或标识替代 Gimi 的产品身份。
 
 设计原则：
 
-1. **黑白为底**：浅色主背景为纯白，深色主背景为纯黑；卡片、面板和消息气泡只用中性灰分层，不使用蓝灰、紫灰或暖灰作为页面底色。
-2. **单一强调**：所有装饰性点缀和交互强调归入品牌蓝色阶。同一视图只保留一个主要蓝色视觉焦点，不使用多色渐变、彩色光晕或轮换强调色。
-3. **内容优先**：不大面积铺设品牌蓝，不用蓝色气泡承载长篇正文，不以蓝色区分普通正文层级。
-4. **语义独立**：错误、成功、警告及第三方提供商标识不被品牌蓝替换；状态同时通过文字、图标或形状表达。
-5. **可读性优先**：品牌标准蓝与普通文字交互色分开定义。不得为了色值完全统一而降低对比度。
+1. **宣白与徽墨为底**：浅色主背景采用防眩光宣纸白（`#FAFAFA`），深色主背景采用防 OLED 拖影的徽墨黑（`#0D0D0F`）；卡片、面板和消息气泡按 M3 5 级墨灰容器色阶自然分层。
+2. **黑白墨灰主强调**：主按钮、激活开关、模式滑块与选中对勾在浅色下用浓墨黑（`#18181B`）、深色下用宣纸白（`#F4F4F6`）；选中项容器使用淡墨灰（`#E4E4E7` 浅色）与焦墨灰（`#2C2C31` 深色）。
+3. **内容优先**：长篇助手回复直接铺在开放阅读画布上；用户消息气泡使用 `surfaceContainerHighest`（浅色 `#E0E0E5` / 深色 `#2E2E33`）。
+4. **语义独立**：保留标准 M3 错误语义色（浅色 `#BA1A1A` / 深色 `#FFB4AB`）及第三方提供商原始品牌色；状态同时通过文字、图标或形状表达。
+5. **可读性优先**：交互描边（`outline`：浅色 `#71717A` / 深色 `#8A8A93`）对比度均大于 4.8:1，满足 M3 3:1 非文字对比度要求；装饰性分隔线使用 `outlineVariant`（浅色 `#D4D4D8` / 深色 `#2E2E33`）。
 
 ## 依据与权威来源
 
 ### 视觉参数
 
 - Gimi 自有图标采用昼夜反转的扁平单色方案：白天／浅色模式使用 `#050505` 底和 `#FFFFFF` 标志；夜间／深色模式使用 `#FFFFFF` 底和 `#3C3C43` 标志。保持现有图形、比例、透明度与净空，不添加渐变或阴影。
-- README 使用自适应透明底标志素材，通过 `prefers-color-scheme` 的 `<picture>` 元素选择：白天／浅色模式用 `doc/icon-light.png`（透明底上的 `#050505` 标志），夜间／深色模式用 `doc/icon-dark.png`（透明底上的 `#F5F5F5` 标志）。`doc/icon.webp` 保留为原始白天版本源图；需要单一夜间素材时，按上述夜间配对生成或选用对应资源。
-- 品牌标准蓝使用项目现有 `BrandBlue = #4D6BFE`，与单色图标色分开定义。
-- `#4D6BFE` 与白色的对比度为 `4.33:1`，与黑色为 `4.85:1`。因此它适合焦点环、图标和非文字强调，但不用于白色背景上的普通字号文字，也不以白字承载普通字号填充按钮。
+- README 使用自适应透明底标志素材，通过 `prefers-color-scheme` 的 `<picture>` 元素选择：白天／浅色模式用 `doc/icon-light.png`，夜间／深色模式用 `doc/icon-dark.png`，`doc/icon.webp` 保留为原始白天版本源图。
+- `BrandBlue = #4D6BFE` 仅保留给实时语音粒子球（`VoiceOrb`）播报态的微冷调点缀，不作为常规 UI 控件主色。
 
 ### 源码位置
 
 以下路径均相对仓库根目录：
 
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Color.kt`：调色板常量。
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Shape.kt`：`GimiShapes` M3 圆角令牌定义。
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Theme.kt`：`GimiLightColorScheme`、`GimiDarkColorScheme` 与 `GimiTheme` 的生效角色映射。
-- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Type.kt`：字体配置。
-- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/UserBubbleTheme.kt`：用户消息专用中性色角色。
-- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/components/` 及同级 `ui/preference/`：已有组件几何与间距。
-
-新设计以本文目标表为准；排查线上行为时读取源码。出现差异时，应显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。当前主题保持固定浅色／深色方案，不启用壁纸动态色。
-
-## 色彩架构与命名
-
-颜色分三层，禁止跨层滥用：
-
-1. **品牌常量**：`BrandBlue`，只表示标准品牌蓝 `#4D6BFE`。
-2. **语义主题角色**：`primary`、`onPrimary`、`primaryContainer`、`background`、`surface`、`onSurface` 等，由 `MaterialTheme.colorScheme` 提供；组件只消费这些角色。
-3. **局部专用角色**：如 `LocalUserBubbleColors`，只解决特定内容角色，不成为新的全局强调色。
-
-命名规则：
-
-- 新增可访问主操作常量使用 `BrandPrimaryLight` / `BrandPrimaryDark`；品牌常量继续命名为 `BrandBlue`，不得再创建 `GimiBlue`、`AccentBlue`、`BrandPrimary` 等同义别名。
-- 生效中性色常量使用 `NeutralLight*` / `NeutralDark*` 命名，不使用 `ChatGpt*` 等历史前缀；仅改变命名归属，不引入另一套色值。
-- `GimiTheme` 是产品主题 API，保持 Gimi 命名；`GimiLightColorScheme` / `GimiDarkColorScheme` 描述视觉方案，可以保留。
-- `secondary` 使用中性色；`tertiary` 不作为第二种装饰强调色。为兼容 Material 组件，可映射到 `primary` 色阶，但不得据此创造独立彩色体系。
-- 不得恢复 `Blue*`、`Yellow*`、`WarmAmber*` 等旧常量，也不凭名称重建旧配色。
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Type.kt`：完整的 M3 排版字阶配置。
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/UserBubbleTheme.kt`：用户消息专用墨灰角色。
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/components/` 及同级 `ui/preference/`：统一的 M3 开关、Outlined 输入框、胶囊搜索框、抽屉与分组卡片。
 
 ## 核心色板与主题角色
 
@@ -63,105 +45,54 @@
 
 | 语义角色／常量 | 浅色 | 深色 | 使用规则 |
 |---|---|---|---|
-| 品牌标准蓝 `BrandBlue` | `#4D6BFE` | `#4D6BFE` | 焦点环、品牌图形、非文字重点；不是普通文字主操作色 |
-| 主操作 `primary` | `#3D5BDB` | `#AEBBFF` | 填充按钮、链接、文字按钮、选中指示等可访问交互色 |
-| 主操作上的内容 `onPrimary` | `#FFFFFF` | `#10205C` | 必须与 `primary` 成对使用 |
-| 主色容器 `primaryContainer` | `#E3E8FF` | `#27366D` | 选中项、轻量强调、标签底色，不代替主按钮 |
-| 主色容器上的内容 | `#10205C` | `#E3E8FF` | 与同主题容器成对使用 |
-| 主背景 `background` | `#FFFFFF` | `#000000` | 页面主画布 |
-| 表面 `surface` | `#F7F7F7` | `#141414` | 内容表面、默认面板 |
-| 表面变体 `surfaceVariant` | `#EDEDED` | `#242424` | 分组、次要容器、非选中控件底色 |
-| 主要文字 `onSurface` / `onBackground` | `#1F1F1F` | `#F5F5F5` | 标题、正文、主要图标 |
-| 次要文字 `onSurfaceVariant` | `#666666` | `#A3A3A3` | 辅助说明、时间、次级图标；不用于禁用态 |
-| 普通描边 `outline` | `#D4D4D4` | `#3D3D3D` | 分隔线、装饰性边界 |
-| 强描边 `outlineStrong` | `#737373` | `#737373` | 需要达到 3:1 非文字对比度的输入框和控件边界 |
-| 错误 `error` | `#BA1B1B` | `#FFB4A9` | 仅表达错误语义，并配错误图标或文字 |
-| 设置页画布 | `#F5F5F5` | `#000000` | 设置页专用画布 |
-| 设置分组卡片 | `#FFFFFF` | `#141414` | 与设置页画布形成一级明度差 |
-| 用户消息容器 | `#E9E9E9` | `#262626` | 保持中性，不改为品牌蓝 |
-| 用户消息文字 | `#1F1F1F` | `#F5F5F5` | 通过 `LocalUserBubbleColors` 配对 |
+| 主操作 `primary`（`BrandPrimaryLight` / `BrandPrimaryDark`） | `#18181B` | `#F4F4F6` | 填充按钮、激活开关轨道、模式滑块、选中对勾、聚焦描边 |
+| 主操作上的内容 `onPrimary` | `#FFFFFF` | `#111113` | 必须与 `primary` 成对使用 |
+| 主色容器 `primaryContainer` | `#E4E4E7` | `#2C2C31` | 抽屉/弹窗选中行、Segmented 激活段底色、主色轻量容器 |
+| 主色容器上的内容 `onPrimaryContainer` | `#111113` | `#F4F4F6` | 与同主题 `primaryContainer` 成对使用 |
+| 次级色 `secondary`（`InkSecondary*`） | `#52525B` | `#A1A1AA` | 次级操作与筛选控件 |
+| 次级色上的内容 `onSecondary` | `#FFFFFF` | `#18181B` | 与 `secondary` 成对使用 |
+| 次级容器 `secondaryContainer` | `#ECECEF` | `#252529` | `FilledTonalButton`、设置列表图标圆底、信息横幅、模型胶囊 |
+| 次级容器上的内容 `onSecondaryContainer` | `#18181B` | `#E4E4E7` | 与 `secondaryContainer` 成对使用 |
+| 第三色 `tertiary`（`InkTertiary*`） | `#3F4850` | `#B8C2CC` | 石墨青灰微冷调，用于辅助徽章与标签 |
+| 第三色容器 `tertiaryContainer` | `#E2E7EC` | `#303840` | 辅助徽章容器 |
+| 第三色容器上的内容 `onTertiaryContainer` | `#141C22` | `#E2E7EC` | 与 `tertiaryContainer` 成对使用 |
+| 主背景与表面 `background` / `surface` | `#FAFAFA` | `#0D0D0F` | 默认页面主画布 |
+| 表面变体 `surfaceVariant` | `#E4E4E7` | `#27272A` | 次级容器与滑轨底色 |
+| 主要文字 `onSurface` / `onBackground` | `#111113` | `#F4F4F6` | 标题、正文、主要图标 |
+| 次要文字 `onSurfaceVariant` | `#52525B` | `#A1A1AA` | 辅助说明、时间、次级图标 |
+| 交互描边 `outline` | `#71717A` | `#8A8A93` | 满足 3:1 非文字对比度，用于输入框、描边按钮、分段按钮、未选中开关边框 |
+| 装饰描边 `outlineVariant` | `#D4D4D8` | `#2E2E33` | 列表内缩分隔线与卡片细描边 |
+| 错误 `error` / `onError` | `#BA1A1A` / `#FFFFFF` | `#FFB4AB` / `#690005` | 仅表达错误语义，并配错误图标或文字 |
+| 错误容器 `errorContainer` / `onErrorContainer` | `#FFDAD6` / `#410002` | `#93000A` / `#FFDAD6` | 错误横幅与错误状态容器 |
+| 设置页画布（`preferenceCanvasColor()`） | `#F4F4F5` | `#0D0D0F` | 设置页与抽屉画布（浅色 `surfaceContainerLow` / 深色 `surface`） |
+| 设置分组卡片（`preferenceGroupCardColor()`） | `#FFFFFF` | `#161618` | 比设置画布高一档明度（浅色 `surfaceContainerLowest` / 深色 `surfaceContainerLow`） |
+| 用户消息容器 | `#E0E0E5` | `#2E2E33` | 对齐 `surfaceContainerHighest`，通过 `LocalUserBubbleColors` 注入 |
+| 用户消息文字 | `#111113` | `#F4F4F6` | 通过 `LocalUserBubbleColors` 配对 |
 
-中性表面色阶固定如下，避免 Material 默认紫色渗入：
+### M3 5 级中性表面色阶
 
 | 角色 | 浅色 | 深色 |
 |---|---|---|
-| `surfaceDim` | `#E4E4E4` | `#0A0A0A` |
-| `surfaceBright` | `#FFFFFF` | `#383838` |
-| `surfaceContainerLowest` | `#FFFFFF` | `#000000` |
-| `surfaceContainerLow` | `#FAFAFA` | `#0F0F0F` |
-| `surfaceContainer` | `#F5F5F5` | `#141414` |
-| `surfaceContainerHigh` | `#F0F0F0` | `#1A1A1A` |
-| `surfaceContainerHighest` | `#E9E9E9` | `#242424` |
+| `surfaceDim` | `#DADADD` | `#0D0D0F` |
+| `surfaceBright` | `#FFFFFF` | `#34343A` |
+| `surfaceContainerLowest` | `#FFFFFF` | `#08080A` |
+| `surfaceContainerLow` | `#F4F4F5` | `#161618` |
+| `surfaceContainer` | `#EFEFF1` | `#1C1C1F` |
+| `surfaceContainerHigh` | `#E8E8EC` | `#242428` |
+| `surfaceContainerHighest` | `#E0E0E5` | `#2E2E33` |
 
-`inverseSurface` / `inverseOnSurface` 使用相反主题的中性表面／文字组合；`inversePrimary` 使用相反主题的 `primary`。前景、容器和状态层必须取自同一主题，禁止跨浅色、深色随意拼接。
+## 字体、形状与组件规范
 
-## 主要交互状态
-
-状态层按 sRGB 在已确定底色上合成，不对整个控件再套一层全局透明度。除下列状态层外，不另造 hover 蓝、pressed 蓝等同义常量。
-
-| 状态 | 色彩规则 | 非颜色提示与行为 |
-|---|---|---|
-| 默认 | 主按钮使用 `primary/onPrimary`；文字按钮、链接和主要图标使用 `primary`；次按钮使用中性表面 | 主操作一个视图原则上只保留一个 |
-| 悬停 | 填充按钮叠加 8% `onPrimary`；文字／图标按钮叠加 8% `primary`；中性控件叠加 8% `onSurface` | 仅用于支持悬停的输入环境，不改变布局 |
-| 按下 | 对应底色上叠加 10% 状态层，颜色规则同悬停；不提高到 12%，以保持普通字号对比度 | 保留按压位置与既有涟漪语义，不触发布局跳动 |
-| 键盘焦点 | 可使用 10% 状态层，并绘制 2 dp `BrandBlue` 焦点环；焦点环与控件间留 2 dp 透明间隔 | 焦点必须清晰可见，不能只靠微弱底色变化 |
-| 选中／当前项 | `primaryContainer` + `onPrimaryContainer`；指示条、单选框和开关使用 `primary` | 同时提供勾选图标、选中指示或形状变化，不只改变文字蓝色 |
-| 禁用 | 浅色容器 `#E9E9E9`、内容 `#8A8A8A`；深色容器 `#262626`、内容 `#737373` | 移除蓝色、阴影和悬停反馈；保留禁用语义，不用全局 alpha 影响子内容 |
-| 加载／提交中 | 保持原主操作色，进度指示使用 `onPrimary`；文字按钮保持 `primary` | 保留标签并显示进度，防止重复提交；不要仅改成禁用灰 |
-| 只读 | 使用中性表面和主要文字，不使用禁用色或蓝色边框 | 与可编辑、禁用状态在语义和外观上区分 |
-| 错误 | 使用 `error` 及对应容器角色，不用品牌蓝替代 | 同时显示错误图标和可执行的修正说明 |
-| 成功／警告 | 使用各自语义色，不纳入品牌蓝色阶 | 不以颜色作为唯一状态线索；未定义的新语义色需单独设计评审 |
-
-补充规则：
-
-- 链接默认带下划线或其他非颜色提示； visited 状态不另造紫色品牌分支。
-- 输入框默认边界使用 `outline`，悬停或需要强化时使用 `outlineStrong`，聚焦时改为 2 dp `BrandBlue`，错误时使用 `error`。
-- 选中与焦点可以同时出现；焦点环不得被选中容器遮盖。
-- 蓝色涟漪不用于中性列表的每一次点击；中性列表使用 `onSurface` 状态层，蓝色保留给主要操作。
-
-### 状态层对比度基准
-
-以下值用于验证状态规则，不要求在组件中另建字面量。合成结果四舍五入到最接近的 RGB 通道值。
-
-| 场景 | 悬停结果／文字对比度 | 按下或焦点结果／文字对比度 |
-|---|---|---|
-| 浅色填充按钮 | `#4D68DE`／`4.83:1` | `#506BDF`／`4.66:1` |
-| 深色填充按钮 | `#A1AFF2`／`7.18:1` | `#9EACEF`／`6.94:1` |
-| 浅色文字按钮，位于 `#F7F7F7` | `#E8EBF5`／`4.74:1` | `#E4E7F4`／`4.58:1` |
-| 深色文字按钮，位于 `#141414` | `#202127`／`8.68:1` | `#23252C`／`8.27:1` |
-
-## 可读性与视觉层级
-
-- 普通文字对比度至少 `4.5:1`；大号文字至少 `3:1`；图标、输入边界和焦点指示等非文字信息至少 `3:1`。禁用组件可按无障碍标准豁免，但仍需可辨认。
-- 关键配对基准：浅色 `primary/onPrimary = 5.65:1`；深色 `primary/onPrimary = 8.21:1`；浅色主色容器组合 `12.47:1`；深色主色容器组合 `9.40:1`。
-- 浅色主要／次要文字在 `#F7F7F7` 上分别为 `15.39:1` / `5.36:1`；深色主要／次要文字在 `#141414` 上分别为 `16.90:1` / `7.30:1`。
-- `BrandBlue` 焦点环在浅色 `#F7F7F7` 和深色 `#141414` 上分别为 `4.04:1` / `4.25:1`，满足非文字对比度要求。
-- 不使用纯蓝正文、蓝色大段高亮或低透明蓝灰文字。正文层级依次使用主要文字、次要文字和字重，不再增加第三级低对比灰。
-- 深色模式通过中性灰明度差分层，不使用蓝色投影、彩色环境光或大面积发光。纯黑仅作背景，正文使用 `#F5F5F5` 而非纯白，降低眩光。
-- 对错误、选中、成功等状态提供图标、文本、位置或形状线索；对比度结论不能替代真实字体大小和组件状态检查。
-
-## 字体、形状与视觉语言
-
-- 使用 `MaterialTheme.typography` 和现有系统／默认字体族，保留中文与英文回退覆盖。当前 `bodyLarge` 为常规字重、16 sp、24 sp 行高和 0.5 sp 字间距；其他角色保持 Material 默认值，除非另有显式配置。
-- 通过标题、正文、标签的既有角色建立层级，不为本视觉方向另引入字体依赖，不把 Android sp 直接换算为外部文档磅值。保留 Markdown 排版和用户文字大小设置。
-- 保留组件圆角、列表几何、安全区域和底部面板规范。现有设置分组紧凑样式 16 dp、其他样式 24 dp、共享底部面板 28 dp 顶部圆角均为组件级规则，不扩展成全局统一圆角。
-- 品牌识别来自“克制的中性界面 + 单一蓝色动作焦点”，而不是增加装饰。焦点环、选中指示和关键操作是主要蓝色语言；不使用蓝色渐变卡片、彩色玻璃拟态或无意义光效。
-- 插画和示意图从中性形状开始，只用蓝色突出主要关系或动作。类别使用文字标签、线型或形状区分，不另造多彩品牌调色板。
+- **排版（Typography）**：`Type.kt` 统一定义 `headlineSmall`（24sp SemiBold）、`titleLarge`（20sp SemiBold）、`titleMedium`（16sp Medium）、`titleSmall`（14sp SemiBold）、`bodyLarge`（16sp Normal）、`bodyMedium`（14sp Normal）、`bodySmall`（12sp Normal）、`labelLarge`（14sp SemiBold）、`labelMedium`（12sp Medium）与 `labelSmall`（11sp Medium）。
+- **圆角（Shapes）**：`Shape.kt` 定义 `GimiShapes`（`extraSmall = 4.dp`、`small = 8.dp`、`medium = 12.dp`、`large = 16.dp`、`extraLarge = 28.dp`）。
+  - `PreferenceGroupCard`、`GimiPickerItemRow`、`PluginRowCard` 与用户消息气泡统一使用 `MaterialTheme.shapes.large`（16.dp）。
+  - `PreferenceTextField` 统一采用 M3 `OutlinedTextField` 与 `MaterialTheme.shapes.medium`（12.dp），未聚焦描边取 `outline`，聚焦描边取 `primary`。
+  - `GimiSearchField` 采用 `CircleShape` 与 `surfaceContainerHigh` 填充底色。
+  - `GimiSheetBase` 与 `ChatComposer` 采用 `28.dp`（`extraLarge`）圆角。
+- **开关（`GimiSwitch`）**：在 48dp 触控盒内绘制 44×26dp M3 轨道；未选中态为 `surfaceContainerHighest` 底 + `1.5.dp outline` 描边 + `14.dp outline` 拇指；选中态为 `primary` 底 + `18.dp onPrimary` 拇指（带尺寸缩放过渡）。
+- **主题判定**：组件内禁止通过 `MaterialTheme.colorScheme.background.luminance() < 0.5f` 手工分支；需要深浅主题判断时统一读取 `LocalGimiDarkTheme.current`。
 
 ## 标志与第三方品牌边界
 
-- 保留 Gimi 名称和现有标志图形。README 的 Gimi 品牌图片使用自适应透明底标志素材 `doc/icon-light.png` / `doc/icon-dark.png`，`doc/icon.webp` 保留为原始白天版本源图；应用启动图标使用 `app/src/main/res/drawable-nodpi/ic_launcher_foreground_art.png` 及各密度启动图标资产。
-- 启动图标按系统昼夜配置切换：默认资源为白天黑底白标；`drawable-night`、`drawable-night-nodpi` 与 `mipmap-night-*` 提供夜间白底深灰标。自适应图标 XML 不变，通过资源限定符解析对应版本。
-- 系统单色图标继续使用透明 alpha 遮罩，由系统负责着色；昼夜切换后资源随配置更新，但启动器缓存可能导致显示延迟，验证时可重启应用或刷新启动器。
-- 保持原始图形、宽高比和透明度，不拉伸、重绘、描边、添加渐变或阴影。标志四周至少保留标志高度 50% 的净空；数字界面建议最小显示宽度 24 dp。
-- 第三方服务标识只在介绍、配置或指向对应服务时使用，不放在 Gimi 应用图标、启动页品牌主标或会暗示官方合作的位置。
-- 蓝色用于标识周围的界面强调，而不是修改第三方标识本身。提供商标志保留原始图案、比例和品牌颜色。
-- 外部物料包含第三方服务名称或标识时，文案必须明确其服务或模型提供方身份，不使用可能造成隶属、联名或授权误解的表述。
-
-## 验收
-
-- 新增或修改 UI 时维护生产 `@Preview`，至少覆盖浅色／深色，主按钮默认／悬停／按下／焦点／禁用／加载，选中项，输入框焦点／错误，链接和用户气泡。
-- 真机检查真实中文字体、用户字号、长文本、深色安全区域和焦点可见性；对状态层和自定义控件复测对比度，不以默认 Material 状态自动合格为假设。
-- 外部文档、演示和示意图使用相同角色名称和色值。
-
-交付检查：主背景与表面层级清晰；蓝色只承担强调；品牌蓝与普通文字主操作色没有混用；状态具有非颜色提示；Gimi 与第三方品牌边界明确；中英文规范数值一致。纯文档修改只需差异、链接和数值检查，不要求为文字修改构建应用；实际 UI 改动仍需遵守预览与适度验证流程。
+- 保留 Gimi 名称和现有标志图形（`doc/icon-light.png` / `doc/icon-dark.png` 及各密度启动图标资产）。
+- 第三方服务标识直接放在透明容器上：黑色单色标识（OpenAI / Anthropic / XiaomiMiMo）在 `res/drawable/` 中提供显式命名的 `*_night` 反白版，由 `LLMModelServiceIcon` 读取 `LocalGimiDarkTheme` 选择；Kimi 用品牌彩色版，彩色标识两种主题共用品牌原色资源。插件商店图标遵循同一代码选择约定。应用内厂商/插件图标禁止使用 `res/drawable-night/` 限定符，深色变体一律由代码按应用主题选择。

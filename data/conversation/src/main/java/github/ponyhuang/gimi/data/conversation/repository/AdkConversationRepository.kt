@@ -11,10 +11,13 @@ import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDao
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataEntity
 import github.ponyhuang.gimi.data.conversation.local.ConversationToolConfigurationCodec
 import github.ponyhuang.gimi.data.conversation.mapper.EventMapper
+import github.ponyhuang.gimi.domain.conversation.model.CONVERSATION_TITLE_STATE_KEY
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +41,7 @@ class AdkConversationRepository(
     private val metadataDao: ConversationMetadataDao,
     private val context: Context,
     private val subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository? = null,
+    private val voiceOverrides: VoiceOverrideRepository? = null,
 ) : ConversationRepository {
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -100,7 +104,7 @@ class AdkConversationRepository(
         }
         if (preview.isNotEmpty() && preview != metadata?.lastMessage) {
             try {
-                metadataDao.setLastMessage(sessionId, preview)
+                metadataDao.setLastMessage(userId, sessionId, preview)
             } catch (t: Throwable) {
                 recover(t, "setLastMessage($sessionId)", Unit)
             }
@@ -162,7 +166,7 @@ class AdkConversationRepository(
     /** Returns the session selected at the previous app shutdown, if one was recorded. */
     override suspend fun lastConversationId(): String? =
         try {
-            metadataDao.getLast()?.sessionId
+            metadataDao.getLast(userId)?.sessionId
         } catch (t: Throwable) {
             recover(t, "lastConversationId()", null)
         }
@@ -170,7 +174,7 @@ class AdkConversationRepository(
     /** Marks an existing session as current and returns its stored model selection payload. */
     override suspend fun activateConversation(sessionId: String, defaultModel: String): String =
         try {
-            val metadata = metadataDao.activate(sessionId, defaultModel)
+            val metadata = metadataDao.activate(userId, sessionId, defaultModel)
             refreshConversation(sessionId)
             metadata.model
         } catch (t: Throwable) {
@@ -181,7 +185,7 @@ class AdkConversationRepository(
     override suspend fun setConversationModel(sessionId: String, model: String) {
         if (sessionId.isBlank()) return
         try {
-            metadataDao.setModel(sessionId, model)
+            metadataDao.setModel(userId, sessionId, model)
             refreshConversation(sessionId)
         } catch (t: Throwable) {
             recover(t, "setConversationModel($sessionId)", Unit)
@@ -193,7 +197,7 @@ class AdkConversationRepository(
     ): ConversationToolConfiguration? {
         if (sessionId.isBlank()) return null
         return try {
-            ConversationToolConfigurationCodec.decode(metadataDao.get(sessionId)?.toolConfigurationJson)
+            ConversationToolConfigurationCodec.decode(metadataDao.get(userId, sessionId)?.toolConfigurationJson)
         } catch (t: Throwable) {
             recover(t, "conversationToolConfiguration($sessionId)", null)
         }
@@ -206,6 +210,7 @@ class AdkConversationRepository(
         if (sessionId.isBlank()) return false
         return try {
             metadataDao.setToolConfiguration(
+                userId,
                 sessionId,
                 ConversationToolConfigurationCodec.encode(configuration),
             )
@@ -219,7 +224,7 @@ class AdkConversationRepository(
     override suspend fun discardConversationMetadata(sessionId: String) {
         if (sessionId.isBlank()) return
         try {
-            metadataDao.delete(sessionId)
+            metadataDao.delete(userId, sessionId)
             _conversationContentRevisions.update { it - sessionId }
         } catch (t: Throwable) {
             recover(t, "discardConversationMetadata($sessionId)", Unit)
@@ -241,7 +246,7 @@ class AdkConversationRepository(
             if (sessionId.isNotBlank()) {
                 try {
                     if (activate) {
-                        val metadata = metadataDao.activate(sessionId, initialModel)
+                        val metadata = metadataDao.activate(userId, sessionId, initialModel)
                         if (initialToolConfiguration != null) {
                             metadataDao.upsert(
                                 metadata.copy(
@@ -255,6 +260,7 @@ class AdkConversationRepository(
                     } else {
                         metadataDao.upsert(
                             ConversationMetadataEntity(
+                                partition = userId,
                                 sessionId = sessionId,
                                 model = initialModel,
                                 isLast = false,
@@ -277,13 +283,24 @@ class AdkConversationRepository(
 
     /**
      * 删除一个会话，触发 [refresh]。
+     *
+     * 对话语音覆盖以会话 ID 为 key 存在另一个偏好文件里，必须随会话一起清理，
+     * 否则覆盖永久残留且会话 ID 复用时会继承旧配置。清理失败只记录告警：
+     * 会话本体已经删掉，不能因此把删除上报为失败。
      */
     override suspend fun deleteConversation(sessionId: String) {
         subtasks?.delete(sessionId)
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
         // 删除失败必须交给调用方提示和重试，不能把未删除的会话当作成功清理。
         sessionService.deleteSession(key)
-        metadataDao.delete(sessionId)
+        metadataDao.delete(userId, sessionId)
+        try {
+            voiceOverrides?.clear(sessionId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: IOException) {
+            Log.w(TAG, "Failed to clear voice overrides for deleted conversation $sessionId", failure)
+        }
         _conversationContentRevisions.update { it - sessionId }
         _conversations.update { list -> list.filterNot { it.id == sessionId } }
         refresh()
@@ -305,14 +322,14 @@ class AdkConversationRepository(
 
     private suspend fun metadataBySessionId(): Map<String, ConversationMetadataEntity> =
         try {
-            metadataDao.getAll().associateBy { it.sessionId }
+            metadataDao.getAll(userId).associateBy { it.sessionId }
         } catch (t: Throwable) {
             recover(t, "metadataBySessionId()", emptyMap())
         }
 
     private suspend fun metadataFor(sessionId: String): ConversationMetadataEntity? =
         try {
-            metadataDao.get(sessionId)
+            metadataDao.get(userId, sessionId)
         } catch (t: Throwable) {
             recover(t, "metadataFor($sessionId)", null)
         }
@@ -381,7 +398,6 @@ class AdkConversationRepository(
         private const val TAG: String = "ConversationRepository"
         private const val TITLE_MAX_LENGTH: Int = 32
         private const val LAST_MESSAGE_MAX_LENGTH: Int = 64
-        private const val CONVERSATION_TITLE_STATE_KEY: String = "conversation.title"
 
         /** 刷新单行会话时读取的最近事件条数；预览与标题回退都在这个窗口内。 */
         private const val PREVIEW_EVENT_WINDOW: Int = 20

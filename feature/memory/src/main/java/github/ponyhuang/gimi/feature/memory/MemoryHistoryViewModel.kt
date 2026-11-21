@@ -6,9 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.memory.repository.Mem0MemoryManagementRepository
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,9 +18,6 @@ class MemoryHistoryViewModel @Inject constructor(
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(MemoryHistoryUiState())
     val uiState = mutableUiState.asStateFlow()
-
-    private val mutableEffects = MutableSharedFlow<MemoryHistoryEffect>(extraBufferCapacity = 1)
-    val effects = mutableEffects.asSharedFlow()
 
     private var nextPage = 1
 
@@ -43,6 +38,7 @@ class MemoryHistoryViewModel @Inject constructor(
             MemoryHistoryAction.DismissDelete -> mutableUiState.update { it.copy(pendingDelete = null) }
             MemoryHistoryAction.ConfirmDelete -> deletePendingMemory()
             is MemoryHistoryAction.SubmitFeedback -> submitFeedback(action)
+            MemoryHistoryAction.ConsumeNotice -> mutableUiState.update { it.copy(notice = null) }
         }
     }
 
@@ -60,7 +56,7 @@ class MemoryHistoryViewModel @Inject constructor(
                 throw cancelled
             } catch (_: Exception) {
                 mutableUiState.update { it.copy(refreshing = false) }
-                mutableEffects.emit(MemoryHistoryEffect.OperationFailed)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.OperationFailed) }
             }
         }
     }
@@ -85,7 +81,7 @@ class MemoryHistoryViewModel @Inject constructor(
                 throw cancelled
             } catch (_: Exception) {
                 mutableUiState.update { it.copy(loadingNextPage = false) }
-                mutableEffects.emit(MemoryHistoryEffect.OperationFailed)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.OperationFailed) }
             }
         }
     }
@@ -103,12 +99,12 @@ class MemoryHistoryViewModel @Inject constructor(
                         operatingMemoryId = null,
                     )
                 }
-                mutableEffects.emit(MemoryHistoryEffect.Deleted)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.Deleted) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 mutableUiState.update { it.copy(operatingMemoryId = null) }
-                mutableEffects.emit(MemoryHistoryEffect.OperationFailed)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.OperationFailed) }
             }
         }
     }
@@ -120,12 +116,12 @@ class MemoryHistoryViewModel @Inject constructor(
             try {
                 repository.submitFeedback(action.memory.id, action.feedback, action.reason)
                 mutableUiState.update { it.copy(operatingMemoryId = null) }
-                mutableEffects.emit(MemoryHistoryEffect.FeedbackSubmitted)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.FeedbackSubmitted) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 mutableUiState.update { it.copy(operatingMemoryId = null) }
-                mutableEffects.emit(MemoryHistoryEffect.OperationFailed)
+                mutableUiState.update { it.copy(notice = MemoryHistoryNotice.OperationFailed) }
             }
         }
     }

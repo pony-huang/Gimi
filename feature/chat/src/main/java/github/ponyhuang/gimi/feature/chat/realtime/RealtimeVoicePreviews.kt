@@ -14,10 +14,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
-import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceMode
+import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
+import github.ponyhuang.gimi.feature.chat.ComposerInputContentParams
+import github.ponyhuang.gimi.feature.chat.MessageData
+import github.ponyhuang.gimi.feature.chat.VoiceInputUiState
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 对比无输入、轻声内收、强声内收、回答和静音，保持球形并使用固定相位与真实电平范围。 */
@@ -60,7 +67,7 @@ private fun VoiceIdlePreview() {
 @Composable
 private fun VoiceIdleChatUnavailablePreview() {
     GimiTheme {
-        RealtimeVoiceScreen(RealtimeVoiceUiState(chatAvailable = false), started = false,
+        RealtimeVoiceScreen(RealtimeVoiceUiState(), started = false,
             onStartCall = {}, onToggleMute = {}, onEnd = {})
     }
 }
@@ -71,8 +78,8 @@ private fun VoiceIdleChatUnavailablePreview() {
 @Composable
 private fun VoiceIdleAssistantReadyPreview() {
     GimiTheme {
-        RealtimeVoiceScreen(RealtimeVoiceUiState(mode = RealtimeVoiceMode.Chat, chatAvailable = true,
-            conversationTitle = "当前聊天"), started = false,
+        RealtimeVoiceScreen(RealtimeVoiceUiState(style = VoiceConversationStyle.ASSISTANT,
+            pipeline = VoicePipeline.CASCADED, conversationTitle = "当前聊天"), started = false,
             onStartCall = {}, onToggleMute = {}, onEnd = {})
     }
 }
@@ -94,10 +101,14 @@ private fun VoiceChatPreview() {
     GimiTheme {
         RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(
             phase = RealtimeVoicePhase.Speaking, listening = true,
+            inputAttachments = listOf(FileAttachment(
+                mimeType = "application/pdf", id = "preview-pdf", sizeBytes = 2048,
+                displayName = "人工智能简史.pdf", fileId = "file_preview", fileVendor = "deepseek",
+            )),
             inputText = "帮我想一个不赶时间的周末。", spokenText = "可以，把这个周末留一点空白。",
             speakingText = "周六先睡到自然醒，再去附近走走。",
             responseText = "可以，把这个周末留一点空白。周六先睡到自然醒，再去附近走走。找一家安静的小店。"),
-            modelName = "DeepSeek V4", mode = RealtimeVoiceMode.Chat, chatAvailable = true,
+            modelName = "DeepSeek V4", style = VoiceConversationStyle.ASSISTANT,
             conversationTitle = "周末放松计划", sttModelName = "MiniMax", ttsModelName = "MiMo"),
             started = true, onStartCall = {}, onToggleMute = {}, onEnd = {})
     }
@@ -121,7 +132,7 @@ private fun VoiceCaptionProgressPreview() {
 @Composable
 private fun VoiceSaveFailurePreview() {
     GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Failed,
-        failure = RealtimeVoiceFailure.Persistence), modelName = "DeepSeek V4", mode = RealtimeVoiceMode.Chat, chatAvailable = true),
+        failure = RealtimeVoiceFailure.Persistence), modelName = "DeepSeek V4", style = VoiceConversationStyle.ASSISTANT),
         started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
@@ -129,7 +140,7 @@ private fun VoiceSaveFailurePreview() {
 @Preview(name = "Switching dark", widthDp = 400, heightDp = 864, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceSwitchingPreview() {
-    GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(modelName = "DeepSeek V4", mode = RealtimeVoiceMode.Chat, switching = true),
+    GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(modelName = "DeepSeek V4", style = VoiceConversationStyle.ASSISTANT, switching = true),
         started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
@@ -142,15 +153,14 @@ private fun VoiceTranscribingPreview() {
         started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
-/** 实时助手：当前与实时轻聊同一引擎，验证胶囊新条目与 ⓘ 信息层配套的固定模型名。 */
+/** 实时助手：当前与实时 Chatbot 同一引擎，验证胶囊新条目与 ⓘ 信息层配套的固定模型名。 */
 @Preview(name = "Realtime assistant light", widthDp = 400, heightDp = 864, locale = "zh-rCN")
 @Preview(name = "Realtime assistant dark", widthDp = 400, heightDp = 864, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceRealtimeAssistantPreview() {
     GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(
         phase = RealtimeVoicePhase.Listening, listening = true), modelName = "qwen3-omni-flash-realtime",
-        mode = RealtimeVoiceMode.RealtimeAssistant, realtimeAvailable = true,
-        realtimeModelName = "qwen3-omni-flash-realtime"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
+        pipeline = VoicePipeline.NATIVE_REALTIME, realtimeAvailable = true), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
 /** 实时助手工具执行中：Thinking 悬挂 + 「正在调用工具」胶囊补位静默，胶囊配色跟随主题场景。 */
@@ -161,8 +171,7 @@ private fun VoiceRealtimeAssistantToolRunningPreview() {
     GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(
         phase = RealtimeVoicePhase.Thinking, listening = true, toolNotice = "get_weather",
         inputText = "杭州今天多少度？"), modelName = "qwen3-omni-flash-realtime",
-        mode = RealtimeVoiceMode.RealtimeAssistant, realtimeAvailable = true,
-        realtimeModelName = "qwen3-omni-flash-realtime"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
+        pipeline = VoicePipeline.NATIVE_REALTIME, realtimeAvailable = true), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
 @Preview(name = "Generating", widthDp = 400, heightDp = 864, locale = "zh-rCN")
@@ -180,4 +189,47 @@ private fun VoiceGeneratingPreview() {
 private fun VoiceMutedPreview() {
     GimiTheme { RealtimeVoiceScreen(RealtimeVoiceUiState(voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening,
         muted = true), modelName = "DeepSeek V4"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
+}
+
+/** 胶囊编辑与附件状态；小屏和深浅色使用生产布局及纯展示参数。 */
+@Preview(name = "Capsule editing light", widthDp = 360, heightDp = 640, locale = "zh-rCN")
+@Preview(name = "Capsule editing dark", widthDp = 360, heightDp = 640, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceCapsuleEditingPreview() = VoiceCapsulePreview(attachments = false)
+
+@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 720, locale = "zh-rCN")
+@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 720, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceCapsuleAttachmentsPreview() = VoiceCapsulePreview(attachments = true)
+
+@Composable
+private fun VoiceCapsulePreview(attachments: Boolean) {
+    GimiTheme {
+        val draft = MessageData(
+            text = "帮我看看这份方案",
+            attachments = if (attachments) listOf(DraftAttachment(
+                reference = "preview-file", displayName = "项目方案.pdf", mimeType = "application/pdf",
+                sizeBytes = 2048, category = AttachmentCategory.DOCUMENT,
+            )) else emptyList(),
+        )
+        RealtimeVoiceScreen(
+            uiState = RealtimeVoiceUiState(
+                active = true,
+                voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, inputPaused = true),
+                composer = VoiceComposerUiState(editing = true, draft = draft),
+            ),
+            started = true, onStartCall = {}, onToggleMute = {}, onEnd = {},
+            composerContent = {
+                VoiceComposerInput(
+                    params = ComposerInputContentParams(
+                        messageData = draft, isGenerating = false,
+                        voiceInputState = VoiceInputUiState.Idle,
+                        isVoiceInputAvailable = false, voiceErrorMessage = null,
+                        onVoiceErrorShown = {}, onTextChange = {}, onRemoveAttachment = {},
+                        onSendClick = {}, onStopClick = {}, onVoiceInputStart = {},
+                    ), sendEnabled = true, onClose = {},
+                )
+            },
+        )
+    }
 }

@@ -5,8 +5,8 @@ package github.ponyhuang.gimi.data.agent.voice
 import android.util.Log
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.InvocationContext
-import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.agents.RunConfig
+import com.google.adk.kt.agents.ToolExecutionMode
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.events.EventActions
 import com.google.adk.kt.events.ToolConfirmation
@@ -20,7 +20,7 @@ import com.google.gson.Gson
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
-import github.ponyhuang.gimi.data.modelaccess.ModelRuntimeMetadata
+import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.contribution.GuardedAppFunctionToolset
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -38,8 +38,6 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import github.ponyhuang.gimi.data.modelaccess.AgentLLMModelFactory
-import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeFunctionCallSink
 
 /**
  * 实时助手模式的工具桥（已解析、可直接下发与执行）。
@@ -110,7 +108,7 @@ class RealtimeVoiceToolBridge(
  * MCP 工具集（mcp，无会话勾选时按全局启用集合解析）、插件（plugin，直接工具 +
  * 工具集）、应用函数（appfunction，按启用包隔离）与 E2B 沙盒（sandbox，配置就绪时）。
  *
- * 解析整体失败（模型配置缺失等）返回 null——实时助手当次退化为无工具的实时轻聊，
+ * 解析整体失败（模型配置缺失等）返回 null——实时助手当次退化为无工具的实时 Chatbot，
  * 不阻断通话；个别来源内部失败已由各自降级逻辑处理（丢弃该来源）。
  */
 @Singleton
@@ -252,7 +250,7 @@ class RealtimeAssistantTools @Inject constructor(
         )
         return InvocationContext(
             session = session,
-            runConfig = RunConfig(customMetadata = metadata),
+            runConfig = RunConfig(customMetadata = metadata, toolExecutionMode = ToolExecutionMode.SEQUENTIAL),
             agent = ToolHostAgent,
             invocationId = invocationId,
         )

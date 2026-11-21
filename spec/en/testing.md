@@ -41,6 +41,24 @@ enablement and selection rules where applicable. Check the HTTP client's implici
 duplicate requests affect cost or correctness. Give each behavior a primary test owner; add
 cross-layer coverage only for wiring risks not already covered.
 
+## Device-level checks and baseline profiles
+
+`app`'s navigation smoke test (`AppNavigationSmokeTest`) drives every typed NavKey through the
+production `AppEntryContent` dispatch inside `DebugTestHostActivity` (debug source set). Host
+activities declared in the androidTest manifest run in the test APK's own process and are rejected
+by `ActivityScenario`, which is why the host lives in the debug source set instead. Run it with
+`ANDROID_SERIAL=<serial> ./gradlew :app:connectedDebugAndroidTest`; on devices whose policy blocks
+new instrumentation packages (some Meizu builds report `INSTALL_FAILED_USER_RESTRICTED`), fall back
+to an emulator and record it. Unregistered destinations fail fast; parameterized destinations use
+placeholder ids and must render an empty/error state rather than crash.
+
+Baseline profiles are generated on a connected device and committed at
+`app/src/release/generated/baselineProfiles/baseline-prof.txt`. Regenerate after changing
+`MainApplication`/`MainActivity` startup paths or first-screen composition:
+`ANDROID_SERIAL=<serial> ./gradlew :app:generateReleaseBaselineProfile`. The `StartupBenchmark`
+pair in `:baselineprofile` refuses emulators by design and needs a device that permits
+instrumentation installs; a benchmark build type is profileable and signed with the debug key.
+
 ## Diagnosis and reporting
 
 Inspect existing logic and runtime evidence first. When the cause remains unclear, use focused tests

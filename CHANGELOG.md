@@ -2,6 +2,23 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [1.0.0-beta.4](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2026-11-21)
+
+
+### Features 新特性
+
+Beta.4 集中交付多项核心能力升级：
+
+* **实时语音重构 Realtime voice rework：** 全新实时语音链路，统一轻聊（chatbot）模式体验 / Rebuilt realtime voice pipeline with a unified chatbot mode experience
+* **模型服务全面改版 Model services overhaul：** 统一模型服务配置、实例化重建与厂商接入层整理 / Unified model service configuration, instance rebuild, and vendor access layer cleanup
+* **Chatbot 默认思考 Default thinking：** 新会话默认开启思考模式且默认高强度 / New sessions default to thinking on at high effort
+* **界面与体验优化 UI & experience：** 聊天输入栏通话入口、顶栏减负、模型选择抽屉两级化等系列改版 / Call entry in the chat composer, decluttered top bar, two-level model picker drawer, and more
+
+
+### Bug Fixes 修复
+
+修复若干问题。 / Fixed several issues.
+
 ## [1.0.0-beta.3](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2026-11-14)
 
 

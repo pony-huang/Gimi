@@ -46,7 +46,7 @@ enum class ChatbotTurnOutcome { FAILED, STOPPED, INTERRUPTED, VOICE_INTERRUPTED,
 data class ChatbotUiState(
     val sessionId: String = "",
     val selection: ModelSelection? = null,
-    val options: ConversationToolConfiguration = ConversationToolConfiguration(thinkingEnabled = false),
+    val options: ConversationToolConfiguration = ChatbotRules.defaultToolConfiguration(null),
     val chat: ChatUiState = ChatUiState(isInitializing = true),
     val uploadedFiles: List<UploadedFileEntry> = emptyList(),
     val draft: MessageData = MessageData(),
@@ -145,7 +145,7 @@ class ChatbotViewModel @Inject constructor(
     private var activeId: String? = null
     private var messages = emptyList<Message>()
     private var selection: ModelSelection? = null
-    private var options = ConversationToolConfiguration()
+    private var options = ChatbotRules.defaultToolConfiguration(null)
     private var recognitionAvailable = false
     private var initialized = false
     /** 当前会话的历史是否已从共享存储加载；加载前只做列表投影。 */

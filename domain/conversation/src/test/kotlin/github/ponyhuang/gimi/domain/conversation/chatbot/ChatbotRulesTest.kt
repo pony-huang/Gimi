@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.domain.conversation.chatbot
 
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.CHATBOT_WEB_SEARCH_TOOL_IDS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,7 +38,8 @@ class ChatbotRulesTest {
 
     @Test fun `default tools enable every vendor search id with all functions allowed`() {
         val config = ChatbotRules.defaultToolConfiguration("deepseek")
-        assertFalse(config.thinkingEnabled)
+        assertTrue(config.thinkingEnabled)
+        assertEquals(ReasoningEffort.HIGH, config.reasoningEffort)
         assertEquals(CHATBOT_WEB_SEARCH_TOOL_IDS["deepseek"], config.enabledOfficialFunctionIds.keys)
         assertEquals(2, config.enabledOfficialFunctionIds.size)
         assertTrue(config.enabledOfficialFunctionIds.values.all {
@@ -47,7 +49,8 @@ class ChatbotRulesTest {
 
     @Test fun `vendors without search tools get an empty configuration`() {
         val config = ChatbotRules.defaultToolConfiguration("qwen")
-        assertFalse(config.thinkingEnabled)
+        assertTrue(config.thinkingEnabled)
+        assertEquals(ReasoningEffort.HIGH, config.reasoningEffort)
         assertTrue(config.enabledOfficialFunctionIds.isEmpty())
         assertTrue(ChatbotRules.defaultToolConfiguration(null).enabledOfficialFunctionIds.isEmpty())
     }

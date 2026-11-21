@@ -39,6 +39,18 @@ class ReleaseToolsTest(unittest.TestCase):
         self.assertEqual(sorted(versions, key=release.version_key),
                          ['0.9.9', '1.0.0-beta.1', '1.0.0-beta.2', '1.0.0-rc.1', '1.0.0'])
 
+    def test_dotted_hotfix_prerelease_sorts_between_base_and_next(self):
+        """四段热修号：beta.4 < beta.4.0.1 < beta.4.1 < beta.5（更新通道排序语义）。"""
+        versions = ['1.0.0-beta.5', '1.0.0-beta.4.1', '1.0.0-beta.4', '1.0.0-beta.4.0.1']
+        self.assertEqual(sorted(versions, key=release.version_key),
+                         ['1.0.0-beta.4', '1.0.0-beta.4.0.1', '1.0.0-beta.4.1', '1.0.0-beta.5'])
+
+    def test_dotted_hotfix_trailing_zeros_and_notes_heading(self):
+        """末尾零归一：beta.4.0 与 beta.4 同序；链接式标题支持四段热修号提取正文。"""
+        self.assertEqual(release.version_key('1.0.0-beta.4.0'), release.version_key('1.0.0-beta.4'))
+        text = '## [1.0.0-beta.4.0.1](https://example.test) (2026-11-21)\n\n- 热修\n'
+        self.assertEqual(release.notes(text, '1.0.0-beta.4.0.1'), '- 热修\n')
+
     def test_extracts_beta_release_notes_heading(self):
         """预发布版本的链接式标题同样能提取正文。"""
         text = ('## [1.0.0-beta.1](https://example.test) (2026-11-11)\n\n### 新增\n\n- 实时语音\n\n'
@@ -54,7 +66,8 @@ class ReleaseToolsTest(unittest.TestCase):
 
     def test_rejects_invalid_versions(self):
         """非法版本（v 前缀、前导零、缺段、注入串）一律拒绝。"""
-        for version in ('v0.6.4', '01.2.3', '1.2', '1.2.3-rc.0', '1.2.3-beta.0', '1.2.3; echo hi'):
+        for version in ('v0.6.4', '01.2.3', '1.2', '1.2.3-rc.0', '1.2.3-beta.0', '1.2.3; echo hi',
+                        '1.2.3-beta.4.', '1.2.3-beta.04', '1.2.3-beta.4.0.'):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 release.version_key(version)
 

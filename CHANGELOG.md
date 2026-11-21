@@ -2,6 +2,13 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [1.0.0-beta.4.0.1](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.4...v1.0.0-beta.4.0.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **chat:** record Chatbot uploads and resolve voice upload failures ([256f416](https://github.com/pony-huang/Gimi/commit/256f4160e0558f6b2d56d29b513e760b06ac1841))
+
 ## [1.0.0-beta.4](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2026-11-21)
 
 

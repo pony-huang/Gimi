@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|rc)\.([1-9]\d*))?')
+VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|rc)\.([1-9]\d*(?:\.(?:0|[1-9]\d*))*))?')
 PLUGINS = ('spotify', 'zhihu', 'xiaohongshu', 'v2ex', 'weibo', 'netease')
 PLUGIN_CATALOG = Path('data/plugin/src/main/assets/plugin_catalog.json')
 
@@ -95,16 +95,23 @@ def run(*args):
 
 
 def version_key(version):
-    """解析 X.Y.Z[-beta.N|-rc.N] 为可比较元组：beta < rc < 正式版，数字段按数值比较。"""
+    """解析 X.Y.Z[-beta.N[.M...]|-rc.N[.M...]] 为可比较元组：beta < rc < 正式版，数字段按数值比较。
+
+    预发布号允许多段热修（如 beta.4.0.1）：semver 语义下同前缀多段高于少段，
+    末尾零在比较时归一（beta.4 与 beta.4.0 同序），避免两种写法被当成不同版本。
+    """
     match = VERSION.fullmatch(version)
     if not match:
-        raise ValueError('Version must be X.Y.Z, X.Y.Z-beta.N or X.Y.Z-rc.N')
-    major, minor, patch, tier, number = match.groups()
+        raise ValueError('Version must be X.Y.Z, X.Y.Z-beta.N[.M...], X.Y.Z-rc.N[.M...]')
+    major, minor, patch, tier, numbers = match.groups()
     base = tuple(map(int, (major, minor, patch)))
     # 预发布层级：beta 早于 rc，rc 早于正式版。
     if tier is None:
         return base + (2, 0)
-    return base + (0 if tier == 'beta' else 1, int(number))
+    number = [int(part) for part in numbers.split('.')]
+    while len(number) > 1 and number[-1] == 0:
+        number.pop()
+    return base + (0 if tier == 'beta' else 1, tuple(number))
 
 
 def config(root=ROOT):
@@ -123,7 +130,7 @@ def config(root=ROOT):
 def notes(text, version):
     """从 CHANGELOG.md 提取指定版本的章节正文，作为 GitHub Release 与应用内更新弹窗的共同文案；章节缺失、重复或为空都拒绝。"""
     # release-please uses both linked and plain SemVer headings, sometimes with dates.
-    sections = list(re.finditer(r'^## (?:\[)?(\d+\.\d+\.\d+(?:-(?:beta|rc)\.[1-9]\d*)?)(?:\]|\s|$).*$', text, re.M))
+    sections = list(re.finditer(r'^## (?:\[)?(\d+\.\d+\.\d+(?:-(?:beta|rc)\.[1-9]\d*(?:\.\d+)*)?)(?:\]|\s|$).*$', text, re.M))
     matches = [(i, item) for i, item in enumerate(sections) if item[1] == version]
     if len(matches) != 1:
         raise ValueError(f'Exactly one CHANGELOG entry for {version} is required')

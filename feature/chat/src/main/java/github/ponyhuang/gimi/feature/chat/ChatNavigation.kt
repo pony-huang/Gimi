@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import github.ponyhuang.gimi.feature.chat.realtime.SimpleChatPromptSettingsRoute
+import github.ponyhuang.gimi.feature.chat.realtime.ChatbotPromptSettingsRoute
 import kotlinx.serialization.Serializable
 
 /** 聊天 ViewModel 随宿主 Activity 保持，避免导航条目重建时丢失会话状态。 */
@@ -33,9 +33,9 @@ sealed interface ChatDestination : NavKey {
     @Serializable
     data object Chat : ChatDestination
 
-    /** 简单聊天提示词预设管理页。 */
+    /** Chatbot 角色预设管理页。 */
     @Serializable
-    data object SimpleChatPromptSettings : ChatDestination
+    data object ChatbotPromptSettings : ChatDestination
 }
 
 /** Cross-capability callbacks and activity inputs supplied by the app composition root. */
@@ -69,8 +69,8 @@ fun ChatEntryProvider(
         true
     }
 
-    ChatDestination.SimpleChatPromptSettings -> {
-        SimpleChatPromptSettingsRoute(onBack = callbacks.onBack)
+    ChatDestination.ChatbotPromptSettings -> {
+        ChatbotPromptSettingsRoute(onBack = callbacks.onBack)
         true
     }
 

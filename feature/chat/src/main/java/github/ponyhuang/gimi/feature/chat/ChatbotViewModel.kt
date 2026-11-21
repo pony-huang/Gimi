@@ -12,8 +12,6 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationReposito
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
-import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUpload
-import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUploadResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
@@ -131,8 +129,16 @@ class ChatbotViewModel @Inject constructor(
     private fun notify(notice: ChatbotNotice) {
         _uiState.update { it.copy(notice = notice) }
     }
-    private val uploads = mutableMapOf<String, Job>()
-    private val uploadStates = mutableMapOf<String, DraftUploadState>()
+    // 三个 surface 共用的文档上传编排：chip 阶段预热与发送时补传共用任务去重与注册表记录，
+    // 上传成功即登记"上传的文件"列表（与是否发送无关）。
+    private val fileUploads = ChatFileUploadCoordinator(
+        scope = viewModelScope,
+        gateway = fileGateway,
+        registry = fileRegistry,
+        resolveConnection = { selection -> catalog.resolveConnection(selection) },
+        // Chatbot 的文档入口随厂商矩阵开启；不支持上传的厂商没有文档草稿流入。
+        isFileUploadEnabled = { selection -> templateIdOf(selection) in FILE_UPLOAD_TEMPLATE_IDS },
+    )
     /** 未提交的输入草稿：只在进程内存在，进程结束即丢。 */
     private val drafts = mutableMapOf<String, MessageData>()
     /** 最近一轮的进程内结局；重试成功后清除。 */
@@ -211,6 +217,8 @@ class ChatbotViewModel @Inject constructor(
                 if (vendor.isNullOrBlank()) flowOf(emptyList()) else fileRegistry.entriesFor(vendor)
             }.collect { registeredFiles = it; publish() }
         }
+        // 上传状态变化即重投影：chip 的 fileId 回填与发送门控都读 draftUploadStates。
+        viewModelScope.launch { fileUploads.states.collect { publish() } }
         viewModelScope.launch { recognition.availability.collect { recognitionAvailable = it; publish() } }
         viewModelScope.launch { playback.state.collect { publish() } }
         viewModelScope.launch { speechSettings.autoSpeakEnabled.collect { publish() } }
@@ -311,8 +319,8 @@ class ChatbotViewModel @Inject constructor(
                             createSession(action.selection)
                         messages.isNotEmpty() -> Unit
                         else -> {
-                            uploads.filterKeys { it.startsWith(id + ":") }.values.forEach { it.cancel() }
-                            uploadStates.keys.removeAll { it.startsWith(id + ":") }
+                            // 换模型即弃当前草稿的在途上传：附件随后按新厂商重建。
+                            fileUploads.clear(drafts[id]?.attachments.orEmpty().map(DraftAttachment::reference))
                             val vendorChanged = templateIdOf(current) != templateIdOf(action.selection)
                             selection = action.selection
                             // 厂商切换后旧厂商的工具勾选无意义：重置为新厂商默认（检索工具全启用）。
@@ -332,7 +340,7 @@ class ChatbotViewModel @Inject constructor(
                     } else {
                         // Chatbot 的模型上下文就是该分区里的 ADK 会话，删除会话即清理上下文。
                         conversations.deleteConversation(action.id)
-                        drafts.remove(action.id)
+                        fileUploads.clear(drafts.remove(action.id)?.attachments.orEmpty().map(DraftAttachment::reference))
                         outcomes.remove(action.id)
                     }
                 }
@@ -423,6 +431,8 @@ class ChatbotViewModel @Inject constructor(
                 submission.complete(ChatSubmissionResult.ACCEPTED)
                 outcomes.remove(id)
                 drafts[id] = MessageData()
+                // 发送被接受即本轮附件已消费：清理上传状态，不让终态跨轮残留。
+                fileUploads.clear(attachments.map(DraftAttachment::reference))
                 if (!retry) {
                     // 乐观插入本轮用户消息；收尾时以 ADK 落盘的历史为准。
                     messages = messages + Messages.fromUser(text, prepared.toFileAttachments())
@@ -544,53 +554,22 @@ class ChatbotViewModel @Inject constructor(
         uploadable.indices.forEach { index ->
             currentCoroutineContext().ensureActive()
             if (uploadable[index].category == AttachmentCategory.DOCUMENT) {
-                uploadable[index] = uploadAttachment(selection, uploadable[index])
+                // 发送时补传与 chip 阶段共用同一编排：同厂商已就绪短路、同引用任务去重、
+                // 厂商切换后的本地副本换厂商重传；终态非 Ready 统一落 UPLOAD 轮次失败。
+                when (val state = fileUploads.awaitUpload(uploadable[index], selection)) {
+                    is DraftUploadState.Ready ->
+                        uploadable[index] = uploadable[index].copy(fileId = state.fileId, fileVendor = state.vendor)
+                    else -> throw ChatbotRunException(ChatbotRunFailure.UPLOAD)
+                }
             }
         }
         return uploadable
     }
 
-    private suspend fun uploadAttachment(selection: ModelSelection, attachment: DraftAttachment): DraftAttachment {
-        val vendor = instances.firstOrNull { it.id == selection.instanceId }?.templateId
-            ?: throw ChatbotRunException(ChatbotRunFailure.CONFIGURATION)
-        if (attachment.isVendorUploaded && attachment.fileVendor == vendor) return attachment
-        val connection = catalog.resolveConnection(selection)
-            ?: throw ChatbotRunException(ChatbotRunFailure.CONFIGURATION)
-        val result = fileGateway.upload(
-            vendor = vendor,
-            protocol = connection.protocol,
-            endpoint = connection.endpoint.trimEnd('/'),
-            apiKey = connection.apiKey,
-            request = VendorFileUpload(
-                mimeType = attachment.mimeType,
-                displayName = attachment.displayName,
-                filePath = attachment.reference,
-            ),
-        )
-        return when (result) {
-            is VendorFileUploadResult.Uploaded -> attachment.copy(fileId = result.fileId, fileVendor = vendor)
-            is VendorFileUploadResult.Failure -> throw ChatbotRunException(ChatbotRunFailure.UPLOAD)
-        }
-    }
-
+    /** 触发文档草稿的厂商上传（chip 阶段预热）；重试复用同一路径，成功即写注册表。 */
     fun uploadDocumentDraft(draft: DraftAttachment) {
-        val session = activeId ?: return
         val selected = selection ?: return
-        val vendor = templateIdOf(selected)
-        val key = session + ":" + draft.reference
-        if (uploads[key]?.isActive == true) return
-        uploadStates[key] = DraftUploadState.Uploading
-        publish()
-        uploads[key] = viewModelScope.launch {
-            val result = cancellationAwareRunCatching { uploadAttachment(selected, draft) }
-            if (activeId == session && selection == selected) {
-                uploadStates[key] = result.fold(
-                    { DraftUploadState.Ready(requireNotNull(it.fileId), requireNotNull(vendor)) },
-                    { DraftUploadState.Failed(github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason.VENDOR_ERROR) },
-                )
-                publish()
-            }
-        }
+        fileUploads.upload(draft, selected)
     }
 
     fun transcribeVoice(pcm: ByteArray, mode: VoiceInputMode, draft: MessageData, onResult: (Result<VoiceDictationResult>) -> Unit) =
@@ -656,7 +635,11 @@ class ChatbotViewModel @Inject constructor(
                     functions = spec.staticFunctionIds.map { OfficialToolFunction(it, it, "") },
                 )
             },
-            draftUploadStates = uploadStates.filterKeys { it.startsWith(id + ":") }.mapKeys { it.key.substringAfter(":") },
+            // 上传状态以草稿引用为键，按当前会话草稿过滤即跨会话隔离；chip 的 fileId
+            // 回填与发送门控都读这份投影。
+            draftUploadStates = fileUploads.states.value.filterKeys {
+                it in drafts[id]?.attachments.orEmpty().map(DraftAttachment::reference).toSet()
+            },
             failedTurn = failedTurn,
         )
         val vendor = instance?.templateId

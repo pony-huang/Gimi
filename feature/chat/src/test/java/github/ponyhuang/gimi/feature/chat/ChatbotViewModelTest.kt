@@ -249,30 +249,113 @@ class ChatbotViewModelTest {
         val fileGateway = mockk<VendorFileGateway>(relaxed = true)
         val vm = viewModel(FakeConversationStore(), agent(execution), mockk(relaxed = true), files, fileGateway)
         val holder = ViewModelStore().apply { put("test", vm) }
+        val reused = DraftAttachment(
+            reference = "gimi-file://deepseek/shared-file",
+            displayName = entry.displayName,
+            mimeType = entry.mimeType,
+            sizeBytes = entry.bytes,
+            category = AttachmentCategory.DOCUMENT,
+            fileId = entry.fileId,
+            fileVendor = entry.vendor,
+        )
         try {
             advanceUntilIdle()
             assertEquals(listOf(entry), vm.uiState.value.uploadedFiles)
-            vm.uploadDocumentDraft(DraftAttachment(
-                reference = "gimi-file://deepseek/shared-file",
-                displayName = entry.displayName,
-                mimeType = entry.mimeType,
-                sizeBytes = entry.bytes,
-                category = AttachmentCategory.DOCUMENT,
-                fileId = entry.fileId,
-                fileVendor = entry.vendor,
-            ))
+            vm.saveDraft(vm.uiState.value.sessionId, MessageData(attachments = listOf(reused)))
+            // 已带同厂商引用的草稿不产生上传任务：chip 直接以 isVendorUploaded 呈现就绪。
+            vm.uploadDocumentDraft(reused)
             advanceUntilIdle()
-            assertEquals(
-                DraftUploadState.Ready(entry.fileId, entry.vendor),
-                vm.uiState.value.chat.draftUploadStates["gimi-file://deepseek/shared-file"],
-            )
+            assertTrue(vm.uiState.value.chat.draftUploadStates.isEmpty())
+            coVerify(exactly = 0) { fileGateway.upload(any(), any(), any(), any(), any()) }
             vm.onAction(ChatbotAction.NewConversation)
             advanceUntilIdle()
             assertEquals(listOf(entry), vm.uiState.value.uploadedFiles)
             files.value = emptyList()
             advanceUntilIdle()
             assertTrue(vm.uiState.value.uploadedFiles.isEmpty())
-            coVerify(exactly = 0) { fileGateway.upload(any(), any(), any(), any(), any()) }
+        } finally { holder.clear(); advanceUntilIdle() }
+    }
+
+    @Test fun `chip upload records the vendor file into the registry for the drawer list`() = runTest(main.dispatcher) {
+        val execution = mockk<ChatAgentExecution>()
+        coEvery { execution.send(any(), any(), any()) } returns flow { emit(replyEvent()) }
+        val fileGateway = mockk<VendorFileGateway>(relaxed = true)
+        val vm = viewModel(FakeConversationStore(), agent(execution), mockk(relaxed = true), fileGateway = fileGateway)
+        val holder = ViewModelStore().apply { put("test", vm) }
+        val draft = DraftAttachment(
+            reference = "/tmp/draft.docx",
+            displayName = "季度报表.docx",
+            mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            sizeBytes = 2048,
+            category = AttachmentCategory.DOCUMENT,
+        )
+        try {
+            advanceUntilIdle()
+            // 与真实导入顺序一致：草稿先入会话草稿，再触发 chip 阶段预热上传。
+            vm.saveDraft(vm.uiState.value.sessionId, MessageData(attachments = listOf(draft)))
+            vm.uploadDocumentDraft(draft)
+            advanceUntilIdle()
+            assertEquals(
+                DraftUploadState.Ready("uploaded-file", "deepseek"),
+                vm.uiState.value.chat.draftUploadStates["/tmp/draft.docx"],
+            )
+            // 上传成功即进注册表（与是否发送无关）：抽屉"上传的文件"列表据此展示；
+            // 缺这条记录会导致 Chatbot 上传的文件在任何界面都查不到。
+            assertEquals(
+                listOf(
+                    UploadedFileEntry(
+                        "uploaded-file", "deepseek", "季度报表.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 10, 1,
+                    ),
+                ),
+                vm.uiState.value.uploadedFiles,
+            )
+        } finally { holder.clear(); advanceUntilIdle() }
+    }
+
+    @Test fun `send time re-upload targets the new vendor after switching on an unlocked session`() = runTest(main.dispatcher) {
+        val store = FakeConversationStore()
+        val execution = mockk<ChatAgentExecution>()
+        val sent = mutableListOf<List<FileAttachment>>()
+        coEvery { execution.send(any(), any(), any()) } coAnswers {
+            sent.add(secondArg())
+            store.appendUser(requireNotNull(store.current()), firstArg())
+            store.appendAssistant(requireNotNull(store.current()), "reply")
+            flow { emit(replyEvent()) }
+        }
+        val fileGateway = mockk<VendorFileGateway>(relaxed = true)
+        val vm = viewModel(
+            store, agent(execution), mockk(relaxed = true), fileGateway = fileGateway,
+            instances = listOf(deepseekInstance(), anthropicInstance()),
+        )
+        val holder = ViewModelStore().apply { put("test", vm) }
+        val draft = DraftAttachment(
+            reference = "/tmp/draft.docx",
+            displayName = "季度报表.docx",
+            mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            sizeBytes = 2048,
+            category = AttachmentCategory.DOCUMENT,
+        )
+        try {
+            advanceUntilIdle()
+            vm.saveDraft(vm.uiState.value.sessionId, MessageData(attachments = listOf(draft)))
+            vm.uploadDocumentDraft(draft)
+            advanceUntilIdle()
+            assertEquals(
+                DraftUploadState.Ready("uploaded-file", "deepseek"),
+                vm.uiState.value.chat.draftUploadStates["/tmp/draft.docx"],
+            )
+            vm.onAction(ChatbotAction.SelectModel(ModelSelection("anthropic-service", "anthropic-messages", "claude-sonnet")))
+            advanceUntilIdle()
+            // 发送的草稿仍带着旧厂商 file_id（与 composer 回填后的形态一致）。
+            vm.send("hello", listOf(draft.copy(fileId = "uploaded-file", fileVendor = "deepseek"))) {}
+            advanceUntilIdle()
+            // 厂商切换后的本地副本草稿换厂商重传：deepseek chip 阶段一次 + anthropic 发送时一次。
+            coVerify(exactly = 1) { fileGateway.upload("deepseek", any(), any(), any(), any()) }
+            coVerify(exactly = 1) { fileGateway.upload("anthropic", any(), any(), any(), any()) }
+            val sentFile = sent.single().single()
+            assertEquals("uploaded-file", sentFile.fileId)
+            assertEquals("anthropic", sentFile.fileVendor)
         } finally { holder.clear(); advanceUntilIdle() }
     }
 
@@ -437,6 +520,12 @@ class ChatbotViewModelTest {
         "minimax-service", "MiniMax", "minimax", true, true, false, "fake-key",
         listOf(ServiceConnection("minimax-messages", ServiceCapability.Conversation, ApiProtocol.Anthropic,
             "https://api.minimaxi.com/anthropic", models = listOf(Model("minimax-text", "MiniMax Text")))),
+    )
+
+    private fun anthropicInstance(): ModelServiceInstance = ModelServiceInstance(
+        "anthropic-service", "Anthropic", "anthropic", true, true, false, "fake-key",
+        listOf(ServiceConnection("anthropic-messages", ServiceCapability.Conversation, ApiProtocol.Anthropic,
+            "https://api.anthropic.com", models = listOf(Model("claude-sonnet", "Claude Sonnet")))),
     )
 
     private fun replyEvent(text: String = "reply") = ChatRunEvent(

@@ -365,6 +365,9 @@ class RealtimeVoiceViewModel @Inject constructor(
                 startArguments,
                 effectiveConfig.map { it.pipeline },
             ) { settings, call, arguments, pipeline ->
+                // 缓存给上传/提交等命令式路径取用：coordinator 的连接解析、发送校验与
+                // inputSelection 回退都读这份快照；漏赋值会让上传连接解析恒为 null（静默失败）。
+                latestSettings = settings
                 val selection = call.modelSelection ?: if (pipeline == VoicePipeline.NATIVE_REALTIME) {
                     settings.realtimeSelection
                 } else {

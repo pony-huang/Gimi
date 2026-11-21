@@ -116,7 +116,7 @@ class ChatbotRolePreferences @Inject constructor(
 
     private companion object {
         // 角色目录沿用现有文件，自建角色继续可用；会话选择使用独立的新键。
-        const val PREFERENCES_NAME = "simple_chat_prompt_preferences"
+        const val PREFERENCES_NAME = "chatbot_prompt_preferences"
         const val PRESETS_KEY = "presets_json"
         const val SELECTED_IDS_KEY = "conversation_roles_json"
     }

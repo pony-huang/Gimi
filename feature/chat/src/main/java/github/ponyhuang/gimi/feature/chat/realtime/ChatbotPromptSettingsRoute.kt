@@ -10,17 +10,17 @@ import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
-fun SimpleChatPromptSettingsRoute(
+fun ChatbotPromptSettingsRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SimpleChatPromptViewModel = hiltViewModel(),
+    viewModel: ChatbotPromptViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     PreferenceScaffold(
         title = stringResource(R.string.voice_prompt_presets),
         onBack = onBack,
     ) { scaffoldModifier ->
-        SimpleChatPromptSettingsScreen(
+        ChatbotPromptSettingsScreen(
             state = state,
             onAction = viewModel::onAction,
             modifier = scaffoldModifier,

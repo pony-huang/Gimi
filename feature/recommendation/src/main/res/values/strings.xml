@@ -23,8 +23,8 @@
     <string name="recommendation_a2ui_title">A2UI 交互卡片</string>
     <string name="recommendation_a2ui_subtitle">允许助手用原生卡片展示表单、控件和结构化结果</string>
     <string name="recommendation_prompt_section">角色</string>
-    <string name="recommendation_simple_chat_title">角色预设</string>
-    <string name="recommendation_simple_chat_subtitle">自定义 Chatbot 会话使用的角色</string>
+    <string name="recommendation_chatbot_title">角色预设</string>
+    <string name="recommendation_chatbot_subtitle">自定义 Chatbot 会话使用的角色</string>
     <string name="recommendation_tools_section">工具</string>
     <string name="recommendation_tool_loading_note">仅作用于助手模式。全量加载每轮声明全部已启用工具，更耗上下文与 Token；按需加载让模型先检索，只加载所需工具。</string>
     <string name="recommendation_close">关闭</string>

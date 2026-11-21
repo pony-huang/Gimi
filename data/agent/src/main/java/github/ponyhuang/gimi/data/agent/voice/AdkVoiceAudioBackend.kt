@@ -60,7 +60,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * 应用会话与语音后端的唯一转换层；设备、AEC 和播放仍由 data:speech 拥有。
- * 简单聊天走分轮重建的级联模型（内存上下文 + 可选预设）；聊天模式直接接入
+ * Chatbot 走分轮重建的级联模型（内存上下文 + 可选预设）；聊天模式直接接入
  * 完整 chat agent（[VoiceAgentConversation]），工具全量自动批准，文字由 ADK
  * Runner 持久化到目标聊天。
  */
@@ -68,7 +68,7 @@ class AdkVoiceAudioBackend @Inject constructor(
     private val models: VoiceLiveModelFactory,
     private val recognition: SpeechRecognitionRepository,
     private val synthesis: SpeechSynthesisRepository,
-    private val simpleChatPrompts: ChatbotRoleRepository,
+    private val chatbotPrompts: ChatbotRoleRepository,
     private val agentVoice: Provider<VoiceAgentConversation>,
     private val assistantTools: RealtimeAssistantTools,
     private val simpleVoice: Provider<ChatbotConversationWriter>,
@@ -134,7 +134,7 @@ class AdkVoiceAudioBackend @Inject constructor(
      * 当前选中的预设正文；选中官方预设或用户自建预设都从这里解析，未选中时为 null。
      * 官方预设与自建预设共用同一套 id 空间，命中顺序是先官方后自建。
      */
-    private fun selectedPresetContent(conversationId: String?): String? = simpleChatPrompts.contentFor(conversationId)
+    private fun selectedPresetContent(conversationId: String?): String? = chatbotPrompts.contentFor(conversationId)
 
     /** Chatbot 写入 Chatbot 分区当前会话（不绑定聊天页传入的助手会话 ID），恢复历史并保存已听回复，级联请求始终不装配工具。 */
     private inner class SimpleSession(private val configuration: RealtimeVoiceConfiguration) : VoiceAudioBackendSession {
@@ -148,8 +148,8 @@ class AdkVoiceAudioBackend @Inject constructor(
         private var pendingInput: Content? = null
         @Volatile private var closed = false
 
-        /** 每轮读取当前选中的简单聊天预设；指令按轮重建，中途切换预设下一轮即生效。 */
-        private fun simpleChatInstruction(): String? = selectedPresetContent(configuration.conversationId)
+        /** 每轮读取当前选中的 Chatbot 角色预设；指令按轮重建，中途切换预设下一轮即生效。 */
+        private fun chatbotInstruction(): String? = selectedPresetContent(configuration.conversationId)
 
         override suspend fun isAvailable(): Boolean {
             check(!closed)
@@ -192,9 +192,9 @@ class AdkVoiceAudioBackend @Inject constructor(
                         synthesisVoice = configuration.synthesisVoice,
                     )
                 }
-                // 简单聊天可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
+                // Chatbot 可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
                 // 「无工具」声明始终叠加（级联链路确实无任何工具）。
-                val instruction = (simpleChatInstruction() ?: VOICE_INSTRUCTION) + VOICE_OUTPUT_RULES + VOICE_NO_TOOLS_RULE
+                val instruction = (chatbotInstruction() ?: VOICE_INSTRUCTION) + VOICE_OUTPUT_RULES + VOICE_NO_TOOLS_RULE
                 val connection = model.connect(LlmRequest(
                     model = model,
                     config = GenerateContentConfig(
@@ -463,7 +463,7 @@ class AdkVoiceAudioBackend @Inject constructor(
         }
     }
 
-    /** 简单聊天单句 PCM 交付槽；开始收集才授权生产，取消播放会唤醒被背压阻塞的连接。 */
+    /** Chatbot 单句 PCM 交付槽；开始收集才授权生产，取消播放会唤醒被背压阻塞的连接。 */
     private class AudioSegment {
         val id = UUID.randomUUID().toString()
         val text = MutableStateFlow("")
@@ -483,7 +483,7 @@ class AdkVoiceAudioBackend @Inject constructor(
     companion object {
         private const val TAG = "AdkVoiceAudioBackend"
 
-        /** 语音人设层：未选预设时的默认助手风格，可被简单聊天预设完全替换。提示词统一用英文撰写（与主指令一致）。 */
+        /** 语音人设层：未选预设时的默认助手风格，可被 Chatbot 角色预设完全替换。提示词统一用英文撰写（与主指令一致）。 */
         internal const val VOICE_INSTRUCTION = "You are a natural, friendly voice assistant talking with the user in a real-time voice call." +
             " Converse like a real person: speak colloquially and warmly, and natural interjections such as \"okay\" and \"mm-hmm\" are fine." +
             " Respond directly first, then add the necessary details. Ask only one question at a time; if you did not hear clearly or are unsure," +

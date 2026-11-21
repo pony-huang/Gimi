@@ -35,7 +35,7 @@ private fun stubSimpleVoice(
 }
 
 /** 后端只读预设状态；测试提供空仓库表示不使用自定义提示词。 */
-private fun emptySimpleChatPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
+private fun emptyChatbotPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
     override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
     override val builtInPresets = emptyList<ChatbotRolePreset>()
     override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -44,16 +44,16 @@ private fun emptySimpleChatPrompts(): ChatbotRoleRepository = object : ChatbotRo
     override fun selectPreset(conversationId: String, presetId: String?) {}
 }
 
-/** 聊天模式的完整 Agent 执行层由 [VoiceAgentConversationTest] 单独覆盖；简单聊天用例不会触碰它。 */
+/** 聊天模式的完整 Agent 执行层由 [VoiceAgentConversationTest] 单独覆盖；Chatbot 用例不会触碰它。 */
 private fun unusedAgentVoice(): javax.inject.Provider<VoiceAgentConversation> =
     javax.inject.Provider { error("Voice agent is not used in simple mode tests") }
 
-/** 级联/简单聊天用例不触碰实时助手工具桥；resolve 一律返回 null。 */
+/** 级联/Chatbot 用例不触碰实时助手工具桥；resolve 一律返回 null。 */
 private fun unusedAssistantTools(): RealtimeAssistantTools = mockk {
     coEvery { resolve(any()) } returns null
 }
 
-/** 保留简单聊天级联后端的付费请求、已听上下文和取消边界，并覆盖官方原生事件顺序。 */
+/** 保留 Chatbot 级联后端的付费请求、已听上下文和取消边界，并覆盖官方原生事件顺序。 */
 class AdkVoiceAudioBackendTest {
     private val recognition = mockk<SpeechRecognitionRepository>()
     private val synthesis = mockk<SpeechSynthesisRepository> {
@@ -71,7 +71,7 @@ class AdkVoiceAudioBackendTest {
             every { bind("selected-chatbot") } returns mockk(relaxed = true)
         }
         val backend = AdkVoiceAudioBackend(
-            models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(),
+            models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(),
             javax.inject.Provider { writer },
         )
         val configuration = github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration(
@@ -94,7 +94,7 @@ class AdkVoiceAudioBackendTest {
             every { bind(null) } returns call
         }
         val backend = AdkVoiceAudioBackend(
-            models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(),
+            models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(),
             javax.inject.Provider { writer },
         )
         backend.openDuplex(
@@ -130,7 +130,7 @@ class AdkVoiceAudioBackendTest {
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
             val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
             val text = StringBuilder()
             val spoken = mutableListOf<String>()
             var firstAudio = true
@@ -179,7 +179,7 @@ class AdkVoiceAudioBackendTest {
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
             val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
 
             val playbackStarted = CompletableDeferred<Unit>()
             val reply = launch {
@@ -220,7 +220,7 @@ class AdkVoiceAudioBackendTest {
                 } else flowOf(pcm)
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             val first = launch {
                 coroutineScope {
                     session.respond("上一轮", "").collect { event ->
@@ -257,7 +257,7 @@ class AdkVoiceAudioBackendTest {
             }
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
             val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
             val first = launch {
                 coroutineScope {
                     session.respond("旧问题", "").collect { event ->
@@ -299,7 +299,7 @@ class AdkVoiceAudioBackendTest {
             val native = mockk<Model>()
             coEvery { native.connect(any()) } returns connection
             coEvery { models.create() } returns native
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             var heard = ""
             val visible = StringBuilder()
             coroutineScope {
@@ -327,7 +327,7 @@ class AdkVoiceAudioBackendTest {
             every { textModel.generateContent(any(), true) } returns flowOf(text("回答。", true))
             every { synthesis.synthesize(any()) } throws IllegalStateException("unavailable")
             coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open()
             try {
                 coroutineScope {
                     session.respond("输入", "").collect { event ->
@@ -355,7 +355,7 @@ class AdkVoiceAudioBackendTest {
         val native = mockk<Model>()
         coEvery { native.connect(any()) } returns connection
         coEvery { models.create() } returns native
-        val events = AdkVoiceAudioBackend(models, recognition, synthesis, emptySimpleChatPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open().respond("输入", "").toList()
+        val events = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice()).open().respond("输入", "").toList()
         assertEquals(listOf(VoiceAudioEvent.Interrupted), events)
         coVerify(exactly = 1) { connection.closeSession() }
     }

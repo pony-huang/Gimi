@@ -316,7 +316,7 @@ internal fun AppEntryContent(
             onBack = goBack,
             navigate = navigate,
             onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults()) },
-            onOpenSimpleChatPromptSettings = { navigate(ChatDestination.SimpleChatPromptSettings) },
+            onOpenChatbotPromptSettings = { navigate(ChatDestination.ChatbotPromptSettings) },
         ) ||
         MemoryEntryProvider(destination, goBack, navigate) ||
         PermissionEntryProvider(destination, goBack) ||

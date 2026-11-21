@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 
 /** 预设管理页：持久化选择与编辑草稿分离，弹层状态不落盘。 */
 @HiltViewModel
-class SimpleChatPromptViewModel @Inject constructor(
+class ChatbotPromptViewModel @Inject constructor(
     private val repository: ChatbotRoleRepository,
     private val voiceCallController: RealtimeVoiceCallController,
 ) : ViewModel() {
@@ -29,14 +29,14 @@ class SimpleChatPromptViewModel @Inject constructor(
     private val confirmDelete = MutableStateFlow<ChatbotRolePreset?>(null)
     private val viewing = MutableStateFlow<ChatbotRolePreset?>(null)
 
-    val uiState: StateFlow<SimpleChatPromptUiState> = combine(
+    val uiState: StateFlow<ChatbotPromptUiState> = combine(
         repository.presets,
         combine(repository.selectedPresetIds, conversationId) { selections, id -> id to selections[id] },
         editing,
         confirmDelete,
         viewing,
     ) { presets, selectedPresetId, editing, confirmDelete, viewing ->
-        SimpleChatPromptUiState(
+        ChatbotPromptUiState(
             presets = presets,
             builtInPresets = repository.builtInPresets,
             selectedPresetId = selectedPresetId.second,
@@ -48,41 +48,41 @@ class SimpleChatPromptViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = SimpleChatPromptUiState(
+        initialValue = ChatbotPromptUiState(
             presets = repository.presets.value,
             builtInPresets = repository.builtInPresets,
             selectedPresetId = null,
         ),
     )
 
-    fun onAction(action: SimpleChatPromptAction) {
+    fun onAction(action: ChatbotPromptAction) {
         if (callState.value.configurationLocked) return
         when (action) {
-            is SimpleChatPromptAction.Select -> conversationId.value?.let { repository.selectPreset(it, action.presetId) }
-            SimpleChatPromptAction.StartCreate ->
+            is ChatbotPromptAction.Select -> conversationId.value?.let { repository.selectPreset(it, action.presetId) }
+            ChatbotPromptAction.StartCreate ->
                 editing.value = ChatbotRolePreset(id = "", name = "", content = "")
-            is SimpleChatPromptAction.StartEdit ->
+            is ChatbotPromptAction.StartEdit ->
                 editing.value = repository.presets.value.firstOrNull { it.id == action.presetId }
-            SimpleChatPromptAction.DismissEdit -> editing.value = null
-            is SimpleChatPromptAction.Save -> save(action)
-            is SimpleChatPromptAction.RequestDelete ->
+            ChatbotPromptAction.DismissEdit -> editing.value = null
+            is ChatbotPromptAction.Save -> save(action)
+            is ChatbotPromptAction.RequestDelete ->
                 confirmDelete.value = repository.presets.value.firstOrNull { it.id == action.presetId }
-            SimpleChatPromptAction.ConfirmDelete -> {
+            ChatbotPromptAction.ConfirmDelete -> {
                 confirmDelete.value?.let { repository.deletePreset(it.id) }
                 confirmDelete.value = null
             }
-            SimpleChatPromptAction.DismissDelete -> confirmDelete.value = null
-            is SimpleChatPromptAction.ViewPrompt ->
+            ChatbotPromptAction.DismissDelete -> confirmDelete.value = null
+            is ChatbotPromptAction.ViewPrompt ->
                 viewing.value = findPreset(action.presetId)
-            SimpleChatPromptAction.CopyViewedPreset -> {
+            ChatbotPromptAction.CopyViewedPreset -> {
                 editing.value = viewing.value?.copy(id = "")
                 viewing.value = null
             }
-            SimpleChatPromptAction.DismissViewPrompt -> viewing.value = null
+            ChatbotPromptAction.DismissViewPrompt -> viewing.value = null
         }
     }
 
-    private fun save(action: SimpleChatPromptAction.Save) {
+    private fun save(action: ChatbotPromptAction.Save) {
         val target = editing.value ?: return
         val name = action.name.trim()
         val content = action.content.trim()

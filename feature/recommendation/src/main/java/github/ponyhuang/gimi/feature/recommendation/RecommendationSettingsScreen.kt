@@ -40,7 +40,7 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
 fun RecommendationSettingsScreen(
     state: RecommendationSettingsUiState,
     onAction: (RecommendationSettingsAction) -> Unit,
-    onOpenSimpleChatPromptSettings: () -> Unit = {},
+    onOpenChatbotPromptSettings: () -> Unit = {},
     onOpenRecommendationUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -55,9 +55,9 @@ fun RecommendationSettingsScreen(
                 PreferenceGroupCard {
                     PreferenceListItem(
                         icon = Icons.Default.EditNote,
-                        title = stringResource(R.string.recommendation_simple_chat_title),
-                        subtitle = stringResource(R.string.recommendation_simple_chat_subtitle),
-                        onClick = onOpenSimpleChatPromptSettings,
+                        title = stringResource(R.string.recommendation_chatbot_title),
+                        subtitle = stringResource(R.string.recommendation_chatbot_subtitle),
+                        onClick = onOpenChatbotPromptSettings,
                     )
                 }
             }

@@ -23,8 +23,8 @@
     <string name="recommendation_a2ui_title">A2UI interactive cards</string>
     <string name="recommendation_a2ui_subtitle">Let the assistant show forms, controls, and structured results as native cards</string>
     <string name="recommendation_prompt_section">Roles</string>
-    <string name="recommendation_simple_chat_title">Role presets</string>
-    <string name="recommendation_simple_chat_subtitle">Customize the roles used by Chatbot conversations</string>
+    <string name="recommendation_chatbot_title">Role presets</string>
+    <string name="recommendation_chatbot_subtitle">Customize the roles used by Chatbot conversations</string>
     <string name="recommendation_tools_section">Tools</string>
     <string name="recommendation_tool_loading_note">Only applies to Assistant mode. Loading all tools declares every enabled tool each turn — heavier on context and tokens; on-demand loading lets the model search first and load only what is needed.</string>
     <string name="recommendation_close">Close</string>

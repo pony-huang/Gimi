@@ -47,7 +47,7 @@ internal val RoleChipsRestingHeight = 48.dp
 internal fun ChatbotRoleChipsRoute(
     conversationId: String,
     edgePadding: Dp = 18.dp,
-    viewModel: SimpleChatPromptViewModel = hiltViewModel(),
+    viewModel: ChatbotPromptViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(conversationId) { viewModel.bind(conversationId) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -60,14 +60,14 @@ internal fun ChatbotRoleChipsRoute(
         locked = call.configurationLocked,
         edgePadding = edgePadding,
         onToggleExpanded = { expanded = !expanded },
-        onSelect = { viewModel.onAction(SimpleChatPromptAction.Select(it)) },
+        onSelect = { viewModel.onAction(ChatbotPromptAction.Select(it)) },
     )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChatbotRoleChips(
-    state: SimpleChatPromptUiState,
+    state: ChatbotPromptUiState,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     onSelect: (String?) -> Unit,
@@ -181,7 +181,7 @@ private fun ChatbotRoleChipsLockedPreview() {
 @Composable
 private fun RoleChipsPreview(expanded: Boolean, locked: Boolean = false) {
     ChatbotRoleChips(
-        state = SimpleChatPromptUiState(
+        state = ChatbotPromptUiState(
             presets = listOf("Travel guide", "English tutor", "Writing coach", "Interview coach")
                 .map { ChatbotRolePreset(id = it, name = it, content = it) },
             selectedPresetId = "Travel guide",

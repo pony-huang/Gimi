@@ -47,14 +47,14 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 /**
- * 简单聊天预设管理页：官方预设与自建预设分两组展示。
+ * Chatbot 角色预设管理页：官方预设与自建预设分两组展示。
  * 官方预设只读可选中，行尾菜单只有「查看提示词」；自建预设可编辑删除，另加一行新建入口。
  * 预设数量由用户自建，规模小，直接在卡片 Column 内展开即可，不需要独立懒加载。
  */
 @Composable
-fun SimpleChatPromptSettingsScreen(
-    state: SimpleChatPromptUiState,
-    onAction: (SimpleChatPromptAction) -> Unit,
+fun ChatbotPromptSettingsScreen(
+    state: ChatbotPromptUiState,
+    onAction: (ChatbotPromptAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
@@ -71,7 +71,7 @@ fun SimpleChatPromptSettingsScreen(
                         title = stringResource(R.string.voice_prompt_preset_none),
                         subtitle = stringResource(R.string.voice_prompt_preset_none_detail),
                         showDivider = state.builtInPresets.isNotEmpty(),
-                        onClick = if (state.canSelect) ({ onAction(SimpleChatPromptAction.Select(null)) }) else null,
+                        onClick = if (state.canSelect) ({ onAction(ChatbotPromptAction.Select(null)) }) else null,
                         trailingContent = {
                             // 单选状态由仓库持有，圆钮本身不响应点击，统一走行点击。
                             // 不可点击的圆钮没有 48dp 最小触摸目标，会比下方可点击圆钮的圆心偏右；
@@ -88,7 +88,7 @@ fun SimpleChatPromptSettingsScreen(
                             title = preset.name,
                             subtitle = preset.description.ifBlank { preset.content },
                             showDivider = index != state.builtInPresets.lastIndex,
-                            onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
+                            onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { menuOpen = true }) {
@@ -99,13 +99,13 @@ fun SimpleChatPromptSettingsScreen(
                                             text = { Text(stringResource(R.string.voice_prompt_preset_view)) },
                                             onClick = {
                                                 menuOpen = false
-                                                onAction(SimpleChatPromptAction.ViewPrompt(preset.id))
+                                                onAction(ChatbotPromptAction.ViewPrompt(preset.id))
                                             },
                                         )
                                     }
                                     if (state.canSelect) RadioButton(
                                         selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
+                                        onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
                                     )
                                 }
                             },
@@ -124,7 +124,7 @@ fun SimpleChatPromptSettingsScreen(
                             title = preset.name,
                             subtitle = preset.content,
                             showDivider = true,
-                            onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
+                            onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { menuOpen = true }) {
@@ -135,20 +135,20 @@ fun SimpleChatPromptSettingsScreen(
                                             text = { Text(stringResource(R.string.voice_prompt_preset_edit)) },
                                             onClick = {
                                                 menuOpen = false
-                                                onAction(SimpleChatPromptAction.StartEdit(preset.id))
+                                                onAction(ChatbotPromptAction.StartEdit(preset.id))
                                             },
                                         )
                                         DropdownMenuItem(
                                             text = { Text(stringResource(R.string.voice_prompt_preset_delete)) },
                                             onClick = {
                                                 menuOpen = false
-                                                onAction(SimpleChatPromptAction.RequestDelete(preset.id))
+                                                onAction(ChatbotPromptAction.RequestDelete(preset.id))
                                             },
                                         )
                                     }
                                     if (state.canSelect) RadioButton(
                                         selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(if (state.canSelect) SimpleChatPromptAction.Select(preset.id) else SimpleChatPromptAction.ViewPrompt(preset.id)) },
+                                        onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
                                     )
                                 }
                             },
@@ -158,14 +158,14 @@ fun SimpleChatPromptSettingsScreen(
                         icon = Icons.Default.Add,
                         title = stringResource(R.string.voice_prompt_preset_create),
                         showDivider = state.presets.isNotEmpty(),
-                        onClick = { onAction(SimpleChatPromptAction.StartCreate) },
+                        onClick = { onAction(ChatbotPromptAction.StartCreate) },
                     )
                 }
             }
         }
     }
     state.editing?.let { editing ->
-        SimpleChatPromptEditDialog(
+        ChatbotPromptEditDialog(
             initialName = editing.name,
             initialContent = editing.content,
             initialDescription = editing.description,
@@ -174,27 +174,27 @@ fun SimpleChatPromptSettingsScreen(
         )
     }
     state.confirmDelete?.let { preset ->
-        SimpleChatPromptDeleteDialog(presetName = preset.name, onAction = onAction)
+        ChatbotPromptDeleteDialog(presetName = preset.name, onAction = onAction)
     }
     state.viewing?.let { preset ->
-        SimpleChatPromptViewDialog(preset = preset, onAction = onAction)
+        ChatbotPromptViewDialog(preset = preset, onAction = onAction)
     }
 }
 
 /** 新建与编辑共用一个弹层；名称和正文去空白后必须同时非空才能保存。 */
 @Composable
-private fun SimpleChatPromptEditDialog(
+private fun ChatbotPromptEditDialog(
     initialName: String,
     initialContent: String,
     initialDescription: String,
     creating: Boolean,
-    onAction: (SimpleChatPromptAction) -> Unit,
+    onAction: (ChatbotPromptAction) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var content by remember { mutableStateOf(initialContent) }
     var description by remember { mutableStateOf(initialDescription) }
     AlertDialog(
-        onDismissRequest = { onAction(SimpleChatPromptAction.DismissEdit) },
+        onDismissRequest = { onAction(ChatbotPromptAction.DismissEdit) },
         title = { Text(stringResource(if (creating) R.string.voice_prompt_preset_create else R.string.voice_prompt_preset_edit_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -224,11 +224,11 @@ private fun SimpleChatPromptEditDialog(
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank() && content.isNotBlank(),
-                onClick = { onAction(SimpleChatPromptAction.Save(name, content, description)) },
+                onClick = { onAction(ChatbotPromptAction.Save(name, content, description)) },
             ) { Text(stringResource(R.string.voice_prompt_preset_save)) }
         },
         dismissButton = {
-            TextButton(onClick = { onAction(SimpleChatPromptAction.DismissEdit) }) {
+            TextButton(onClick = { onAction(ChatbotPromptAction.DismissEdit) }) {
                 Text(stringResource(R.string.voice_prompt_preset_cancel))
             }
         },
@@ -236,22 +236,22 @@ private fun SimpleChatPromptEditDialog(
 }
 
 @Composable
-private fun SimpleChatPromptDeleteDialog(
+private fun ChatbotPromptDeleteDialog(
     presetName: String,
-    onAction: (SimpleChatPromptAction) -> Unit,
+    onAction: (ChatbotPromptAction) -> Unit,
 ) {
     AlertDialog(
-        onDismissRequest = { onAction(SimpleChatPromptAction.DismissDelete) },
+        onDismissRequest = { onAction(ChatbotPromptAction.DismissDelete) },
         title = { Text(stringResource(R.string.voice_prompt_preset_delete_title)) },
         text = { Text(stringResource(R.string.voice_prompt_preset_delete_text, presetName)) },
         confirmButton = {
-            TextButton(onClick = { onAction(SimpleChatPromptAction.ConfirmDelete) }) {
+            TextButton(onClick = { onAction(ChatbotPromptAction.ConfirmDelete) }) {
                 Text(stringResource(R.string.voice_prompt_preset_delete),
                     color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
-            TextButton(onClick = { onAction(SimpleChatPromptAction.DismissDelete) }) {
+            TextButton(onClick = { onAction(ChatbotPromptAction.DismissDelete) }) {
                 Text(stringResource(R.string.voice_prompt_preset_cancel))
             }
         },
@@ -260,12 +260,12 @@ private fun SimpleChatPromptDeleteDialog(
 
 /** 官方预设正文只读展示：完整提示词较长，弹层内可滚动查看。 */
 @Composable
-private fun SimpleChatPromptViewDialog(
+private fun ChatbotPromptViewDialog(
     preset: ChatbotRolePreset,
-    onAction: (SimpleChatPromptAction) -> Unit,
+    onAction: (ChatbotPromptAction) -> Unit,
 ) {
     AlertDialog(
-        onDismissRequest = { onAction(SimpleChatPromptAction.DismissViewPrompt) },
+        onDismissRequest = { onAction(ChatbotPromptAction.DismissViewPrompt) },
         title = { Text(preset.name) },
         text = {
             Column(
@@ -280,12 +280,12 @@ private fun SimpleChatPromptViewDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onAction(SimpleChatPromptAction.DismissViewPrompt) }) {
+            TextButton(onClick = { onAction(ChatbotPromptAction.DismissViewPrompt) }) {
                 Text(stringResource(R.string.voice_prompt_preset_view_close))
             }
         },
         dismissButton = {
-            TextButton(onClick = { onAction(SimpleChatPromptAction.CopyViewedPreset) }) {
+            TextButton(onClick = { onAction(ChatbotPromptAction.CopyViewedPreset) }) {
                 Text(stringResource(R.string.voice_prompt_preset_copy))
             }
         },
@@ -313,10 +313,10 @@ private val PreviewBuiltInPresets = listOf(
 )
 
 @Composable
-private fun SimpleChatPromptPagePreview(dark: Boolean, empty: Boolean = false) {
+private fun ChatbotPromptPagePreview(dark: Boolean, empty: Boolean = false) {
     github.ponyhuang.gimi.ui.theme.GimiTheme(darkTheme = dark) {
-        SimpleChatPromptSettingsScreen(
-            state = SimpleChatPromptUiState(
+        ChatbotPromptSettingsScreen(
+            state = ChatbotPromptUiState(
                 presets = if (empty) emptyList() else PreviewPresets,
                 builtInPresets = if (empty) emptyList() else PreviewBuiltInPresets,
                 canSelect = true,
@@ -329,36 +329,36 @@ private fun SimpleChatPromptPagePreview(dark: Boolean, empty: Boolean = false) {
 
 @Preview(name = "Presets light", showBackground = true, widthDp = 400, heightDp = 720, locale = "zh-rCN")
 @Composable
-private fun SimpleChatPromptPageLightPreview() {
-    SimpleChatPromptPagePreview(dark = false)
+private fun ChatbotPromptPageLightPreview() {
+    ChatbotPromptPagePreview(dark = false)
 }
 
 @Preview(name = "Presets dark", showBackground = true, widthDp = 400, heightDp = 720, locale = "zh-rCN",
     uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun SimpleChatPromptPageDarkPreview() {
-    SimpleChatPromptPagePreview(dark = true)
+private fun ChatbotPromptPageDarkPreview() {
+    ChatbotPromptPagePreview(dark = true)
 }
 
 @Preview(name = "Empty light", showBackground = true, widthDp = 400, heightDp = 480, locale = "zh-rCN")
 @Composable
-private fun SimpleChatPromptPageEmptyLightPreview() {
-    SimpleChatPromptPagePreview(dark = false, empty = true)
+private fun ChatbotPromptPageEmptyLightPreview() {
+    ChatbotPromptPagePreview(dark = false, empty = true)
 }
 
 @Preview(name = "Empty dark", showBackground = true, widthDp = 400, heightDp = 480, locale = "zh-rCN",
     uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun SimpleChatPromptPageEmptyDarkPreview() {
-    SimpleChatPromptPagePreview(dark = true, empty = true)
+private fun ChatbotPromptPageEmptyDarkPreview() {
+    ChatbotPromptPagePreview(dark = true, empty = true)
 }
 
 @Preview(name = "Edit dialog", showBackground = true, widthDp = 400, locale = "zh-rCN")
 @Composable
-private fun SimpleChatPromptEditDialogPreview() {
+private fun ChatbotPromptEditDialogPreview() {
     github.ponyhuang.gimi.ui.theme.GimiTheme {
-        SimpleChatPromptSettingsScreen(
-            state = SimpleChatPromptUiState(
+        ChatbotPromptSettingsScreen(
+            state = ChatbotPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
                 canSelect = true,
@@ -372,10 +372,10 @@ private fun SimpleChatPromptEditDialogPreview() {
 
 @Preview(name = "Delete dialog", showBackground = true, widthDp = 400, locale = "zh-rCN")
 @Composable
-private fun SimpleChatPromptDeleteDialogPreview() {
+private fun ChatbotPromptDeleteDialogPreview() {
     github.ponyhuang.gimi.ui.theme.GimiTheme {
-        SimpleChatPromptSettingsScreen(
-            state = SimpleChatPromptUiState(
+        ChatbotPromptSettingsScreen(
+            state = ChatbotPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
                 canSelect = true,
@@ -389,10 +389,10 @@ private fun SimpleChatPromptDeleteDialogPreview() {
 
 @Preview(name = "Prompt dialog", showBackground = true, widthDp = 400, locale = "zh-rCN")
 @Composable
-private fun SimpleChatPromptViewDialogPreview() {
+private fun ChatbotPromptViewDialogPreview() {
     github.ponyhuang.gimi.ui.theme.GimiTheme {
-        SimpleChatPromptSettingsScreen(
-            state = SimpleChatPromptUiState(
+        ChatbotPromptSettingsScreen(
+            state = ChatbotPromptUiState(
                 presets = PreviewPresets,
                 builtInPresets = PreviewBuiltInPresets,
                 canSelect = true,

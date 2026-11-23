@@ -2,6 +2,17 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [2.0.0-beta.4.0.1](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.4.0.1...v2.0.0-beta.4.0.1) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Unify local command execution.
+
+### Features
+
+* consolidate v1.0.0-beta.5 changes ([c30e4fd](https://github.com/pony-huang/Gimi/commit/c30e4fdb8bd2d04643feccf22a35457019904017))
+
 ## [1.0.0-beta.4.0.1](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.4...v1.0.0-beta.4.0.1) (2026-11-21)
 
 

@@ -46,8 +46,6 @@ fun DefaultModelSettingsScreen(
     state: DefaultModelSettingsUiState,
     onAction: (DefaultModelSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
-    /** 打开外部链接；音色选择器用它跳转官方音色列表。 */
-    onOpenUrl: (String) -> Unit = {},
     /** 从选择器空态进入添加服务；保存后宿主回到本页并再次打开该用途选择器。 */
     onAddService: (DefaultModelDialog) -> Unit = {},
 ) {
@@ -199,10 +197,6 @@ fun DefaultModelSettingsScreen(
                 isLoading = state.isTtsVoiceLoading,
                 onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it)) },
                 onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
-                // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
-                namingTemplate = state.ttsVoiceIdTemplate,
-                docsUrl = state.ttsVoiceDocsUrl,
-                onOpenUrl = onOpenUrl,
             )
         }
 

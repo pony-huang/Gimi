@@ -25,6 +25,7 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileScreenCoordinates
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileShellResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
+import github.ponyhuang.gimi.domain.mobileuse.MobileClickCandidate
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySessions
@@ -62,11 +63,13 @@ class ShizukuMobileUseRepository @Inject constructor(
     override val displaySession: StateFlow<MobileDisplaySession?> = sessions.session
     private val mutex = Mutex()
     private val inputMutex = Mutex()
+    @Volatile private var manualInputVersion = 0L
+    @Volatile private var manualGesture: Pair<String, Long>? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val args by lazy {
         Shizuku.UserServiceArgs(
             ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-        ).tag("gimi.mobileuse.shell").version(11).daemon(false).processNameSuffix("mobileuse")
+        ).tag("gimi.mobileuse.shell").version(SHIZUKU_USER_SERVICE_VERSION).daemon(false).processNameSuffix("mobileuse")
     }
     private val guard = MobileObservationGuard()
     // 连续 text_focus_unavailable 次数；仅在互斥锁内变更。到 2 时确定性硬停，不依赖模型自觉。
@@ -78,15 +81,18 @@ class ShizukuMobileUseRepository @Inject constructor(
 
     init {
         // 本循环只做断连探测：UserService 可能在 Shizuku 主进程退出后继续存活，
-        // 不能只依赖它的断连回调；几何刷新已移除，尺寸只在建屏和显式旋转时更新，
-        // 不能让预览或异常远端尺寸改写坐标基准。
+        // 不能只依赖它的断连回调；仅在有活跃显示会话时执行检测，空闲时完全挂起避免消耗电量。
         scope.launch {
-            while (true) {
-                delay(400)
-                val current = displaySession.value ?: continue
-                if (!Shizuku.pingBinder()) {
-                    mutex.withLock {
-                        if (displaySession.value?.id == current.id && !Shizuku.pingBinder()) closeLocked()
+            displaySession.collect { session ->
+                if (session != null) {
+                    while (displaySession.value?.id == session.id) {
+                        delay(400)
+                        if (!Shizuku.pingBinder()) {
+                            mutex.withLock {
+                                if (displaySession.value?.id == session.id && !Shizuku.pingBinder()) closeLocked()
+                            }
+                            break
+                        }
                     }
                 }
             }
@@ -208,6 +214,37 @@ class ShizukuMobileUseRepository @Inject constructor(
             observeResult(remote, id, owner, delivery, if (accepted) "clicked" else "action_rejected", "Click attempted once.")
         }
 
+    override suspend fun clickElement(owner: String, elementId: String): MobileUseResult =
+        perform(owner, action = true, allowCreate = false) { remote, id, delivery ->
+            val accepted = inputMutex.withLock {
+                val previous = guard.latest ?: return@withLock null
+                val target = previous.clickTargets[elementId] ?: return@withLock null
+                if (manualGesture?.let { it.first == physicalSessionId } == true ||
+                    previous.manualInputVersion != manualInputVersion
+                ) return@withLock null
+
+                // 输入锁覆盖读取、复核与投递，人工操作不能插入两者之间。
+                val before = readFrame(remote)
+                if (before.error != null || before.frame == null) return@withLock null
+                val current = nativeSnapshot(id, before.frame)
+                val after = readFrame(remote)
+                if (after.error != null || after.frame == null) return@withLock null
+                val bounds = target.bounds
+                val region = tapBounds(bounds.centerX, bounds.centerY)
+                if (guard.rejection(owner, id, previous.id, now(), after.frame, current, coordinateBounds = region) != null ||
+                    !MobileFrameStability.sameRegion(before.frame, after.frame, bounds) ||
+                    !MobileFrameStability.sameRegion(previous.frame, after.frame, bounds) ||
+                    target !in current.clickTargets()
+                ) return@withLock null
+                attempt(delivery) { remote.tap(id, bounds.centerX, bounds.centerY) }
+            }
+            if (accepted == null) {
+                if (guard.latest?.clickTargets?.containsKey(elementId) == true) guard.clear()
+                return@perform invalid("stale_observation", "Control is no longer available; observe the current screen again.")
+            }
+            observeResult(remote, id, owner, delivery, if (accepted) "clicked" else "action_rejected", "Control click attempted once.")
+        }
+
     override suspend fun dragAndDrop(
         owner: String, startX: Int, startY: Int, endX: Int, endY: Int, holdMs: Int,
     ): MobileUseResult = coordinateAction(owner, startX, startY, swipe = holdMs == 0) { remote, id, px, py, screen, delivery ->
@@ -266,32 +303,26 @@ class ShizukuMobileUseRepository @Inject constructor(
                 observeResult(remote, id, owner, delivery, status, "Shell command attempted once; inspect output and screen before continuing.")
             } catch (failure: CancellationException) {
                 throw failure
-            } catch (_: RemoteException) {
-                MobileUseResult(status, "Shell returned; screenshot unavailable. Do not automatically repeat the command.")
-            } catch (_: RuntimeException) {
+            } catch (_: Exception) {
                 MobileUseResult(status, "Shell returned; screenshot unavailable. Do not automatically repeat the command.")
             }
             observed.copy(shellResult = outcome)
         }
 
-    /** 匹配以 input 开头的命令；input 的显示参数必须紧跟在 input 之后，不能落在子命令后面。 */
-    private val shellInputStart = Regex("""^\s*input\b""")
-    private val shellInputWithDisplay = Regex("""^\s*input\s+(?:-d|--display)\b""")
-    private val shellInputText = Regex("""^\s*input(?:\s+(?:-d|--display)\s+\S+)?\s+text\s+(.+)$""", RegexOption.DOT_MATCHES_ALL)
+    /** 匹配位于命令起始或命令分隔符后的 input 命令（紧随子命令的非 ASCII 载荷直接拒绝，缺失 -d/--display 时自动注入当前副屏编号）。 */
+    private val shellInputText = Regex("""(?<=^|[;&|\n])\s*input(?:\s+(?:-d|--display)\s+\S+)?\s+text\s+([^;&|\n]+)""")
+    private val shellInputWithoutDisplay = Regex("""(?<=^|[;&|\n])(\s*)input\b(?!\s+(?:-d|--display)\b)""")
 
     /**
-     * input 命令不带显示参数时默认作用于主屏：自动补上受控副屏的 -d，避免静默写错屏幕。
+     * input 命令不带显示参数时默认作用于主屏：自动补上受控副屏的 -d，避免静默写错屏幕（复合命令中亦生效）。
      * input text 的非 ASCII 载荷会让平台命令抛 NPE，必须提前拒绝并指路 mobile_type；返回 null 表示拒绝。
      */
     private fun prepareShellInput(command: String, displayId: Int): String? {
-        val payload = shellInputText.find(command)?.groupValues?.get(1)
-        if (payload != null && payload.any { it.code !in 0x20..0x7E }) return null
-        return when {
-            shellInputWithDisplay.containsMatchIn(command) -> command
-            // 替换串不带尾随空格：原命令 input 后的空白原样保留，避免拼出双空格。
-            shellInputStart.containsMatchIn(command) -> shellInputStart.replaceFirst(command, "input -d $displayId")
-            else -> command
+        for (match in shellInputText.findAll(command)) {
+            val payload = match.groupValues[1]
+            if (payload.any { it.code !in 0x20..0x7E }) return null
         }
+        return shellInputWithoutDisplay.replace(command) { "${it.groupValues[1]}input -d $displayId" }
     }
 
     override suspend fun pressKey(owner: String, key: MobileKey): MobileUseResult =
@@ -394,20 +425,31 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     override suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult = manual(sessionId) { remote, id ->
-        if (remote.touch(id, touch.action.ordinal, touch.x, touch.y, touch.gestureId, touch.eventTimeMs)) {
+        manualInputVersion++
+        val gesture = sessionId to touch.gestureId
+        val accepted = remote.touch(id, touch.action.ordinal, touch.x, touch.y, touch.gestureId, touch.eventTimeMs)
+        when (touch.action) {
+            MobileTouchAction.DOWN -> if (accepted) manualGesture = gesture
+            MobileTouchAction.UP, MobileTouchAction.CANCEL -> if (manualGesture == gesture) manualGesture = null
+            MobileTouchAction.MOVE -> Unit
+        }
+        if (accepted) {
             MobileUseResult("delivered", "", actionStatus = MobileUseResult.ACTION_DELIVERED)
         } else invalid(if (touch.action == MobileTouchAction.DOWN) "input_unavailable" else "input_rejected", "Touch was not accepted.")
     }
 
     override suspend fun manualBack(sessionId: String): MobileUseResult = manual(sessionId) { remote, id ->
+        manualInputVersion++
         if (remote.back(id)) MobileUseResult("delivered", "", actionStatus = MobileUseResult.ACTION_DELIVERED)
         else invalid("input_rejected", "Back was not accepted.")
     }
 
     override suspend fun manualRotate(sessionId: String): MobileUseResult {
         val result = manual(sessionId) { remote, id ->
+            manualInputVersion++
             val geometry = remote.rotateDisplay(id)
             require(geometry.size >= 2 && geometry[0] > 0 && geometry[1] > 0)
+            manualGesture = null
             sessions.update(sessionId, geometry[0], geometry[1])
             MobileUseResult("delivered", "", displayId = id, width = geometry[0], height = geometry[1], actionStatus = MobileUseResult.ACTION_DELIVERED)
         }
@@ -439,9 +481,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                     sessions.clear(blockOwner = true)
                     scope.launch { mutex.withLock { if (service === remote) closeLocked() } }
                     invalid("session_lost", "Connection lost.")
-                } catch (_: RemoteException) {
-                    invalid("input_unavailable", "Input unavailable.")
-                } catch (_: RuntimeException) {
+                } catch (_: Exception) {
                     invalid("input_unavailable", "Input unavailable.")
                 }
             }
@@ -562,9 +602,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                 closeLocked()
                 MobileUseResult("session_lost", "Service disconnected. Action may have executed; observe, do not repeat it.",
                     actionStatus = delivery.status)
-            } catch (failure: RemoteException) {
-                operationFailure(failure, delivery)
-            } catch (failure: RuntimeException) {
+            } catch (failure: Exception) {
                 operationFailure(failure, delivery)
             }
         }
@@ -601,12 +639,14 @@ class ShizukuMobileUseRepository @Inject constructor(
     ): MobileUseResult {
         guard.clear()
         val startedAt = now()
+        val inputVersion = manualInputVersion
         val requiredFrameAfterMs = guard.requiredFrameAfterMs
         // 动作后的新帧要求跨 observe 调用保留；超时后的旧缓存不能在下一次观察中重新变成 settled。
         val stability = MobileFrameStability(startedAt, requiredFrameAfterMs)
         var frame: CapturedMobileFrame? = null
         var native = MobileAccessibilitySnapshot("not_captured")
         var state = "timeout"
+        var alignedFrame: CapturedMobileFrame? = null
         var reason = "no_frame"
         var captureError: String? = null
         while (now() - startedAt < OBSERVATION_TIMEOUT_MS) {
@@ -622,6 +662,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                     (accessibility?.lastChangeMs(id) ?: 0) <= native.lastChangeMs
                 ) {
                     frame = checked.frame
+                    alignedFrame = checked.frame
                     state = "settled"
                     reason = "quiet_pixels_and_target_window_events"
                     break
@@ -634,6 +675,10 @@ class ShizukuMobileUseRepository @Inject constructor(
             ) {
                 native = nativeSnapshot(id, frame)
                 if (native.consistent) {
+                    if (native.status == "available" && native.targets.isNotEmpty()) {
+                        val checked = readFrame(remote)
+                        if (checked.error == null) alignedFrame = checked.frame
+                    }
                     // 轮播、广告和计时器可以长期变化；一帧动作后的画面已足够交给模型判断，
                     // 后续动作会在发送前再次复核目标局部，而不是重复等待整屏静止。
                     state = "changing"
@@ -658,11 +703,27 @@ class ShizukuMobileUseRepository @Inject constructor(
             nodesStatus = native.status
             truncated = native.truncated
         }
-        val actionable = frame != null && captureError == null && native.consistent
+        val before = frame
+        val after = alignedFrame
+        val actionable = before != null && captureError == null && native.consistent
+        val stableTargets = if (actionable && after != null && inputVersion == manualInputVersion &&
+            manualGesture?.let { it.first == physicalSessionId } != true &&
+            (requiredFrameAfterMs == null || before.capturedAtMs > requiredFrameAfterMs)
+        ) {
+            native.clickTargets()
+                .filter { target ->
+                    val bounds = target.bounds
+                    MobileFrameStability.sameRegion(before, after, bounds) &&
+                        MobileFrameStability.sameRegion(before, after, tapBounds(bounds.centerX, bounds.centerY))
+                }
+                .distinctBy { it.node.element.windowId to it.node.clickPath }
+        } else emptyList()
+        val clickTargets = stableTargets.take(MAX_CLICK_CANDIDATES)
+            .mapIndexed { index, target -> "$observationId:${index + 1}" to target }.toMap()
         if (actionable) {
-            guard.confirmFrame(frame)
-            guard.record(MobileObservedScreen(observationId, owner, id, observedAt, frame, native, elements,
-                actionsAllowed = pixelActionsAllowed))
+            guard.confirmFrame(before)
+            guard.record(MobileObservedScreen(observationId, owner, id, observedAt, before, native, elements,
+                actionsAllowed = pixelActionsAllowed, clickTargets = clickTargets, manualInputVersion = inputVersion))
         }
         if (frame == null) state = "frame_unavailable"
         val observation = MobileObservation(
@@ -673,10 +734,16 @@ class ShizukuMobileUseRepository @Inject constructor(
                     add("pixel_coordinates")
                     add("swipe_coordinates")
                 }
+                if (clickTargets.isNotEmpty()) add("element_click")
                 add("back")
             },
+            clickCandidates = clickTargets.map { (key, target) ->
+                MobileClickCandidate(key, target.label, target.bounds, target.context)
+            },
+            clickCandidatesTruncated = clickTargets.isNotEmpty() &&
+                (native.truncated || stableTargets.size > MAX_CLICK_CANDIDATES),
         )
-        Log.i("GimiMobileUse", "Observation: display=$id state=$state reason=$reason action=${delivery.status} nodes=${elements.size}")
+        Log.i("GimiMobileUse", "Observation: display=$id state=$state reason=$reason action=${delivery.status} nodes=${elements.size} controls=${clickTargets.size}")
         return MobileUseResult(status,
             "$message Observation=$state ($reason). A quiet frame does not prove business loading is complete.",
             id, frame?.jpeg, frame?.width, frame?.height, delivery.status, observation)
@@ -801,9 +868,12 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     private companion object {
+        /** Shizuku UserService 协议版本；UserService 实现或 AIDL 变更时递增以使旧服务进程失效。 */
+        const val SHIZUKU_USER_SERVICE_VERSION = 11
         /** 始终变化的页面也只需取得动作后的新帧；给首帧编码留出短暂时间。 */
         const val CHANGING_OBSERVATION_GRACE_MS = 1_000L
         const val OBSERVATION_TIMEOUT_MS = 6_000L
+        const val MAX_CLICK_CANDIDATES = 40
     }
 }
 

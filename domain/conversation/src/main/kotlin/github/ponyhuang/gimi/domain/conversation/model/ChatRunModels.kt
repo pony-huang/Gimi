@@ -25,6 +25,7 @@ data class ChatRunEvent(
     val finishReason: ChatFinishReason? = null,
     /** 会话标题：厂商随回答顺带返回时由事件带出，宿主决定是否落库。 */
     val conversationTitle: String? = null,
+    val webCitations: List<WebCitation> = emptyList(),
 )
 
 data class ChatRunPart(

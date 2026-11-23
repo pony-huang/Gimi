@@ -146,11 +146,17 @@ class CompanionEnvironmentRepository @Inject constructor(
     override suspend fun readFile(session: String, path: String): ByteArray = call("read", args(session, path)).getByteArray("bytes") ?: byteArrayOf()
     override suspend fun writeFile(session: String, path: String, content: ByteArray) { call("write", args(session, path).apply { putByteArray("bytes", content) }) }
     override suspend fun startJob(session: String, command: String, keepAlive: Boolean): String = call("startJob", args(session).apply { putString("command", command); putBoolean("keepAlive", keepAlive) }).getString("id") ?: throw IOException("Missing job")
+    override suspend fun writeJobInput(session: String, id: String, chars: String) {
+        call("writeJobInput", args(session).apply {
+            putString("id", id)
+            putString("chars", chars)
+        })
+    }
     override suspend fun queryJob(session: String, id: String): EnvironmentJobStatus =
         call("queryJob", args(session).apply { putString("id", id) }).let {
             val running = it.getBoolean("running")
             EnvironmentJobStatus(running, it.getString("stdout").orEmpty(), it.getString("stderr").orEmpty(),
-                if (running) null else it.getInt("exitCode"), it.getBoolean("timedOut"))
+                if (running || !it.containsKey("exitCode")) null else it.getInt("exitCode"), it.getBoolean("timedOut"))
         }
     override suspend fun stopJob(session: String, id: String) { call("stopJob", args(session).apply { putString("id", id) }) }
     private fun Bundle.commandResult() = EnvironmentCommandResult(getString("stdout").orEmpty(), getString("stderr").orEmpty(), getInt("exitCode"), getBoolean("timedOut"))

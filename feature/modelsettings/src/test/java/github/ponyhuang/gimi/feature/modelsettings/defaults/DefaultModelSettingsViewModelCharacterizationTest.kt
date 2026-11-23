@@ -5,6 +5,7 @@ import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -23,14 +24,18 @@ import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityNotSupported
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
@@ -53,6 +58,51 @@ class DefaultModelSettingsViewModelCharacterizationTest {
             assertEquals(listOf("chat"), state.chatModels.map { it.model.id })
             assertEquals(listOf("stt"), state.speechModels.map { it.model.id })
             assertEquals(listOf("tts"), state.ttsModels.map { it.model.id })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun unavailableSpeechDefaultsDoNotShowModelsOrLoadVoices() = runTest {
+        val instance = instance()
+        val connection = instance.connections.single()
+        val unkeyedVoiceConnection = connection.copy(
+            id = "voice",
+            credential = CredentialSource.Independent(""),
+            models = listOf(
+                Model("tts", "TTS", capabilities = setOf(ModelCapability.TTS)),
+                Model("realtime", "Realtime", capabilities = setOf(ModelCapability.Realtime)),
+            ),
+        )
+        val chatConnection = connection.copy(models = connection.models.filter { it.id != "tts" })
+        val instances = MutableStateFlow(listOf(instance.copy(connections = listOf(chatConnection, unkeyedVoiceConnection))))
+        val tts = ModelSelection(instance.id, unkeyedVoiceConnection.id, "tts")
+        val realtime = ModelSelection(instance.id, unkeyedVoiceConnection.id, "realtime")
+        val repository = repository(ttsSelection = tts, realtimeSelection = realtime)
+        every { repository.observeInstances() } returns instances
+        val voices = mockk<TtsVoiceRepository> { coEvery { getVoices(any()) } returns emptyList() }
+
+        viewModel(repository, voices).uiState.test {
+            runCurrent()
+            val unavailable = expectMostRecentItem()
+            assertTrue(unavailable.chatModels.isNotEmpty())
+            assertTrue(unavailable.ttsModels.isEmpty())
+            assertTrue(unavailable.realtimeModels.isEmpty())
+            assertNull(unavailable.ttsSelection)
+            assertNull(unavailable.realtimeSelection)
+            assertEquals("", unavailable.ttsVoiceId)
+            coVerify(exactly = 0) { voices.getVoices(any()) }
+
+            val keyedVoiceConnection = unkeyedVoiceConnection.copy(credential = CredentialSource.Independent("voice-key"))
+            instances.value = listOf(instance.copy(connections = listOf(chatConnection, keyedVoiceConnection)))
+            runCurrent()
+            val available = expectMostRecentItem()
+            assertEquals(tts, available.ttsModels.single().selection())
+            assertEquals(realtime, available.realtimeModels.single().selection())
+            assertEquals(tts, available.ttsSelection)
+            assertEquals(realtime, available.realtimeSelection)
+            assertEquals("female-shaonv", available.ttsVoiceId)
+            coVerify(exactly = 1) { voices.getVoices(tts) }
             cancelAndIgnoreRemainingEvents()
         }
     }

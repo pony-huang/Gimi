@@ -21,6 +21,7 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
@@ -49,7 +50,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
             observeSettings()
                 .collectLatest { settings ->
                     val selection = settings.ttsSelection
-                    if (selection == null) {
+                    if (selection == null || settings.resolveTtsConnection() == null) {
                         ttsVoiceOptions.value = emptyList()
                         return@collectLatest
                     }
@@ -66,8 +67,11 @@ class DefaultModelSettingsViewModel @Inject constructor(
                         if (settings.ttsVoiceId.isBlank()) {
                             voices.firstOrNull()?.let { updateSettings.voice(it.id) }
                         }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (_: Exception) {
                         // 出错由 Repository / Provider 内部降级，若仍然异常则置空由兜底策略生效
+                        ttsVoiceOptions.value = emptyList()
                     } finally {
                         isTtsVoiceLoading.value = false
                     }
@@ -96,12 +100,13 @@ class DefaultModelSettingsViewModel @Inject constructor(
         combine(ttsVoiceOptions, isTtsVoiceLoading) { options, loading -> options to loading },
         mutableNotice,
     ) { settings, currentDialog, runtimeState, voiceOptions, notice ->
-        val ttsTemplateId = settings.instances.resolveConnection(settings.ttsSelection)?.templateId
+        val ttsTemplateId = settings.resolveTtsConnection()?.templateId
         settings.toUiState(
             dialog = currentDialog,
             isMutationBlocked = runtimeState.isBusy,
-            ttsVoiceOptions = voiceOptions.first.ifEmpty { voiceCatalog.builtInVoices(ttsTemplateId) },
-            isTtsVoiceLoading = voiceOptions.second,
+            ttsVoiceOptions = if (ttsTemplateId == null) emptyList()
+                else voiceOptions.first.ifEmpty { voiceCatalog.builtInVoices(ttsTemplateId) },
+            isTtsVoiceLoading = ttsTemplateId != null && voiceOptions.second,
             ttsTemplateId = ttsTemplateId,
         ).copy(notice = notice)
     }.stateIn(
@@ -148,7 +153,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
                             github.ponyhuang.gimi.feature.modelsettings.R.string.modelsettings_agent_mutation_blocked,
                         )
                 }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 // 语音偏好写入失败会从仓库上抛：反馈保存失败并保留弹窗供重试，
@@ -202,6 +207,12 @@ class DefaultModelSettingsViewModel @Inject constructor(
         }
     }
 
+    private fun DefaultModelSettings.resolveTtsConnection() =
+        instances.resolveConnection(ttsSelection)?.takeIf { connection ->
+            ModelCapability.TTS in connection.model.capabilities &&
+                connection.templateId?.let { voiceCapabilities.isSupported(it, ModelCapability.TTS) } == true
+        }
+
     private fun DefaultModelSettings.toUiState(
         dialog: DefaultModelDialog?,
         isMutationBlocked: Boolean,
@@ -214,35 +225,23 @@ class DefaultModelSettingsViewModel @Inject constructor(
         // 会静默回落到级联链路（而级联要求 STT/TTS 能力），选它只会得到起不来的会话。
         // 这里整组隐藏而不是像 STT/TTS 那样"显示但不可选"——级联模型不可选仍可让用户看出
         // 厂商缺哪一项能力，而 Realtime 没有第二条链路可言，只会把人引到起不来的会话上。
-        val realtimeRows = configuredInstances
-            .filter { instance ->
-                val templateId = instance.templateId
-                templateId != null && voiceCapabilities.isSupported(templateId, ModelCapability.Realtime)
-            }
-            .flatMap { instance ->
-                instance.connections.flatMap { connection ->
-                    connection.models.filter { ModelCapability.Realtime in it.capabilities }.map { model ->
-                        SelectableModelRow(
-                            instance = instance,
-                            connection = connection,
-                            model = model,
-                            capability = ModelCapability.Realtime,
-                            isSupported = true,
-                        )
-                    }
-                }
-            }
+        val realtimeRows = configuredInstances.rows(
+            predicate = { ModelCapability.Realtime in it.capabilities },
+            requiredCapability = { ModelCapability.Realtime },
+        ).filter { it.isSupported && instances.resolveConnection(it.selection()) != null }
+        val ttsRows = configuredInstances.rows(
+            predicate = { ModelCapability.TTS in it.capabilities },
+            requiredCapability = { ModelCapability.TTS },
+        ).filter { instances.resolveConnection(it.selection()) != null }
         return DefaultModelSettingsUiState(
             assistantSelection = assistantSelection,
             fastSelection = fastSelection,
             speechSelection = speechSelection,
-            ttsSelection = ttsSelection,
-            ttsVoiceId = ttsVoiceId,
+            ttsSelection = ttsSelection.takeIf { ttsTemplateId != null },
+            ttsVoiceId = ttsVoiceId.takeIf { ttsTemplateId != null }.orEmpty(),
             ttsVoiceOptions = ttsVoiceOptions,
             isTtsVoiceLoading = isTtsVoiceLoading,
             ttsVoiceCustomInputAllowed = voiceCatalog.allowsCustomVoice(ttsTemplateId),
-            ttsVoiceIdTemplate = voiceCatalog.customVoiceIdTemplate(ttsTemplateId),
-            ttsVoiceDocsUrl = voiceCatalog.customVoiceListUrl(ttsTemplateId),
             chatModels = configuredInstances.rows(
                 predicate = { ModelCapability.LLM in it.capabilities },
             ),
@@ -250,11 +249,10 @@ class DefaultModelSettingsViewModel @Inject constructor(
                 predicate = { it.capabilities.any { capability -> capability.isRecognition } },
                 requiredCapability = { it.recognitionCapability },
             ),
-            ttsModels = configuredInstances.rows(
-                predicate = { ModelCapability.TTS in it.capabilities },
-                requiredCapability = { ModelCapability.TTS },
-            ),
-            realtimeSelection = realtimeSelection,
+            ttsModels = ttsRows,
+            realtimeSelection = realtimeSelection.takeIf { selection ->
+                realtimeRows.any { it.selection() == selection }
+            },
             realtimeModels = realtimeRows,
             dialog = dialog,
             isMutationBlocked = isMutationBlocked,

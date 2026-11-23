@@ -10,6 +10,8 @@ interface MobileUseController {
     suspend fun registerExecution(owner: String, chatId: String)
     suspend fun openApp(owner: String, appName: String): MobileUseResult
     suspend fun click(owner: String, x: Int, y: Int): MobileUseResult
+    /** 点击本次执行最新截图中公布的控件编号。 */
+    suspend fun clickElement(owner: String, elementId: String): MobileUseResult
     suspend fun listApps(owner: String): MobileUseResult
     suspend fun wait(owner: String, seconds: Int = 1): MobileUseResult
     suspend fun goBack(owner: String): MobileUseResult

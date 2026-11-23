@@ -33,6 +33,8 @@ public object OfficialToolIds {
      * wire 形态（Anthropic 协议为 `web_search_20250305`）。
      */
     public const val PROVIDER_WEB_SEARCH: String = "provider_web_search"
+    public const val DEEPSEEK_NATIVE_WEB_SEARCH: String = "deepseek_native_web_search"
+    public const val DEEPSEEK_NATIVE_READ_URL: String = "deepseek_native_read_url"
 
     /**
      * GLM 在一个工具目录下展开两个本地执行函数，函数 ID 即厂商协议函数名

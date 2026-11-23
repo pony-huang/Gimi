@@ -20,7 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** 服务列表投影：实例流与目录加载状态按序组合；搜索词只改列表状态。 */
+/** 服务列表投影：实例流与目录加载状态按序组合。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ModelServiceListViewModelTest {
     @get:Rule
@@ -37,26 +37,6 @@ class ModelServiceListViewModelTest {
             while (state.items.isEmpty()) state = awaitItem()
             assertEquals(CatalogLoadState.Ready, state.loadState)
             assertEquals(listOf("OpenAI 个人"), state.items.map { it.name })
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun queryChangesUpdateListStateWithoutTouchingRepository() = runTest {
-        val repository = repository()
-        val viewModel = viewModel(repository)
-        viewModel.uiState.test {
-            awaitItem()
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        viewModel.onAction(ModelServiceListAction.QueryChanged("openai"))
-
-        viewModel.uiState.test {
-            var state = awaitItem()
-            while (state.query.isEmpty()) state = awaitItem()
-            assertEquals("openai", state.query)
             cancelAndIgnoreRemainingEvents()
         }
     }

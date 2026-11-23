@@ -129,8 +129,8 @@ class PlaybackEchoGuard(
         /** 静置超过这么久才丢弃回声基线；短于此视为同一轮播报的句间间隙。 */
         const val PLAYBACK_IDLE_NANOS = 1_200_000_000L
 
-        /** 近端人声的 VAD 置信门槛，明显高于切句器的 0.6。 */
-        const val NEAR_END_PROBABILITY = 0.8f
+        /** 近端人声的 VAD 置信门槛，明显高于切句器的 0.75；室外人群声电平容易过电平对比，置信门槛是主要增量防线。 */
+        const val NEAR_END_PROBABILITY = 0.85f
 
         /** 麦克风电平至少要达到播放参考电平的这个比例，才可能是近端人声。 */
         const val NEAR_END_REFERENCE_RATIO = 0.65f
@@ -138,8 +138,8 @@ class PlaybackEchoGuard(
         /** 电平超出回声基线多少才认作近端语音（0..1 刻度，约 7 dB）。 */
         const val NEAR_END_LEVEL_MARGIN = 0.12f
 
-        /** 连续命中的 32 ms 帧数，压掉回声里的瞬态尖峰。 */
-        const val NEAR_END_FRAMES = 3
+        /** 连续命中的 32 ms 帧数，压掉回声与室外环境声里的瞬态尖峰（5 帧约 160 ms）。 */
+        const val NEAR_END_FRAMES = 5
 
         /** 打断确认后，概率低于此值就解除放行闩锁。 */
         const val NEAR_END_RELEASE_PROBABILITY = 0.5f

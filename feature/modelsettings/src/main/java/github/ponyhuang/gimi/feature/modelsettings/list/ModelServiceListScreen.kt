@@ -31,7 +31,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.feature.modelsettings.detail.ServiceListPreviewFixtures
-import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import androidx.compose.material.icons.automirrored.outlined.Chat
@@ -60,7 +59,6 @@ internal data class ServiceListRow(
 @Composable
 fun ModelServiceListScreen(
     state: ModelServiceListUiState,
-    onAction: (ModelServiceListAction) -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onAddService: () -> Unit,
     onOpenDefaults: () -> Unit,
@@ -76,24 +74,10 @@ fun ModelServiceListScreen(
                 Modifier.padding(24.dp),
             )
             CatalogLoadState.Ready -> {
-                val normalizedQuery = state.query.trim()
-                val instances = state.items.filter { instance ->
-                    normalizedQuery.isBlank() ||
-                        instance.name.contains(normalizedQuery, ignoreCase = true) ||
-                        sourceLabel(instance).contains(normalizedQuery, ignoreCase = true)
-                }
-                Column(Modifier.fillMaxSize()) {
-                    GimiSearchField(
-                        state.query,
-                        { onAction(ModelServiceListAction.QueryChanged(it)) },
-                        placeholder = stringResource(R.string.modelsettings_search_service),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                    if (instances.isEmpty() && normalizedQuery.isBlank()) {
-                        EmptyServiceList(onAddService)
-                    } else {
-                        ServiceListContent(instances, normalizedQuery, onNavigateToDetail, onOpenDefaults)
-                    }
+                if (state.items.isEmpty()) {
+                    EmptyServiceList(onAddService)
+                } else {
+                    ServiceListContent(state.items, onNavigateToDetail, onOpenDefaults)
                 }
             }
         }
@@ -103,24 +87,19 @@ fun ModelServiceListScreen(
 @Composable
 private fun ServiceListContent(
     instances: List<ModelServiceInstance>,
-    normalizedQuery: String,
     onNavigateToDetail: (String) -> Unit,
     onOpenDefaults: () -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
         item { PreferenceSectionTitle(stringResource(R.string.modelsettings_list_section_configured)) }
-        if (instances.isEmpty()) {
-            item { PreferenceSectionNote(stringResource(R.string.modelsettings_no_matches)) }
-        } else {
-            item {
-                PreferenceGroupCard {
-                    instances.forEachIndexed { index, instance ->
-                        ServiceListRowItem(
-                            row = instance.toListRow(),
-                            showDivider = index < instances.lastIndex,
-                            onClick = { onNavigateToDetail(instance.id) },
-                        )
-                    }
+        item {
+            PreferenceGroupCard {
+                instances.forEachIndexed { index, instance ->
+                    ServiceListRowItem(
+                        row = instance.toListRow(),
+                        showDivider = index < instances.lastIndex,
+                        onClick = { onNavigateToDetail(instance.id) },
+                    )
                 }
             }
         }
@@ -140,7 +119,7 @@ private fun ServiceListContent(
 
 @Composable
 private fun ServiceListRowItem(row: ServiceListRow, showDivider: Boolean, onClick: () -> Unit) {
-    // 与「添加服务 · 内置服务商」共用同一行骨架：24dp 品牌图标 + 标题/说明两行，
+    // 与「添加服务商 · 内置服务商」共用同一行骨架：24dp 品牌图标 + 标题/说明两行，
     // 行高、内边距、分隔线内缩与尾部箭头都由 PreferenceListItem 统一给出。
     PreferenceListItem(
         title = row.instance.name,
@@ -178,15 +157,6 @@ private fun EmptyServiceList(onAddService: () -> Unit) {
             Text(stringResource(R.string.modelsettings_add_service))
         }
     }
-}
-
-/** 实例的来源行：模板品牌名，或自定义服务的协议说明。 */
-internal fun sourceLabel(instance: ModelServiceInstance): String = when (val templateId = instance.templateId) {
-    null -> when (instance.conversationConnection?.protocol) {
-        ApiProtocol.Anthropic -> PROTOCOL_LABEL_ANTHROPIC
-        else -> PROTOCOL_LABEL_OPENAI
-    }
-    else -> templateId
 }
 
 /** 说明行：来源（仅自定义服务）+ 能力摘要；停用服务整行加停用前缀。 */
@@ -232,9 +202,6 @@ private fun ModelServiceInstance.localizedSummary(): String {
     return counts.joinToString(" · ").ifEmpty { stringResource(R.string.modelsettings_summary_unconfigured) }
 }
 
-private const val PROTOCOL_LABEL_ANTHROPIC = "Messages"
-private const val PROTOCOL_LABEL_OPENAI = "Completions"
-
 // ---- Previews ----
 
 private val capabilityIcons = mapOf(
@@ -257,7 +224,6 @@ private fun ServiceListPreview() {
     GimiTheme {
         ModelServiceListScreen(
             state = ModelServiceListUiState(loadState = CatalogLoadState.Ready, items = ServiceListPreviewFixtures()),
-            onAction = {},
             onNavigateToDetail = {},
             onAddService = {},
             onOpenDefaults = {},
@@ -275,7 +241,6 @@ private fun EmptyServiceListPreview() {
     GimiTheme {
         ModelServiceListScreen(
             state = ModelServiceListUiState(loadState = CatalogLoadState.Ready),
-            onAction = {},
             onNavigateToDetail = {},
             onAddService = {},
             onOpenDefaults = {},
@@ -289,7 +254,6 @@ private fun NarrowServiceListPreview() {
     GimiTheme {
         ModelServiceListScreen(
             state = ModelServiceListUiState(loadState = CatalogLoadState.Ready, items = ServiceListPreviewFixtures()),
-            onAction = {},
             onNavigateToDetail = {},
             onAddService = {},
             onOpenDefaults = {},

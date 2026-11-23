@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.modelaccess.deepseek.llm
 
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.messagesRequestBlocks
 import com.anthropic.core.JsonValue
 import com.anthropic.core.JsonValue.Companion.from
 import com.anthropic.core.jsonMapper
@@ -57,6 +58,7 @@ internal class DeepSeekMessageRequestConverter(
     private val defaultMaxTokens: Int,
     /** 每次请求取一次 latest_reminder 内容；null 或空白表示本轮不注入。 */
     private val latestReminder: (() -> String?)? = null,
+    private val webSearchReplayScope: String? = null,
 ) {
     private val jsonMapper = jsonMapper()
 
@@ -165,7 +167,7 @@ internal class DeepSeekMessageRequestConverter(
     }
 
     internal fun contentToAnthropicMessageParam(content: Content): MessageParam? {
-        val blocks = content.parts.mapNotNull { it.toContentBlockParam() }
+        val blocks = content.messagesRequestBlocks(webSearchReplayScope) { it.toContentBlockParam() }
         if (blocks.isEmpty()) return null
         return MessageParam.builder()
             .role(toClaudeRole(content.role.toString()))
@@ -353,11 +355,16 @@ internal class DeepSeekMessageRequestConverter(
      * 一律按普通函数下发。
      */
     private fun nativeProviderTool(declarationName: String): ToolUnion? = when (declarationName) {
+        OfficialToolIds.DEEPSEEK_NATIVE_WEB_SEARCH -> deepSeekHostedTool("deepseek_web_search")
+        OfficialToolIds.DEEPSEEK_NATIVE_READ_URL -> deepSeekHostedTool("deepseek_read_url")
         OfficialToolIds.PROVIDER_WEB_SEARCH ->
             ToolUnion.ofWebSearchTool20250305(WebSearchTool20250305.builder().build())
 
         else -> null
     }
+
+    private fun deepSeekHostedTool(name: String): ToolUnion =
+        jsonMapper.convertValue(mapOf("type" to name, "name" to name), ToolUnion::class.java)
 
     private fun Schema.toClaudeParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()

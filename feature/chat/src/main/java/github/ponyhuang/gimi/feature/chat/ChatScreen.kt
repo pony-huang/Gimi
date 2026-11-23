@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
@@ -66,7 +65,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -163,6 +164,7 @@ fun ChatScaffold(
     onUploadedFilePrune: (Collection<String>) -> Unit = {},
     attachFileRequests: Flow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = kotlinx.coroutines.flow.emptyFlow(),
     chatMode: github.ponyhuang.gimi.domain.conversation.model.ChatMode? = null,
+    onOpenWebSource: ((String) -> Unit)? = null,
     roleChips: (@Composable () -> Unit)? = null,
     onChatModeChange: (github.ponyhuang.gimi.domain.conversation.model.ChatMode) -> Unit = {},
     /** 顶栏由宿主在分页容器之上统一渲染时置 false；内部保留同高占位维持正文 padding。 */
@@ -296,10 +298,18 @@ fun ChatScaffold(
         }
     }
 
+    // 是否存在用户手势发起的滚动（拖拽及其惯性）。只有用户发起的滚动结束才重新评估跟随意图；
+    // 程序化跟随滚动（流式内容增长触发的 scrollToItem）结束时内容往往又增长了，
+    // 若据此重评会误判为"用户离开底部"而永久关闭跟随 —— 视图冻结在当前位置（跳顶）。
+    var userDrivenScroll by remember { mutableStateOf(false) }
+
     LaunchedEffect(listState) {
         listState.interactionSource.interactions.collect { interaction ->
             // 手指开始拖动就交还滚动控制权，不能等拖动结束才停止流式跟随。
-            if (interaction is DragInteraction.Start) shouldFollowLatest = false
+            if (interaction is DragInteraction.Start) {
+                userDrivenScroll = true
+                shouldFollowLatest = false
+            }
         }
     }
 
@@ -317,14 +327,17 @@ fun ChatScaffold(
         }
     }
 
-    // 仅在一次实际滚动结束时更新“跟随最新”意图，避免流式内容自身增长时误判为用户离开底部。
+    // 仅在用户手势发起的一次实际滚动结束时更新“跟随最新”意图：拖拽后惯性停在底部 → 恢复跟随，
+    // 停在别处 → 保持交还。程序化滚动结束一律不重评 —— 快速流式期间内容在滚动结束后又增长，
+    // 此时 canScrollForward=true 与"用户离开底部"无关，不能据此关闭跟随。
     LaunchedEffect(listState, state.sessionId) {
         var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
             .collect { isScrolling ->
                 if (wasScrolling && !isScrolling) {
-                    shouldFollowLatest = !listState.canScrollForward
+                    if (userDrivenScroll) shouldFollowLatest = !listState.canScrollForward
+                    userDrivenScroll = false
                 }
                 wasScrolling = isScrolling
             }
@@ -496,6 +509,7 @@ fun ChatScaffold(
                                         onReasoningEffortChange = onReasoningEffortChange,
                                         onThinkingEnabledChange = onThinkingEnabledChange,
                                         lockedVendor = state.lockedVendor,
+                                        indicateAlwaysOnSearch = chatMode == github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT,
                                         modelSwitchCreatesNewSession = chatMode == github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT && state.messages.isNotEmpty(),
                                     )
                                 },
@@ -624,6 +638,7 @@ fun ChatScaffold(
                                                     speechPlaybackState = speechPlaybackState,
                                                     onToggleSpeechPlayback = onToggleSpeechPlayback,
                                                     onOpenDocument = onOpenDocument,
+                                                    onOpenWebSource = onOpenWebSource,
                                                 )
                                             }
                                         }
@@ -834,7 +849,7 @@ internal fun ChatHeaderActions(
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = ImageVector.vectorResource(R.drawable.ic_chat_add),
                         contentDescription = stringResource(R.string.chat_new_conversation),
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -907,7 +922,8 @@ private fun MessageRow(
     speechPlaybackState: github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenWebSource: ((String) -> Unit)? = null,
 ) {
     if (message.role == MessageRole.Assistant && message.textParts.none { !it.thought && it.text.isNotBlank() } &&
         message.fileAttachments.isEmpty() && message.functionResponses.any { it.a2uiDocument != null } &&
@@ -923,6 +939,7 @@ private fun MessageRow(
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             onOpenDocument = onOpenDocument,
             modifier = modifier,
+            onOpenWebSource = onOpenWebSource,
             a2uiContent = {
                 val tasks = message.functionResponses.mapNotNull { it.a2uiTask }
                 if (a2uiSurfaces.isNotEmpty() || tasks.isNotEmpty() || message.functionResponses.any { it.a2uiFailed }) {

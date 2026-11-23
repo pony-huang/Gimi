@@ -6,11 +6,14 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.audio.AmbientNoiseFloorTracker
 import github.ponyhuang.gimi.core.audio.PlaybackEchoGuard
 import github.ponyhuang.gimi.core.audio.SileroVoiceActivityDetector
 import github.ponyhuang.gimi.core.audio.SoftwareEchoCanceller
 import github.ponyhuang.gimi.core.audio.VoiceActivitySegmenter
 import github.ponyhuang.gimi.core.audio.VoiceAudioFormat
+import github.ponyhuang.gimi.core.audio.UtteranceCommitGate
+import github.ponyhuang.gimi.core.audio.UtteranceSegment
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.core.audio.calculatePcm16Level
 import github.ponyhuang.gimi.core.audio.encodePcm16Wav
@@ -70,9 +73,15 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         /** 等待服务端响应的兜底任务；超时后把卡住的 Thinking 拉回 Listening。 */
         private var responseWatchdog: Job? = null
 
-        /** 播放期上行门控的语音预滚环(约 12 帧/384ms),首帧放行前冲出,保证不丢前导音。 */
+        /** 上行门控的语音预滚环(约 12 帧/384ms),首帧放行前冲出,保证不丢前导音。 */
         private val uplinkPreRoll = ArrayDeque<ByteArray>()
         @Volatile private var uplinkGateOpen = false
+
+        /**
+         * 环境底噪跟踪:识别提交门的电平参照。与切句器同一线程喂入(reset 除外),
+         * 电平刻度同 [calculatePcm16Level]。
+         */
+        private val noiseFloorTracker = AmbientNoiseFloorTracker()
 
         /**
          * 会话就绪前的上行暂存：openDuplex 为挂起语义（实时助手模式解析工具桥可能耗时），
@@ -93,6 +102,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                         echoCanceller?.reset()
                         detector?.reset()
                         segmenter.reset()
+                        noiseFloorTracker.reset()
                     }
                 }
             }
@@ -100,16 +110,16 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         })
         private val segmenter = VoiceActivitySegmenter(
             onSpeechStarted = { scope.launch { speechStarted() } },
-            onUtterance = { bytes ->
+            onUtterance = { segment ->
                 if (duplexMode) {
-                    // 播放期本地语音段结束:关闸恢复持续上行;整轮判轮归服务端 server_vad。
+                    // 本地语音段结束:关闸回到门控待命,静默帧重新进预滚环;整轮判轮归服务端 server_vad。
                     uplinkGateOpen = false
                     uplinkPreRoll.clear()
                 } else {
                     if (configuration.pipeline == VoicePipeline.SEMI_CASCADED) {
-                        scope.launch { handleSemiCascadedUtterance(bytes) }
+                        scope.launch { handleSemiCascadedUtterance(segment) }
                     } else {
-                        scope.launch { recognize(bytes) }
+                        scope.launch { recognize(segment) }
                     }
                 }
             },
@@ -215,7 +225,15 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     }
                 } else {
                     detector?.accept(bytes) { frame, probability ->
-                        segmenter.accept(frame, gatedProbability(frame, probability))
+                        // 底噪估计必须用门控前的原始概率与「未在播放」状态：门控把播放期
+                        // 帧压到 0,会把回声伪装成静默污染估计。
+                        val level = calculatePcm16Level(frame)
+                        noiseFloorTracker.accept(
+                            level,
+                            probability,
+                            contaminated = player.playing || echoGuard.tailRisk(),
+                        )
+                        segmenter.accept(frame, gatedProbability(frame, probability, level))
                     }
                 }
             }
@@ -226,10 +244,10 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
          * 但仍喂给切句器与上行预滚环，前置音频和 VAD 隐藏状态都不丢，只是不会
          * 触发新一轮用户输入；明显强于回声的近端人声照常放行打断。两种模式共用。
          */
-        private fun gatedProbability(frame: ByteArray, probability: Float): Float = echoGuard.gate(
+        private fun gatedProbability(frame: ByteArray, probability: Float, level: Float = calculatePcm16Level(frame)): Float = echoGuard.gate(
             isPlaying = player.playing,
             speechProbability = probability,
-            microphoneLevel = calculatePcm16Level(frame),
+            microphoneLevel = level,
             referenceLevel = currentReferenceLevel,
         )
 
@@ -247,21 +265,13 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         }
 
         /**
-         * Realtime 模式的混合上行门控(设计 D4):
-         * 非播放期持续全量上行;播放期只放行本地 VAD 判定为语音的帧,
-         * 首帧放行前先冲出预滚环,保证打断上行不丢前导音。判轮与打断归服务端。
+         * Realtime 模式的本地上行门控（设计 D4 演进——全程门控）：
+         * 嘈杂环境的人群声在服务端 VAD 看来同样是语音，部分厂商判轮鲁棒性不足；
+         * 统一由本地 VAD 把关，静默帧不上行，服务端只收到判定为语音的帧（含预滚
+         * 前导音）。判轮与打断仍归服务端；播放期与播完尾音期回声主导的帧已被
+         * [PlaybackEchoGuard] 压到 0，天然进不了上行。
          */
         private fun uplinkFrame(frame: ByteArray, probability: Float) {
-            // 播放期判定必须看真实播放状态（不能看 duplexPlayback 是否为空：
-            // finishDuplexPlayback 先置空 channel、再等待播放器排空尾音），并且要
-            // 覆盖播完后的声学尾音期：混响与 AEC 残留照样会被服务端 server_vad
-            // 判成一次用户开口，是独立于本地切句器的第二条自激路径。
-            if (!player.playing && !echoGuard.tailRisk()) {
-                uplinkGateOpen = true
-                uplinkPreRoll.clear()
-                sendUplink(frame)
-                return
-            }
             if (!uplinkGateOpen) {
                 if (probability < UPLINK_GATE_THRESHOLD) {
                     // VAD 的 frame 按帧复用，预滚环跨帧持有必须拷贝。
@@ -454,8 +464,10 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             fail(failure)
         }
 
-        private fun handleSemiCascadedUtterance(bytes: ByteArray) {
+        private fun handleSemiCascadedUtterance(segment: UtteranceSegment) {
             if (closed || !started || state.value.muted || state.value.inputPaused) return
+            if (!commitSegment(segment)) return
+            val bytes = segment.pcm16
             val revision = inputRevision
             recognitionJob?.cancel()
             recognitionJob = scope.launch {
@@ -501,8 +513,28 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             }
         }
 
-        private fun recognize(bytes: ByteArray) {
+        /**
+         * 识别提交门:不达标的段直接回监听,不进 Transcribing、不花识别成本。
+         * 丢弃与空识别同语义(无 generation、无 context slot);记录画像便于真机标定。
+         */
+        private fun commitSegment(segment: UtteranceSegment): Boolean {
+            val floor = noiseFloorTracker.floor()
+            val allowed = UtteranceCommitGate.allows(segment, floor)
+            if (!allowed) {
+                android.util.Log.d(
+                    TAG,
+                    "Utterance rejected by commit gate: peak=${segment.peakProbability} " +
+                        "speech=${segment.speechFrameCount} voiced=${segment.voicedFrameCount} " +
+                        "frames=${segment.frameCount} level=${segment.peakLevel} floor=$floor",
+                )
+            }
+            return allowed
+        }
+
+        private fun recognize(segment: UtteranceSegment) {
             if (closed || !started || state.value.muted || state.value.inputPaused) return
+            if (!commitSegment(segment)) return
+            val bytes = segment.pcm16
             val revision = inputRevision
             recognitionJob?.cancel()
             recognitionJob = scope.launch {
@@ -578,9 +610,9 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 }.onFailure { error ->
                     if (!closed && state.value.revision == revision) {
                         android.util.Log.w(TAG, "Voice reply failed", error)
-                        fail(
-                            (error as? VoiceAudioBackendException)?.failure ?: RealtimeVoiceFailure.Generation,
-                        )
+                        val failure = (error as? VoiceAudioBackendException)?.failure
+                            ?: if (error is VoiceException) RealtimeVoiceFailure.Synthesis else RealtimeVoiceFailure.Generation
+                        fail(failure)
                     }
                 }
             } finally {
@@ -639,6 +671,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     synchronized(inputLock) {
                         detector?.reset()
                         segmenter.reset()
+                        noiseFloorTracker.reset()
                     }
                 }
             }
@@ -655,6 +688,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 synchronized(inputLock) {
                     detector?.reset()
                     segmenter.reset()
+                    noiseFloorTracker.reset()
                     uplinkPreRoll.clear()
                     uplinkQueue.clear()
                     uplinkGateOpen = false
@@ -758,6 +792,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     echoCanceller?.close()
                     echoCanceller = null
                     segmenter.reset()
+                    noiseFloorTracker.reset()
                 }
             }
             if (!closed) start()
@@ -818,6 +853,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                         detector?.close(); detector = null
                         echoCanceller?.close(); echoCanceller = null
                         segmenter.reset()
+                        noiseFloorTracker.reset()
                     }
                 }
                 try {
@@ -852,10 +888,13 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
          */
         private const val RESPONSE_WATCHDOG_MS = 30_000L
 
-        /** Realtime 模式播放期上行门控:本地 VAD 概率达到该值的帧才放行。 */
-        private const val UPLINK_GATE_THRESHOLD = 0.5f
+        /**
+         * Realtime 模式全程上行门控:本地 VAD 概率达到该值的帧才放行。
+         * 与切句器起始阈值对齐,静默帧不上行,噪声不进服务端判轮。
+         */
+        private const val UPLINK_GATE_THRESHOLD = 0.75f
 
-        /** 播放期门控的预滚帧数(32ms/帧);与设计 D4 的 12 帧预滚一致。 */
+        /** 上行门控的预滚帧数(32ms/帧);与设计 D4 的 12 帧预滚一致。 */
         private const val UPLINK_PRE_ROLL_FRAMES = 12
 
         /**

@@ -13,7 +13,7 @@ import javax.inject.Inject
  * 厂商级联 TTS 内置音色目录与自定义音色策略的统一解析。
  *
  * 音色表跟随各厂商适配器住在 `<vendor>/…`，按模板标识解析；千问基础音色没有列表接口，
- * 因此是唯一开放自由填写音色 ID 的服务（命名模板与官方列表页随策略一起给出）。
+ * 因此是唯一开放自由填写音色 ID 的服务。
  */
 class VoiceCatalog @Inject constructor() : VoiceCatalogResolver {
     override fun builtInVoices(serviceId: String?): List<TtsVoice> = when (serviceId) {
@@ -33,23 +33,11 @@ class VoiceCatalog @Inject constructor() : VoiceCatalogResolver {
 
     override fun allowsCustomVoice(serviceId: String?): Boolean = serviceId == QWEN_TEMPLATE_ID
 
-    override fun customVoiceIdTemplate(serviceId: String?): String? =
-        if (allowsCustomVoice(serviceId)) QWEN_BASE_VOICE_TEMPLATE else null
-
-    override fun customVoiceListUrl(serviceId: String?): String? =
-        if (allowsCustomVoice(serviceId)) QWEN_VOICE_LIST_URL else null
-
     private companion object {
         /**
          * 千问音频：内置表只是系统音色的一部分，3.0 还有五百余个基础音色没有列表接口，
          * 因此除了选择还需要允许直接填写音色 ID。
          */
         private const val QWEN_TEMPLATE_ID = "qwen"
-
-        /** 千问基础音色没有列表接口，用户需要按这个命名规则拼出 voice 参数。 */
-        private const val QWEN_BASE_VOICE_TEMPLATE = "qwen-audio-3.0-tts-{plus|flash}-{后缀}"
-
-        /** 千问官方音色列表页，用于查基础音色的后缀。 */
-        private const val QWEN_VOICE_LIST_URL = "https://help.aliyun.com/zh/model-studio/qwen-tts-voice-list"
     }
 }

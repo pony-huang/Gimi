@@ -37,11 +37,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
@@ -78,6 +79,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -100,8 +102,14 @@ private val DrawerGroupCornerRadius = 16.dp
 /** 分组卡片左右外边距，同时是行内文字与卡片边缘的距离基准。 */
 private val DrawerGroupHorizontalPadding = 16.dp
 
-/** 会话行最小高度：抽屉按设计评审比设置页 `GimiListDefaults.MinHeight` 更紧凑。 */
-private val DrawerRowMinHeight = 52.dp
+/** 会话行最小高度：单行精简胶囊高度。 */
+private val DrawerRowMinHeight = 48.dp
+
+/** 独立胶囊行圆角：方案 A 独立圆角胶囊。 */
+private val DrawerRowCornerRadius = 12.dp
+
+/** 独立胶囊行上下垂直微间距。 */
+private val DrawerRowItemSpacing = 4.dp
 
 /** 底部渐隐高度：容纳右下角齿轮按钮及其留白。 */
 private val DrawerFooterHeight = 88.dp
@@ -166,8 +174,8 @@ private fun ChatHistoryModeTabs(mode: ChatMode, onModeChange: (ChatMode) -> Unit
  * 历史对话抽屉 —— 预测性返回进度抽屉（[PredictiveBackDrawer]）的内容编排。
  *
  * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片。
- * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 模型服务 / 自动播报开关 / 个性化）
- * → 最近会话 + 管理（多选期间换成取消 / 已选数 / 全选 / 删除）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
+ * 结构自上而下：顶部搜索入口 → 常用功能入口（模型服务 / 插件 / 本地环境 / 个性化 / 自动播报开关）
+ * → 多选工具栏（取消 / 已选数 / 删除，从会话长按菜单的「多选」进入）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
  * 自动播报从聊天顶栏下沉到抽屉，作为开关类设置与跳转类入口分层呈现。
  * 夜间模式等外观配置已移至设置的"个性化"分组，抽屉不再直接切换。
  *
@@ -183,8 +191,9 @@ private fun ChatHistoryModeTabs(mode: ChatMode, onModeChange: (ChatMode) -> Unit
  * @param onConversationClick  点击某个对话时回调（实现方负责关闭抽屉）
  * @param recentState          搜索、多选和删除进度状态
  * @param onRecentAction       最近会话操作，由 ViewModel 处理并再次校验删除保护
- * @param onNewConversationClick 点击"新对话"入口时回调（实现方负责新建会话并关闭抽屉）
  * @param onModelServicesClick 点击"模型服务"入口时回调（实现方负责跳转模型服务配置并关闭抽屉）
+ * @param onPluginsClick       点击"插件"入口时回调（实现方负责跳转插件列表并关闭抽屉）
+ * @param onLocalEnvironmentClick 点击"本地环境"入口时回调（实现方负责直达本地环境页并关闭抽屉）
  * @param onPersonalizeClick   点击"个性化"入口时回调（实现方负责跳转设置并关闭抽屉）
  * @param onSettingsClick      点击右下角齿轮时回调（实现方负责关闭抽屉并跳转）
  * @param autoSpeakEnabled     自动播报全局开关当前值，驱动抽屉内开关卡片
@@ -208,8 +217,9 @@ fun ChatDrawer(
     onConversationClick: (Conversation) -> Unit,
     recentState: RecentConversationsState = RecentConversationsState(),
     onRecentAction: (RecentConversationsAction) -> Unit = {},
-    onNewConversationClick: () -> Unit = {},
     onModelServicesClick: () -> Unit = {},
+    onPluginsClick: () -> Unit = {},
+    onLocalEnvironmentClick: () -> Unit = {},
     onPersonalizeClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     autoSpeakEnabled: Boolean = false,
@@ -252,8 +262,9 @@ fun ChatDrawer(
                         onConversationClick = onConversationClick,
                         recentState = recentState,
                         onRecentAction = onRecentAction,
-                        onNewConversationClick = onNewConversationClick,
                         onModelServicesClick = onModelServicesClick,
+                        onPluginsClick = onPluginsClick,
+                        onLocalEnvironmentClick = onLocalEnvironmentClick,
                         onPersonalizeClick = onPersonalizeClick,
                         onSettingsClick = onSettingsClick,
                         autoSpeakEnabled = autoSpeakEnabled,
@@ -289,8 +300,9 @@ private fun HistoryDrawerContent(
     onConversationClick: (Conversation) -> Unit,
     recentState: RecentConversationsState,
     onRecentAction: (RecentConversationsAction) -> Unit,
-    onNewConversationClick: () -> Unit,
     onModelServicesClick: () -> Unit,
+    onPluginsClick: () -> Unit,
+    onLocalEnvironmentClick: () -> Unit,
     onPersonalizeClick: () -> Unit,
     onSettingsClick: () -> Unit,
     autoSpeakEnabled: Boolean = false,
@@ -309,8 +321,6 @@ private fun HistoryDrawerContent(
     val visible = recentState.visibleConversations(conversations)
     val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
     val selectedIds = recentState.selectedIds.intersect(eligible)
-    val visibleEligible = visible.map { it.id }.toSet().intersect(eligible)
-    val allSelected = visibleEligible.isNotEmpty() && selectedIds.containsAll(visibleEligible)
     val canvas = preferenceCanvasColor()
     val topFadeBrush = remember(canvas) {
         Brush.verticalGradient(listOf(canvas, Color.Transparent))
@@ -349,26 +359,28 @@ private fun HistoryDrawerContent(
         ) {
             Column {
                 // 常用功能：图标 + 文字的紧凑入口行，免滚动直达高频操作。
-                // 新对话/模型服务一组，自动播报独立成卡，个性化独立成卡——
-                // 开关类设置与跳转类入口视觉分层；两档 tab 共用同一套入口。
-                DrawerFunctionEntry(
-                    icon = Icons.Default.Add,
-                    label = stringResource(R.string.chat_drawer_new_conversation),
-                    isFirst = true,
-                    isLast = false,
-                    onClick = onNewConversationClick,
-                )
+                // 模型服务/插件/本地环境一组（跳转类入口），个性化独立成卡，自动播报
+                // 开关卡沉到常用功能最底部——开关类设置与跳转类入口视觉分层；两档 tab 共用同一套入口。
                 DrawerFunctionEntry(
                     icon = Icons.Default.SmartToy,
                     label = stringResource(R.string.chatbot_model_services),
-                    isFirst = false,
-                    isLast = true,
+                    isFirst = true,
+                    isLast = false,
                     onClick = onModelServicesClick,
                 )
-                Spacer(Modifier.height(12.dp))
-                DrawerAutoSpeakCard(
-                    enabled = autoSpeakEnabled,
-                    onToggle = onToggleAutoSpeak,
+                DrawerFunctionEntry(
+                    icon = Icons.Default.Extension,
+                    label = stringResource(R.string.chat_drawer_plugins),
+                    isFirst = false,
+                    isLast = false,
+                    onClick = onPluginsClick,
+                )
+                DrawerFunctionEntry(
+                    icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_linux),
+                    label = stringResource(R.string.chat_drawer_local_environment),
+                    isFirst = false,
+                    isLast = true,
+                    onClick = onLocalEnvironmentClick,
                 )
                 Spacer(Modifier.height(12.dp))
                 DrawerFunctionEntry(
@@ -379,9 +391,14 @@ private fun HistoryDrawerContent(
                     onClick = onPersonalizeClick,
                 )
                 Spacer(Modifier.height(12.dp))
+                DrawerAutoSpeakCard(
+                    enabled = autoSpeakEnabled,
+                    onToggle = onToggleAutoSpeak,
+                )
+                Spacer(Modifier.height(12.dp))
             }
         }
-        // 历史区头：最近会话 + 管理；搜索期间同步收起，多选时显示选择工具栏。
+        // 历史区头：多选时显示选择工具栏；多选入口统一放在会话长按菜单里。
         if (recentState.isSelecting) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -399,12 +416,6 @@ private fun HistoryDrawerContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(
-                    enabled = visibleEligible.isNotEmpty() && !recentState.isDeleting,
-                    onClick = { onRecentAction(RecentConversationsAction.ToggleSelectAll) },
-                ) {
-                    Text(stringResource(if (allSelected) R.string.chat_drawer_deselect_all else R.string.chat_drawer_select_all))
-                }
                 // 批量删除入口：先弹确认框（RequestDeletion 固化待删集合），确认后才真正删除。
                 // 红色跟随可用态：未勾选或删除中时置灰，避免禁用态看起来仍可点击。
                 val deleteEnabled = selectedIds.isNotEmpty() && !recentState.isDeleting
@@ -425,32 +436,6 @@ private fun HistoryDrawerContent(
                     )
                 }
             }
-        } else {
-            AnimatedVisibility(
-                visible = !recentState.isSearching,
-                enter = fadeIn(tween(180)) + expandVertically(tween(280), expandFrom = Alignment.Top),
-                exit = fadeOut(tween(140)) + shrinkVertically(tween(280), shrinkTowards = Alignment.Top),
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.chat_drawer_recent_conversations),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // 助手/Chatbot 两个档位都走同一套 recentAction 分流，管理多选两档通用。
-                    TextButton(
-                        enabled = !recentState.isDeleting && conversations.isNotEmpty(),
-                        onClick = { onRecentAction(RecentConversationsAction.StartSelection()) },
-                        modifier = Modifier.padding(start = 4.dp),
-                    ) {
-                        Text(stringResource(R.string.chat_drawer_manage))
-                    }
-                }
-            }
         }
         if (historyMode != null) {
             ChatHistoryModeTabs(historyMode, onHistoryModeChange, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
@@ -459,6 +444,7 @@ private fun HistoryDrawerContent(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(DrawerRowItemSpacing),
                 contentPadding = PaddingValues(top = 12.dp, bottom = if (recentState.isSearching) 16.dp else DrawerFooterHeight),
             ) {
                 if (visible.isEmpty()) {
@@ -482,8 +468,6 @@ private fun HistoryDrawerContent(
                         enabled = !recentState.isDeleting && (!recentState.isSelecting || conversation.id in eligible),
                         isSelecting = recentState.isSelecting,
                         isSelected = conversation.id in selectedIds,
-                        isFirst = conversation.id == visible.firstOrNull()?.id,
-                        isLast = conversation.id == visible.lastOrNull()?.id,
                         onClick = {
                             if (recentState.isSelecting) onRecentAction(RecentConversationsAction.ToggleSelection(conversation.id))
                             else onConversationClick(conversation)
@@ -493,9 +477,7 @@ private fun HistoryDrawerContent(
                         canDelete = conversation.id in eligible,
                         onExport = { onExportConversation(conversation.id, historyMode ?: ChatMode.ASSISTANT) },
                         onDelete = { onDeleteConversation(conversation.id) },
-                        onLongClick = if (recentState.isSearching) {
-                            { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) }
-                        } else null,
+                        onStartSelection = { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) },
                     )
                 }
             }
@@ -673,13 +655,12 @@ private fun DrawerAutoSpeakCard(enabled: Boolean, onToggle: () -> Unit) {
 // ── 对话列表项 ──────────────────────────────────────────────────
 
 /**
- * 分组卡片中的单个会话行：点击切换，长按显示导出/删除操作；多选时点击整行切换勾选。
+ * 历史会话单行胶囊项（方案 A）：点击切换，长按显示多选/导出/删除操作；多选时点击整行切换勾选。
  *
- * 行内只有标题与末条消息摘要副标题（摘要为空时省略），不额外加图标——
- * 会话行靠卡片、分隔线与排版区分层次，逐行重复同一个图标只会增加视觉噪声。
+ * 标题单行长文本自动省略（Ellipsis），末尾右对齐展示紧凑相对时间（如 3m, 6h, 2d）。
+ * 移除原有的底部末条消息摘要，采用独立圆角胶囊与微间距排版，无内部分隔线。
  *
  * @param isCurrent 当此行是当前正在使用的会话时 MUST 高亮且不可删除（防止用户把自己正在用的会话删掉）。
- * @param isFirst/isLast 首尾行落下圆角，相邻行拼成一张连续卡片。
  */
 @Composable
 private fun ConversationListItem(
@@ -689,29 +670,22 @@ private fun ConversationListItem(
     enabled: Boolean,
     isSelecting: Boolean = false,
     isSelected: Boolean = false,
-    isFirst: Boolean = false,
-    isLast: Boolean = false,
     onClick: () -> Unit,
     canExport: Boolean = true,
     canDelete: Boolean = true,
     onExport: () -> Unit = {},
     onDelete: () -> Unit = {},
-    onLongClick: (() -> Unit)? = null,
+    onStartSelection: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showActions by remember(conversation.id) { mutableStateOf(false) }
-    // 选中态用品牌 primaryContainer：深/浅主题下都与白色卡片拉开明度差，
-    // secondaryContainer 在深色模式 (#26262A on #1E1E23) 几乎看不出哪条是当前会话。
+    // 选中态用品牌 primaryContainer：深/浅主题下都与画布拉开明度差；未选中态透明无背景
     val highlighted = if (isSelecting) isSelected else isCurrent
-    val containerColor = if (highlighted) MaterialTheme.colorScheme.primaryContainer else preferenceGroupCardColor()
+    val containerColor = if (highlighted) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     val contentColor = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val timeColor = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
     val rowAlpha = if (enabled) 1f else 0.45f
-    val shape = RoundedCornerShape(
-        topStart = if (isFirst) DrawerGroupCornerRadius else 0.dp,
-        topEnd = if (isFirst) DrawerGroupCornerRadius else 0.dp,
-        bottomStart = if (isLast) DrawerGroupCornerRadius else 0.dp,
-        bottomEnd = if (isLast) DrawerGroupCornerRadius else 0.dp,
-    )
+    val shape = RoundedCornerShape(DrawerRowCornerRadius)
     val taskContentDescription = when (taskStatus) {
         is ConversationTaskStatus.Running -> stringResource(R.string.chat_task_running)
         is ConversationTaskStatus.WaitingForConfirmation -> stringResource(
@@ -725,7 +699,7 @@ private fun ConversationListItem(
         null -> ""
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = DrawerGroupHorizontalPadding)
@@ -741,54 +715,40 @@ private fun ConversationListItem(
                     else Modifier.combinedClickable(
                         enabled = enabled,
                         onClick = onClick,
-                        onLongClickLabel = stringResource(if (onLongClick != null) R.string.chat_drawer_manage else R.string.session_export_actions),
-                        onLongClick = { if (onLongClick != null) onLongClick() else showActions = true },
+                        onLongClickLabel = stringResource(R.string.session_export_actions),
+                        onLongClick = { showActions = true },
                     ),
                 )
-                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isSelecting) {
                 Checkbox(checked = isSelected, onCheckedChange = null, enabled = enabled, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.size(12.dp))
             }
-            Column(
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    text = conversation.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = contentColor.copy(alpha = rowAlpha),
-                )
-                // 副标题只保留末条消息摘要：相对时间元数据按评审移除，摘要为空时整行省略。
-                val snippet = conversation.lastMessage.lineSequence().firstOrNull()?.trim().orEmpty()
-                if (snippet.isNotEmpty()) {
-                    Text(
-                        text = snippet,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = contentColor.copy(alpha = rowAlpha).copy(alpha = 0.6f),
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
+            Text(
+                text = conversation.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = contentColor.copy(alpha = rowAlpha),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
             when (taskStatus) {
                 is ConversationTaskStatus.Running -> CircularProgressIndicator(
                     modifier = Modifier
-                        .size(20.dp)
+                        .padding(end = 6.dp)
+                        .size(16.dp)
                         .semantics { contentDescription = taskContentDescription },
                     strokeWidth = 2.dp,
                 )
                 is ConversationTaskStatus.WaitingForConfirmation -> Text(
                     text = taskStatus.count.toString(),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .padding(start = 12.dp)
+                        .padding(end = 6.dp)
                         .semantics { contentDescription = taskContentDescription },
                 )
                 ConversationTaskStatus.WaitingForInput -> Icon(
@@ -796,23 +756,32 @@ private fun ConversationListItem(
                     contentDescription = taskContentDescription,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(20.dp),
+                        .padding(end = 6.dp)
+                        .size(16.dp),
                 )
                 ConversationTaskStatus.Completed -> Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = stringResource(R.string.chat_task_completed),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(16.dp),
                 )
                 ConversationTaskStatus.Failed -> Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = stringResource(R.string.chat_task_failed),
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(16.dp),
                 )
                 null -> Unit
             }
+            Text(
+                text = formatCompactTime(conversation.timestamp),
+                style = MaterialTheme.typography.labelMedium,
+                color = timeColor.copy(alpha = rowAlpha),
+            )
         }
         ConversationActionsMenu(
             expanded = showActions && !isSelecting && enabled,
@@ -823,23 +792,69 @@ private fun ConversationListItem(
             canDelete = canDelete,
             onExport = onExport,
             onDelete = onDelete,
+            onStartSelection = onStartSelection,
         )
-        if (!isLast) {
-            // 分隔线内缩到文字左缘：多选时让开勾选框（24 + 12），与设置页分组一致。
-            HorizontalDivider(
-                modifier = Modifier.padding(
-                    start = DrawerGroupHorizontalPadding + if (isSelecting) 36.dp else 0.dp,
-                    end = DrawerGroupHorizontalPadding,
-                ),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-            )
-        }
     }
 }
 
-// ── 副标题：相对时间 + 末条消息 ─────────────────────────────────
+// ── 紧凑相对时间格式化 ─────────────────────────────────
 
-/** 单个会话操作不复用删除勾选规则，因此当前会话也能在空闲时导出；删除则沿用同一套保护条件。 */
+/**
+ * 格式化会话紧凑相对时间：如 `刚刚` (或 `now`), `3m`, `6h`, `2d`, `1mo`, `1y`。
+ *
+ * 超紧凑纯数字+单字符后缀，适配单行会话行，避免长标题被多字副标题时间挤压。
+ */
+@Composable
+internal fun formatCompactTime(timestamp: Long, now: Long = System.currentTimeMillis()): String {
+    val diff = (now - timestamp).coerceAtLeast(0L)
+    val minutes = diff / 60_000L
+    val hours = diff / 3_600_000L
+    val days = diff / 86_400_000L
+    val months = days / 30L
+    val years = days / 365L
+    return when {
+        minutes < 1L -> stringResource(R.string.chat_time_compact_just_now)
+        minutes < 60L -> stringResource(R.string.chat_time_compact_minutes, minutes)
+        hours < 24L -> stringResource(R.string.chat_time_compact_hours, hours)
+        days < 30L -> stringResource(R.string.chat_time_compact_days, days)
+        months < 12L -> stringResource(R.string.chat_time_compact_months, months)
+        else -> stringResource(R.string.chat_time_compact_years, years)
+    }
+}
+
+/**
+ * 纯计算版本，供 JVM 单元测试在无 Compose/Context 环境下验证时间档位区间。
+ */
+internal fun formatCompactTimeRaw(
+    timestamp: Long,
+    now: Long,
+    justNow: String = "刚刚",
+    minutesFormat: String = "%dm",
+    hoursFormat: String = "%dh",
+    daysFormat: String = "%dd",
+    monthsFormat: String = "%dmo",
+    yearsFormat: String = "%dy",
+): String {
+    val diff = (now - timestamp).coerceAtLeast(0L)
+    val minutes = diff / 60_000L
+    val hours = diff / 3_600_000L
+    val days = diff / 86_400_000L
+    val months = days / 30L
+    val years = days / 365L
+    return when {
+        minutes < 1L -> justNow
+        minutes < 60L -> String.format(java.util.Locale.ROOT, minutesFormat, minutes)
+        hours < 24L -> String.format(java.util.Locale.ROOT, hoursFormat, hours)
+        days < 30L -> String.format(java.util.Locale.ROOT, daysFormat, days)
+        months < 12L -> String.format(java.util.Locale.ROOT, monthsFormat, months)
+        else -> String.format(java.util.Locale.ROOT, yearsFormat, years)
+    }
+}
+
+/**
+ * 单个会话操作菜单：多选入口始终可用（进入时由 reducer 过滤可删除会话并预选被长按的项），
+ * 导出不复用删除勾选规则，当前会话也能在空闲时导出；删除则沿用同一套保护条件。
+ */
 @Composable
 private fun ConversationActionsMenu(
     expanded: Boolean,
@@ -848,8 +863,18 @@ private fun ConversationActionsMenu(
     canDelete: Boolean,
     onExport: () -> Unit,
     onDelete: () -> Unit,
+    onStartSelection: () -> Unit = {},
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        // 多选入口固定在首位：长按任意会话都能带预选进入批量操作。
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.chat_drawer_multi_select)) },
+            leadingIcon = { Icon(Icons.Default.Checklist, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onStartSelection()
+            },
+        )
         if (canExport) DropdownMenuItem(
             text = { Text(stringResource(R.string.session_export_single)) },
             leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
@@ -1023,8 +1048,9 @@ private fun RecentContentPreview(
                     onConversationClick = {},
                     recentState = recentState,
                     onRecentAction = {},
-                    onNewConversationClick = {},
                     onModelServicesClick = {},
+                    onPluginsClick = {},
+                    onLocalEnvironmentClick = {},
                     onPersonalizeClick = {},
                     onSettingsClick = {},
                     showUpdateBadge = true,
@@ -1044,8 +1070,6 @@ private fun ConversationExportPreview() {
             isCurrent = true,
             taskStatus = null,
             enabled = true,
-            isFirst = true,
-            isLast = true,
             onClick = {},
         )
     }

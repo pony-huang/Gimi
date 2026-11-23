@@ -140,8 +140,9 @@
     <string name="chat_stt_configure_default_first">请先在设置中配置语音识别模型</string>
 
     <!-- ChatConversationDrawer -->
-    <string name="chat_drawer_new_conversation">新对话</string>
     <string name="chat_drawer_auto_speak">自动播放</string>
+    <string name="chat_drawer_plugins">插件</string>
+    <string name="chat_drawer_local_environment">本地环境</string>
     <string name="chat_drawer_auto_speak_subtitle">回复生成后自动朗读</string>
     <string name="chat_drawer_personalize">个性化选项</string>
     <string name="chat_drawer_empty_history">暂无最近会话</string>
@@ -225,21 +226,24 @@
     <string name="chat_timeline_tool_rejected">已拒绝</string>
     <string name="chat_timeline_tool_awaiting_confirmation">等待确认</string>
     <string name="chat_timeline_tool_unknown">状态未知</string>
-    <string name="chat_drawer_manage">管理</string>
-    <string name="chat_drawer_recent_conversations">最近会话</string>
     <string name="chat_drawer_done">完成</string>
     <string name="chat_drawer_search">搜索会话</string>
     <string name="chat_drawer_clear_search">清除搜索</string>
     <string name="chat_drawer_search_empty">没有找到相关会话</string>
     <string name="chat_drawer_selected_count">已选 %1$d 项</string>
-    <string name="chat_drawer_select_all">全选</string>
-    <string name="chat_drawer_deselect_all">取消全选</string>
+    <string name="chat_drawer_multi_select">多选</string>
     <string name="chat_drawer_delete_count">删除 %1$d 个会话</string>
     <string name="chat_drawer_delete_selected">删除</string>
     <string name="chat_drawer_deleting">正在删除…</string>
     <string name="chat_drawer_delete_confirm_title">删除 %1$d 个会话？</string>
     <string name="chat_drawer_delete_confirm_message">删除后无法恢复。当前会话和运行中的会话不会被删除。</string>
     <string name="chat_drawer_cancel">取消</string>
+    <string name="chat_time_compact_just_now">刚刚</string>
+    <string name="chat_time_compact_minutes">%1$dm</string>
+    <string name="chat_time_compact_hours">%1$dh</string>
+    <string name="chat_time_compact_days">%1$dd</string>
+    <string name="chat_time_compact_months">%1$dmo</string>
+    <string name="chat_time_compact_years">%1$dy</string>
     <string name="chat_notice_delete_failed">有会话未能删除，请重试。</string>
     <string name="chat_choice_show_full_text">查看选项全文</string>
     <string name="chat_choice_close_full_text">关闭</string>
@@ -408,6 +412,7 @@
     <string name="voice_settings_pick_tts_voice">选择播放音色</string>
     <string name="voice_settings_pick_realtime_voice">选择会话音色</string>
     <string name="voice_settings_search_model">搜索模型或服务</string>
+    <string name="voice_settings_search_hint">输入关键词搜索模型</string>
     <string name="voice_settings_no_models">暂无可选模型</string>
     <string name="voice_settings_mutation_blocked">通话或任务进行中，暂不能修改语音配置</string>
     <string name="voice_capability_stt">语音转写</string>
@@ -432,6 +437,7 @@
     <string name="voice_prompt_settings_section">角色预设</string>
     <string name="voice_prompt_settings_note">角色仅用于当前 Chatbot 会话，文字与语音共用。更换后保留历史，从下一次回复起生效。</string>
     <string name="voice_prompt_preset_create">创建角色</string>
+    <string name="voice_prompt_preset_enable">启用角色预设 %1$s</string>
     <string name="voice_prompt_preset_edit">编辑</string>
     <string name="voice_prompt_preset_edit_title">编辑预设</string>
     <string name="voice_prompt_preset_name">名称</string>
@@ -483,4 +489,10 @@
     <string name="voice_settings_chat_model">对话模型</string>
     <string name="chatbot_role_chips_show_all">展示全部</string>
     <string name="chatbot_role_chips_show_less">收起全部</string>
+    <string name="chat_web_citations_title">引用来源</string>
+    <string name="chat_web_citations_open">查看引用来源</string>
+    <string name="chat_web_citations_close">关闭引用来源</string>
+    <string name="chat_model_always_search">始终联网</string>
+    <string name="chat_web_citations_open_failed">无法打开来源链接</string>
+    <string name="chat_web_citations_overflow">+%1$d</string>
 </resources>

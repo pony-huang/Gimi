@@ -95,16 +95,6 @@ class RecentConversationsStateTest {
     }
 
     @Test
-    fun selectAllOnlyAffectsMatchingDeletableConversationsAndPreservesHiddenSelections() {
-        var state = state().reduceRecentConversations(RecentConversationsAction.StartSelection("food"))
-            .reduceRecentConversations(RecentConversationsAction.Search("camera"))
-            .reduceRecentConversations(RecentConversationsAction.ToggleSelectAll)
-        assertEquals(setOf("food", "camera"), state.recentConversations.selectedIds)
-        state = state.reduceRecentConversations(RecentConversationsAction.ToggleSelectAll)
-        assertEquals(setOf("food"), state.recentConversations.selectedIds)
-    }
-
-    @Test
     fun confirmationUsesFrozenSelectionAndRechecksProtection() {
         val state = state().reduceRecentConversations(RecentConversationsAction.StartSelection("camera"))
             .reduceRecentConversations(RecentConversationsAction.RequestDeletion)

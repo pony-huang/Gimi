@@ -33,8 +33,6 @@ sealed interface RecentConversationsAction {
     data class StartSelection(val sessionId: String? = null) : RecentConversationsAction
     /** 切换一个可删除会话的勾选状态。 */
     data class ToggleSelection(val sessionId: String) : RecentConversationsAction
-    /** 全选或取消当前搜索结果中可删除的会话。 */
-    data object ToggleSelectAll : RecentConversationsAction
     /** 退出多选并清除勾选。 */
     data object FinishSelection : RecentConversationsAction
     /** 固定待删除集合并请求确认。 */
@@ -88,11 +86,6 @@ internal fun ChatUiState.reduceRecentConversations(action: RecentConversationsAc
         is RecentConversationsAction.ToggleSelection -> {
             if (!state.isSelecting || action.sessionId !in eligible) return this
             state.copy(selectedIds = if (action.sessionId in selected) selected - action.sessionId else selected + action.sessionId)
-        }
-        RecentConversationsAction.ToggleSelectAll -> {
-            if (!state.isSelecting) return this
-            val visibleIds = state.visibleConversations(conversations).map { it.id }.toSet().intersect(eligible)
-            state.copy(selectedIds = if (selected.containsAll(visibleIds)) selected - visibleIds else selected + visibleIds)
         }
         RecentConversationsAction.FinishSelection -> state.copy(isSelecting = false, selectedIds = emptySet(), pendingDeletionIds = emptySet())
         RecentConversationsAction.RequestDeletion -> {

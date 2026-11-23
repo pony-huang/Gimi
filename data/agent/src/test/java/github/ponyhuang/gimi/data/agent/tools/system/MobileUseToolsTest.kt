@@ -16,6 +16,7 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileShellResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
 import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
 import github.ponyhuang.gimi.domain.mobileuse.MobileElement
+import github.ponyhuang.gimi.domain.mobileuse.MobileClickCandidate
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -37,8 +38,11 @@ class MobileUseToolsTest {
     @Test
     fun screenshotIsOnlyAttachedToImmediateNextRequest() = runTest {
         val jpeg = byteArrayOf(1, 2, 3, 4)
+        val control = MobileClickCandidate("screen:1", "Search", MobileBounds(12, 24, 60, 50), "Messages")
         coEvery { repository.takeScreenshot("turn-1") } returns
-            MobileUseResult("ready", "screenshot", 290, jpeg, 1080, 2400)
+            MobileUseResult("ready", "screenshot", 290, jpeg, 1080, 2400, observation =
+                MobileObservation("screen", "changing", "banner", 20, 1, "available",
+                    clickCandidates = listOf(control)))
         val tool = tools.getValue("mobile_take_screenshot")
         val payload = tool.execute(context("turn-1"), mapOf("intent" to "Inspect the screen")) as Map<*, *>
         assertEquals(1080, payload["width"])
@@ -47,9 +51,24 @@ class MobileUseToolsTest {
             Part(functionResponse = FunctionResponse(name = tool.name, id = "call-1",
                 response = payload.entries.associate { it.key.toString() to it.value })),
         ))))
-        val enriched = tool.processLlmRequest(mockk(), request)
-        assertArrayEquals(jpeg, enriched.contents.last().parts.last().inlineData?.data)
-        assertEquals(1, tool.processLlmRequest(mockk(), request).contents.size)
+        assertFalse(payload.toString().contains("Search"))
+        assertEquals(1, tool.processLlmRequest(context("other"), request).contents.size)
+        val enriched = tool.processLlmRequest(context("turn-1"), request)
+        assertArrayEquals(jpeg, enriched.contents.last().parts[1].inlineData?.data)
+        assertTrue(enriched.contents.last().parts[2].text.orEmpty().contains("screen:1"))
+        assertTrue(enriched.contents.last().parts[2].text.orEmpty().contains("Messages"))
+        assertEquals(1, tool.processLlmRequest(context("turn-1"), request).contents.size)
+    }
+
+    @Test
+    fun elementClickIsDeclaredForChat() = runTest {
+        assertTrue("mobile_click_element" in tools)
+        coEvery { repository.clickElement("turn-1", "screen:1") } returns
+            MobileUseResult("stale_observation", "observe again", actionStatus = "not_sent")
+        assertEquals("invalid_argument", execute("mobile_click_element", mapOf("element_id" to ""))["status"])
+        assertEquals("stale_observation", execute("mobile_click_element", mapOf("element_id" to "screen:1"))["status"])
+        coVerify(exactly = 1) { repository.clickElement("turn-1", "screen:1") }
+        confirmVerified(repository)
     }
 
     @Test

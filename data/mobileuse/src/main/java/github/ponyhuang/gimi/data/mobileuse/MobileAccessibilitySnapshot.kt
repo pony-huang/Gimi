@@ -13,6 +13,8 @@ internal data class MobileNodeTarget(
     val ownElement: MobileElement,
     val clickPath: List<Int>?,
     val clickElement: MobileElement?,
+    /** 密码节点或其子节点不得出现在模型的控件列表中。 */
+    val sensitive: Boolean = false,
 )
 
 /** 单一显示的节点快照及事件版本；consistent 为 false 表示采集期间发生过窗口变化。 */

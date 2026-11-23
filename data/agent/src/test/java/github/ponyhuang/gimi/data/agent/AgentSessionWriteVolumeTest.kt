@@ -1,5 +1,12 @@
 package github.ponyhuang.gimi.data.agent
 
+import github.ponyhuang.gimi.domain.conversation.model.ChatbotStopped
+import github.ponyhuang.gimi.domain.conversation.model.WebCitation
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
+import github.ponyhuang.gimi.domain.conversation.model.WebSource
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.agents.ResumabilityConfig
@@ -133,6 +140,42 @@ class AgentSessionWriteVolumeTest {
         val responseEvents = recorder.appended.filter { event -> event.functionResponses().isNotEmpty() }
         assertEquals(1, responseEvents.size)
         assertEquals(2, responseEvents.single().functionResponses().size)
+    }
+
+    @Test
+    fun userStopPersistsReceivedTextAndCitationsInOneSnapshot() = runTest {
+        val recorder = RecordingSessionService()
+        val citation = WebCitation(WebSource("https://example.org/post"), 4)
+        val model = object : Model {
+            override val name = "web-citation-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                emit(response("Read", partial = true).copy(customMetadata = mapOf(
+                    WebCitationMetadata.KEY to WebCitationMetadata.encode(listOf(citation)),
+                )))
+                awaitCancellation()
+            }
+        }
+        val runner = InMemoryRunner(
+            App(appName = AgentChatRunner.APP_NAME, rootAgent = LlmAgent(name = "agent", model = model)),
+            sessionService = recorder,
+        )
+        val execution = AgentChatExecution("user", "session", runner, emptyMap(), emitSessionTitle = true)
+        val received = CompletableDeferred<Unit>()
+        val collect = launch {
+            execution.send("Search").collect { event ->
+                if (event.partial && event.content?.parts?.any { it.text == "Read" } == true) received.complete(Unit)
+            }
+        }
+        received.await()
+        collect.cancel(ChatbotStopped())
+        collect.join()
+        val snapshot = recorder.appended.single {
+            it.customMetadata?.containsKey(WebCitationMetadata.STOPPED_REPLY_KEY) == true
+        }
+        assertFalse(snapshot.partial)
+        assertEquals("Read", snapshot.content?.parts?.single()?.text)
+        assertEquals(listOf(citation), WebCitationMetadata.decode(snapshot.customMetadata?.get(WebCitationMetadata.KEY)))
+        assertEquals(null, snapshot.invocationId)
     }
 
     private fun response(text: String, partial: Boolean) = LlmResponse(

@@ -20,6 +20,9 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioEvent
+import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
+import java.io.IOException
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -53,10 +56,11 @@ class AgentSessionPipelineTest {
 
     private fun emptyChatbotPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
         override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
-        override val builtInPresets = emptyList<ChatbotRolePreset>()
+        override val builtInPresets = MutableStateFlow(emptyList<ChatbotRolePreset>())
         override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
         override fun upsertPreset(preset: ChatbotRolePreset) {}
         override fun deletePreset(presetId: String) {}
+        override fun setEnabled(presetId: String, enabled: Boolean) {}
         override fun selectPreset(conversationId: String, presetId: String?) {}
     }
 
@@ -167,5 +171,29 @@ class AgentSessionPipelineTest {
             events.filterIsInstance<VoiceAudioEvent.Audio>().map { it.text.value })
         assertEquals("你好。今天天气不错。", events.filterIsInstance<VoiceAudioEvent.Text>().joinToString("") { it.text })
         session.close()
+    }
+
+    @Test
+    fun sessionSynthesisWrapsFlushErrorIntoSynthesisFailure() = runBlocking {
+        val brokenSession = object : SpeechSynthesisSession {
+            override fun send(text: String) {}
+            override suspend fun flush() {
+                throw IOException("rate limit exceeded(RPM)")
+            }
+            override fun cancel() {}
+            override val segments: Flow<SynthesisSegment> = flowOf()
+            override suspend fun close() {}
+        }
+        val execution = scriptedExecution(flowOf(modelText("你好。", partial = true)))
+        val backend = backendWith(execution, brokenSession)
+        val session = backend.open(configuration)
+        try {
+            session.respond("你好", "").toList()
+            org.junit.Assert.fail("Expected VoiceAudioBackendException")
+        } catch (e: VoiceAudioBackendException) {
+            assertEquals(RealtimeVoiceFailure.Synthesis, e.failure)
+        } finally {
+            session.close()
+        }
     }
 }

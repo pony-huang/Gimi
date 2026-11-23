@@ -153,7 +153,7 @@ internal class KtorChatCompletionsClient(
 
   override suspend fun create(request: ChatCompletionRequest): ChatCompletionResponse {
     val body =
-      withRetries(request) { httpRequest ->
+      withRetries(request, canRetry = { request.webSearchOptions == null }) { httpRequest ->
         // Bounds the whole attempt and closes it, so a retry does not leave it running.
         timeout?.let { limit ->
           // Ktor rejects zero, which a sub-millisecond timeout would round to.

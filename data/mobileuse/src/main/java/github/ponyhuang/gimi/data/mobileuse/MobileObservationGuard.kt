@@ -14,6 +14,8 @@ internal data class MobileObservedScreen(
     val elements: List<MobileElement>,
     /** 观察后是否允许坐标类动作（点按/手势）；文本输入不走该门槛，由焦点与选区复核把关。 */
     val actionsAllowed: Boolean = true,
+    val clickTargets: Map<String, MobileClickTarget> = emptyMap(),
+    val manualInputVersion: Long = 0,
 )
 
 /** 将观察与后续动作绑定；动作一旦尝试就消费快照，观察失败不会重新开放同一次操作。 */

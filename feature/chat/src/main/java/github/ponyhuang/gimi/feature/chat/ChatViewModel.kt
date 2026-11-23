@@ -835,7 +835,9 @@ class ChatViewModel @Inject constructor(
                 ?: return@launch
             if (_uiState.value.sessionId != sessionId || runtime.isActive) return@launch
             runtime.closePartChannels()
-            runtime.messages = messages
+            // 身份保持式采用：后台完成/外部写入后回前台，内容等价的消息保留内存身份，
+            // 避免回前台换 id 触发整轮 item key 变化与静态重 parse。
+            runtime.messages = adoptLoadedHistory(runtime.messages, messages)
             runtime.isLoaded = true
             // 恢复前台只同步完整内容，阅读位置由列表保留，不能当作用户要求回到最新。
             publishRuntime(runtime)

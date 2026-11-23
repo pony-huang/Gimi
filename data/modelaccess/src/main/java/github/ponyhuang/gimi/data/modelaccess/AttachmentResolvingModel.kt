@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.modelaccess
 
+import com.google.adk.kt.types.Role
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
@@ -34,7 +36,7 @@ internal class AttachmentResolvingModel(
     override val name: String = delegate.name
 
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> {
-        val resolved = request.resolveAttachmentParts(documentIngestMode)
+        val resolved = request.withoutSupersededStoppedReplies().resolveAttachmentParts(documentIngestMode)
         val selected = audioDelegate?.takeIf { resolved.hasAudioInput() }?.value ?: delegate
         return selected.generateContent(resolved, stream)
     }
@@ -42,6 +44,28 @@ internal class AttachmentResolvingModel(
     @OptIn(ExperimentalLiveApi::class)
     override suspend fun connect(request: LlmRequest): LiveConnection =
         delegate.connect(request.resolveAttachmentParts(documentIngestMode))
+}
+
+/** 重试当前轮时去掉停止快照；新问题仍能引用前一轮已经展示的正文。 */
+private fun LlmRequest.withoutSupersededStoppedReplies(): LlmRequest {
+    val marker = WebCitationMetadata.STOPPED_REPLY_KEY
+    if (contents.none { content -> content.parts.any { marker in it.partMetadata.orEmpty() } }) return this
+
+    var hasLaterUser = false
+    var hasReplacement = false
+    val history = contents.asReversed().mapNotNull { content ->
+        if (content.role == Role.USER) {
+            hasLaterUser = true
+            hasReplacement = false
+        }
+        val replacement = content.parts.filterNot { marker in it.partMetadata.orEmpty() }
+        val retained = if (hasLaterUser && !hasReplacement) content.parts else replacement
+        if ((content.role == Role.MODEL || content.role == "assistant") && replacement.any {
+            it.thought != true && !it.text.isNullOrBlank()
+        }) hasReplacement = true
+        content.copy(parts = retained).takeIf { retained.isNotEmpty() }
+    }
+    return copy(contents = history.asReversed())
 }
 
 private fun LlmRequest.hasAudioInput(): Boolean = contents.any { content ->

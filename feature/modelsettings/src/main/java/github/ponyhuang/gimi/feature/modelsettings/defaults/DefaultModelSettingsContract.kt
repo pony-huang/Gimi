@@ -36,10 +36,6 @@ data class DefaultModelSettingsUiState(
     val isTtsVoiceLoading: Boolean = false,
     /** TTS 服务是否允许填写内置音色表之外的音色 ID（声音复刻、基础音色）。 */
     val ttsVoiceCustomInputAllowed: Boolean = false,
-    /** 开放自由填写厂商（千问）的音色 ID 命名模板；null 表示不展示。 */
-    val ttsVoiceIdTemplate: String? = null,
-    /** 开放自由填写厂商的官方音色列表页；null 表示不展示。 */
-    val ttsVoiceDocsUrl: String? = null,
     /** 待呈现的一次性通知；Route 呈现后经 [DefaultModelSettingsAction.ConsumeNotice] 清除。 */
     val notice: DefaultModelSettingsNotice? = null,
     val chatModels: List<SelectableModelRow> = emptyList(),

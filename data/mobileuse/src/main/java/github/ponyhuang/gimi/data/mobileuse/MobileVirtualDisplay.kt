@@ -69,16 +69,29 @@ internal class MobileVirtualDisplay private constructor(
 
     companion object {
         private const val TAG = "GimiVirtualDisplay"
+
+        // DisplayManager.VIRTUAL_DISPLAY_FLAG_* 常量（部分属于平台隐藏常量）
+        private const val FLAG_PUBLIC = 1
+        private const val FLAG_AUTO_MIRROR = 1 shl 3
+        private const val FLAG_ROTATES_WITH_CONTENT = 1 shl 6
+        private const val FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 shl 7
+        private const val FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS = 1 shl 8
+        private const val FLAG_TRUSTED = 1 shl 10
         private const val OWN_DISPLAY_GROUP = 1 shl 11
+        private const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
+        private const val FLAG_TOUCH_FEEDBACK_DISABLED = 1 shl 13
+        private const val FLAG_OWN_FOCUS = 1 shl 14
+        private const val FLAG_NO_SYSTEM_DECORATIONS = 1 shl 16
 
         /** 按平台版本启用可信副屏、独立焦点及禁止抢占主屏焦点；移除时销毁副屏任务。 */
         internal fun flags(sdk: Int, trusted: Boolean): Int {
-            var flags = 1 or (1 shl 3) or (1 shl 6) or (1 shl 7) or (1 shl 8)
+            var flags = FLAG_PUBLIC or FLAG_AUTO_MIRROR or FLAG_ROTATES_WITH_CONTENT or
+                FLAG_DESTROY_CONTENT_ON_REMOVAL or FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS
             if (sdk >= 33) {
-                flags = flags or (1 shl 13)
-                if (trusted) flags = flags or (1 shl 10) or OWN_DISPLAY_GROUP or (1 shl 12)
+                flags = flags or FLAG_TOUCH_FEEDBACK_DISABLED
+                if (trusted) flags = flags or FLAG_TRUSTED or OWN_DISPLAY_GROUP or FLAG_ALWAYS_UNLOCKED
             }
-            if (sdk >= 34 && trusted) flags = flags or (1 shl 14) or (1 shl 16)
+            if (sdk >= 34 && trusted) flags = flags or FLAG_OWN_FOCUS or FLAG_NO_SYSTEM_DECORATIONS
             return flags
         }
 

@@ -35,7 +35,7 @@ class EnvironmentStatusTool @Inject constructor(
             else -> "ready"
         }
         val hint = when (state) {
-            "ready" -> "Use execute/start_job. Install App skills with install_skill, then load_skill and prepare_skill."
+            "ready" -> "Use execute. Install App skills with install_skill, then load_skill and prepare_skill."
             "runtime_missing" -> "Open App environment settings and install the companion runtime."
             "connection_unavailable" -> "Open App environment settings and reconnect the runtime."
             "update_required" -> "Open App environment settings and update the companion runtime to the bundled version."

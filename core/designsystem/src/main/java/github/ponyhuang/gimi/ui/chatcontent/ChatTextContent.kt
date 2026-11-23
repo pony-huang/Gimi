@@ -11,6 +11,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,8 +47,10 @@ import kotlinx.coroutines.channels.ReceiveChannel
  * - **静态路径**：[chunkChannel] 为空且 [partial] 为 false 时
  *   `Markdown(content = text)`，首帧立即可见（用户消息 / 历史回放 / 已完成消息）。
  *
- * 在同一轮流式输出中，即使增量来源暂时消失，也继续用 streaming state 渲染；当 channel
- * 被重新播种时，外层 key 会重建状态并回到权威全文。正常完成只更新消息文本，不重建渲染状态。
+ * 在同一轮流式输出中，即使增量来源暂时消失，也继续用 streaming state 渲染；只有换成
+ * **新的非空 channel**（重播种重放全文）才重建渲染状态。正常完成只翻 `partial` 标志、
+ * channel 随历史刷新关闭不算换源，不重建渲染状态。排水结束后会把累计文本与权威全文
+ * 比对一次，不一致（增量丢失/后台完成被替换）时重建并回到静态权威全文。
  *
  * ## Channel 关闭 / 协程取消的契约
  *
@@ -71,10 +74,14 @@ fun ChatTextContent(
 ) {
     // 桥接路径遇到非前缀覆盖时递增，重建内部流式状态（StreamingMarkdownState 只能 append）。
     var bridgeEpoch by remember { mutableIntStateOf(0) }
-    // A new channel means the producer reseeded the stream (for example after returning from
-    // background). Reset only for a channel replacement so ordinary stream completion can keep
-    // its current markdown state without a visible re-parse flash.
-    key(bridgeEpoch, chunkChannel) {
+    // 流式状态的重建 key：只有「换了新的非空 channel」（重播种重放全文）才变化。
+    // 正常收尾时 channel 从有到无不算重播种 —— 流式状态已与权威全文一致，沿用上一个
+    // channel 身份保留内部状态，避免收尾历史刷新切静态路径整段重 parse（气泡闪一下）。
+    // 普通 remember 持有（非 snapshot 状态）：同一次组合内先读后写即可，不参与重组驱动。
+    val lastStreamChannel = remember { arrayOfNulls<ReceiveChannel<String>>(1) }
+    val streamChannelKey = chunkChannel ?: lastStreamChannel[0]
+    if (chunkChannel != null) lastStreamChannel[0] = chunkChannel
+    key(bridgeEpoch, streamChannelKey) {
         ChatTextContentBody(
             text = text,
             partial = partial,
@@ -100,15 +107,27 @@ private fun ChatTextContentBody(
     // 一旦置 true，即使增量来源后续消失，也继续走 streaming state 路径，
     // 避免切到静态路径引发气泡闪一下。
     var streamedAnyChunk by remember { mutableStateOf(false) }
+    // 累计已消费的流式增量：排水结束后与权威全文比对，校验流式状态没有缺字。
+    val streamedText = remember { StringBuilder() }
+    // 排水结束时的校验读取的是收尾那一刻的 props（effect 持有的是启动期捕获值）。
+    val latestText by rememberUpdatedState(text)
+    val latestPartial by rememberUpdatedState(partial)
 
     if (chunkChannel != null) {
         LaunchedEffect(chunkChannel, streamingState) {
             try {
                 for (chunk in chunkChannel) {
                     streamingState.append(chunk)
+                    streamedText.append(chunk)
                     streamedAnyChunk = true
                 }
             } catch (_: CancellationException) {
+            }
+            // 排水结束（channel 关闭后 for 循环正常退出，或收尾换 key 触发重启）后校验一次：
+            // 已收尾而累计文本与权威全文不一致（增量被丢弃、后台完成被 SDK 重试替换等），
+            // 重建回静态权威全文，避免流式状态永久缺字。
+            if (!latestPartial && streamedText.toString() != latestText) {
+                onBridgeMismatch()
             }
         }
     } else if (partial) {

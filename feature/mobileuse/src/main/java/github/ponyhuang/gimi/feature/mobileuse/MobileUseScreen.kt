@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Phonelink
@@ -24,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
@@ -122,7 +122,7 @@ fun MobileUseScreen(
                                     onClick = onRefresh,
                                 ),
                                 MobileUseActionRow(
-                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                    icon = ImageVector.vectorResource(R.drawable.ic_shizuku),
                                     title = stringResource(R.string.mobile_use_open_shizuku),
                                     onClick = onOpenShizuku,
                                 ),

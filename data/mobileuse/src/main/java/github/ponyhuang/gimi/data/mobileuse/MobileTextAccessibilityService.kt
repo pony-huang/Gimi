@@ -135,12 +135,13 @@ class MobileTextAccessibilityService : AccessibilityService() {
             var truncated = false
             val deadline = SystemClock.elapsedRealtime() + 500
             fun walk(node: AccessibilityNodeInfo, path: List<Int>, window: MobileWindowState,
-                     clickAncestor: Pair<List<Int>, MobileElement>?) {
+                     clickAncestor: Pair<List<Int>, MobileElement>?, sensitiveAncestor: Boolean = false) {
                 if (++visited > 2_000 || path.size > 48 || targets.size >= 200 || SystemClock.elapsedRealtime() >= deadline) {
                     truncated = true
                     return
                 }
                 val own = node.element(window, path, width, height)
+                val sensitive = sensitiveAncestor || node.isPassword
                 val click = if ("click" in own.actions) path to own else clickAncestor
                 if (node.isVisibleToUser && own.bounds.right > own.bounds.left &&
                     own.bounds.bottom > own.bounds.top && !states.covers(own) &&
@@ -149,11 +150,11 @@ class MobileTextAccessibilityService : AccessibilityService() {
                     val actions = own.actions.toMutableList()
                     if (own.enabled && click != null && "click" !in actions) actions += "click"
                     val element = own.copy(actions = actions)
-                    targets[element.id] = MobileNodeTarget(element, path, own, click?.first, click?.second)
+                    targets[element.id] = MobileNodeTarget(element, path, own, click?.first, click?.second, sensitive)
                 }
                 for (index in 0 until node.childCount.coerceAtMost(2_000)) {
                     if (visited >= 2_000 || targets.size >= 200 || SystemClock.elapsedRealtime() >= deadline) { truncated = true; break }
-                    node.getChild(index)?.let { walk(it, path + index, window, click) }
+                    node.getChild(index)?.let { walk(it, path + index, window, click, sensitive || node.isEditable) }
                 }
             }
             for (window in windows) {

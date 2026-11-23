@@ -53,6 +53,7 @@ data class Message(
     val subtaskBatch: SubtaskBatch? = null,
     /** 原生实时通话的用户转写，无法通过文本重试恢复原回合。 */
     val isNativeRealtimeTranscript: Boolean = false,
+    val webCitations: List<WebCitation> = emptyList(),
 )
 
 /** 原生实时用户转写在持久化事件中的来源标记。 */

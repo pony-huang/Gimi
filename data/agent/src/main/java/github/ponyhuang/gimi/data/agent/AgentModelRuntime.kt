@@ -28,6 +28,9 @@ class AgentModelRuntime @Inject constructor(
     /**
      * 装配模型；[conversationTitleEnabled] 为 true 时请求厂商随回答返回会话标题。
      */
-    fun createModel(cfg: ModelConfig, conversationTitleEnabled: Boolean = false): Model =
-        models.createModel(cfg, conversationTitleEnabled)
+    fun createModel(
+        cfg: ModelConfig,
+        conversationTitleEnabled: Boolean = false,
+        chatbotConnectionId: String? = null,
+    ): Model = models.createModel(cfg, conversationTitleEnabled, chatbotConnectionId)
 }

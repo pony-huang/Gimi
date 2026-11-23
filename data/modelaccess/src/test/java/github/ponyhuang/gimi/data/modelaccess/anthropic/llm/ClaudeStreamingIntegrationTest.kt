@@ -1,5 +1,10 @@
 package github.ponyhuang.gimi.data.modelaccess.anthropic.llm
 
+import com.google.adk.kt.types.FunctionDeclaration
+import com.google.adk.kt.types.Tool
+import github.ponyhuang.gimi.data.modelaccess.deepseek.llm.DeepSeekMessageRequestConverter
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
 import com.anthropic.client.AnthropicClient
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.LlmRequest
@@ -50,6 +55,95 @@ class ClaudeStreamingIntegrationTest {
     fun tearDown() {
         client.close()
         server.shutdown()
+    }
+
+    @Test
+    fun webCitationsFollowStreamingTextAndSurviveTheAggregate() = runBlocking {
+        enqueueStream(
+            start(),
+            """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"中🙂"}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"citations_delta","citation":{"type":"web_search_result_location","url":"https://example.org/story","title":"Story","encrypted_index":"index","cited_text":"Source"}}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"文"}}""",
+            """{"type":"content_block_stop","index":0}""",
+            finish(),
+            """{"type":"message_stop"}""",
+        )
+        val responses = Claude("claude-sonnet-4-6", client, webSearchReplayScope = "scope")
+            .generateContent(request(), stream = true).toList()
+        val live = responses.filter { it.partial == true }.flatMap {
+            WebCitationMetadata.decode(it.customMetadata?.get(WebCitationMetadata.KEY))
+        }.single()
+        assertEquals(3, live.endOffset)
+        assertEquals("https://example.org/story", live.source.url)
+        assertEquals(listOf(live), WebCitationMetadata.decode(responses.last().customMetadata?.get(WebCitationMetadata.KEY)))
+    }
+
+    @Test
+    fun deepSeekNativeSearchReturnsSiteIconAndReplaysOnlyOnTheSameConnection() = runBlocking {
+        val scope = "deepseek-connection"
+        val converter = DeepSeekMessageRequestConverter("deepseek-flash", 8196, webSearchReplayScope = scope)
+        val adapter = DeepSeekMessageChat("deepseek-flash", client, webSearchReplayScope = scope, requestConverter = converter::convert)
+        val original = request()
+        val withSearch = original.copy(config = original.config.copy(tools = listOf(Tool(
+            functionDeclarations = listOf(FunctionDeclaration(name = OfficialToolIds.DEEPSEEK_NATIVE_WEB_SEARCH, description = "Search the web")),
+        ))))
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
+            """{"id":"msg_web","type":"message","role":"assistant","model":"deepseek-flash","stop_reason":"end_turn","content":[
+                {"type":"server_tool_use","id":"srvtoolu_search","name":"deepseek_web_search","input":{"query":"fixtures"}},
+                {"type":"web_search_tool_result","tool_use_id":"srvtoolu_search","kind":"search","signature":"signed","content":[
+                    {"type":"web_search_result","url":"https://example.org/story","title":"Story","encrypted_content":"opaque","site_icon":"https://example.org/icon.png"}
+                ]},
+                {"type":"text","text":"Reply","citations":[{"type":"web_search_result_location","url":"https://example.org/story","title":"Story","encrypted_index":"","cited_text":"Reply"}]}
+            ],"usage":{"input_tokens":10,"output_tokens":2}}""",
+        ))
+        val reply = adapter.generateContent(withSearch, stream = false).toList().single()
+        val sent = JSONObject(server.takeRequest().body.readUtf8())
+        assertEquals("deepseek_web_search", sent.getJSONArray("tools").getJSONObject(0).getString("type"))
+        val citation = WebCitationMetadata.decode(reply.customMetadata?.get(WebCitationMetadata.KEY)).single()
+        assertEquals("https://example.org/icon.png", citation.source.iconUrl)
+        val next = original.copy(contents = original.contents + requireNotNull(reply.content) + original.contents)
+        fun blocks(params: com.anthropic.models.messages.MessageCreateParams) =
+            com.anthropic.core.jsonMapper().writeValueAsString(params.messages()[1])
+        assertTrue(blocks(converter.convert(next)).contains("signed"))
+        val changed = DeepSeekMessageRequestConverter("deepseek-flash", 8196, webSearchReplayScope = "another")
+        assertFalse(blocks(changed.convert(next)).contains("signed"))
+        assertTrue(blocks(changed.convert(next)).contains("Reply"))
+    }
+
+    @Test
+    fun hostedToolStreamPreservesInputsFromTheStartBlockAndFromDeltas() = runBlocking {
+        val scope = "deepseek-connection"
+        val converter = DeepSeekMessageRequestConverter("deepseek-flash", 8196, webSearchReplayScope = scope)
+        val adapter = DeepSeekMessageChat(
+            "deepseek-flash", client, webSearchReplayScope = scope, requestConverter = converter::convert,
+        )
+        enqueueStream(
+            start(),
+            """{"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_search","name":"deepseek_web_search","input":{"query":"input from start"}}}""",
+            """{"type":"content_block_stop","index":0}""",
+            """{"type":"content_block_start","index":1,"content_block":{"type":"server_tool_use","id":"srvtoolu_second","name":"deepseek_web_search","input":{}}}""",
+            """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}""",
+            """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"input from delta\"}"}}""",
+            """{"type":"content_block_stop","index":1}""",
+            """{"type":"content_block_start","index":2,"content_block":{"type":"text","text":""}}""",
+            """{"type":"content_block_delta","index":2,"delta":{"type":"text_delta","text":"Reply"}}""",
+            """{"type":"content_block_delta","index":2,"delta":{"type":"citations_delta","citation":{"type":"web_search_result_location","url":"https://example.org/story","title":"Story","encrypted_index":"","cited_text":"Reply"}}}""",
+            """{"type":"content_block_stop","index":2}""",
+            finish(),
+            """{"type":"message_stop"}""",
+        )
+
+        val original = request()
+        val reply = adapter.generateContent(original, stream = true).toList().last()
+        assertEquals(reply.errorMessage, "Reply", reply.content?.parts?.single()?.text)
+        val citation = WebCitationMetadata.decode(reply.customMetadata?.get(WebCitationMetadata.KEY)).single()
+        assertEquals("https://example.org/story", citation.source.url)
+        val next = original.copy(contents = original.contents + requireNotNull(reply.content) + original.contents)
+        val replay = JSONObject(com.anthropic.core.jsonMapper().writeValueAsString(converter.convert(next).messages()[1]))
+            .getJSONArray("content")
+        assertEquals("input from start", replay.getJSONObject(0).getJSONObject("input").getString("query"))
+        assertEquals("input from delta", replay.getJSONObject(1).getJSONObject("input").getString("query"))
     }
 
     @Test

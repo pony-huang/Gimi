@@ -155,7 +155,8 @@ fun PreferenceGroupCard(
  * @property iconContainer 图标圆形底色，默认主题蓝。
  * @property iconTint 圆底上的字形色，默认取 onPrimary 与 primary 圆底成对；禁用等特殊态可改为灰色组合。
  * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
- * @property subtitleMaxLines 说明文字的最大行数；需要完整解释功能的设置项可单独放宽。
+ * @property titleMaxLines 标题的最大行数，默认为 1 行并在超长时省略（保持抽屉与列表项整齐单行节奏）。
+ * @property subtitleMaxLines 说明文字的最大行数；紧凑（抽屉）模式下默认 1 行，常规设置页默认 2 行，需要完整解释功能的设置项可单独放宽。
  * @property titleColor 标题文字色，默认继承行内内容色；禁用态可只降级文字而不用整行透明度。
  * @property subtitleColor 说明文字颜色，默认次要文字色。
  * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
@@ -180,7 +181,8 @@ fun PreferenceListItem(
     iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
     iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
-    subtitleMaxLines: Int = 2,
+    titleMaxLines: Int = 1,
+    subtitleMaxLines: Int = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) 1 else 2,
     titleColor: Color = Color.Unspecified,
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
@@ -254,7 +256,7 @@ fun PreferenceListItem(
                         text = title,
                         style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
                         color = resolvedTitleColor,
-                        maxLines = if (compact) 2 else 1,
+                        maxLines = titleMaxLines,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -309,6 +311,8 @@ fun PreferenceSwitchRow(
     title: String? = null,
     description: String? = null,
     showDivider: Boolean = false,
+    titleMaxLines: Int = 1,
+    descriptionMaxLines: Int = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) 1 else 2,
 ) {
     val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     PreferenceListItem(
@@ -316,6 +320,8 @@ fun PreferenceSwitchRow(
         title = title.orEmpty(),
         subtitle = description,
         modifier = modifier,
+        titleMaxLines = titleMaxLines,
+        subtitleMaxLines = descriptionMaxLines,
         iconTint = when {
             compact && !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
             compact -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -529,6 +535,33 @@ private fun PreferenceBannerInfoPreview() {
             text = "信息提示文案",
             tone = PreferenceBannerTone.Info,
         )
+    }
+}
+
+@Preview(name = "Compact 长文本单行省略", showBackground = true, widthDp = 390)
+@Composable
+private fun PreferenceListItemCompactLongTextPreview() {
+    GimiTheme {
+        PreferenceStyleScope(PreferenceStyle.Compact) {
+            Surface(color = preferenceCanvasColor()) {
+                PreferenceGroupCard(modifier = Modifier.padding(16.dp)) {
+                    PreferenceListItem(
+                        icon = Icons.Default.Info,
+                        title = "这是一段非常长非常长的抽屉列表项标题文案仅能占一行超过限度在此省略",
+                        subtitle = "这是一段非常长的说明文案在紧凑模式下同样限制为单行超过限度省略",
+                        onClick = {},
+                        showDivider = true,
+                    )
+                    PreferenceSwitchRow(
+                        icon = Icons.Default.Info,
+                        title = "这是一段超长的开关行标题仅能占一行超过限度在此省略截断测试",
+                        description = "超长开关说明文案单行截断测试",
+                        checked = true,
+                        onCheckedChange = {},
+                    )
+                }
+            }
+        }
     }
 }
 

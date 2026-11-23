@@ -1,5 +1,10 @@
 package github.ponyhuang.gimi.data.agent.chatbot
 
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialBuiltInTool
+import github.ponyhuang.gimi.data.agent.tools.official.isOfficialToolEnabled
+import github.ponyhuang.gimi.domain.modelaccess.isOfficialDeepSeekAnthropicEndpoint
+import github.ponyhuang.gimi.domain.modelcatalog.model.DEEPSEEK_CHATBOT_SEARCH_MODEL
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolset
@@ -29,6 +34,16 @@ class ChatbotOfficialToolset @Inject constructor(
         config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
+        if (config.modelId == DEEPSEEK_CHATBOT_SEARCH_MODEL && isOfficialDeepSeekAnthropicEndpoint(config)) {
+            return buildList {
+                if (selection.isOfficialToolEnabled(OfficialToolIds.DEEPSEEK_WEB_SEARCH)) {
+                    add(OfficialBuiltInTool(OfficialToolIds.DEEPSEEK_NATIVE_WEB_SEARCH))
+                }
+                if (selection.isOfficialToolEnabled(OfficialToolIds.DEEPSEEK_WEB_FETCH)) {
+                    add(OfficialBuiltInTool(OfficialToolIds.DEEPSEEK_NATIVE_READ_URL))
+                }
+            }
+        }
         val allowed = allowedToolNames(config.templateId.orEmpty())
         if (allowed.isEmpty()) return emptyList()
         return delegate.resolveTools(config, selection).filter { it.name in allowed }

@@ -121,6 +121,13 @@ class RealtimeAssistantToolsResolveTest {
     }
 
     @Test
+    fun realtimeDoesNotExposeScreenshotBoundElementClick() = runTest {
+        val source = contribution("local", toolset(localTool("mobile_click_element"), localTool("mobile_click")))
+        val bridge = tools(AgentContributionRegistry(setOf(source))).resolve(realtimeSelection)
+        assertEquals(listOf("mobile_click"), bridge?.declarations?.map { it.name })
+    }
+
+    @Test
     fun `resolvable realtime selection yields a bridge`() = runTest {
         val bridge = tools().resolve(realtimeSelection)
         assertNotNull(bridge)

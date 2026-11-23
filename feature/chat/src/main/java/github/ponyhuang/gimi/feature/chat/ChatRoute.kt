@@ -59,6 +59,8 @@ fun ChatRoute(
     onOpenSettings: () -> Unit,
     onOpenPersonalization: () -> Unit,
     onConfigureModels: () -> Unit,
+    onOpenPlugins: () -> Unit,
+    onOpenLocalEnvironment: () -> Unit,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
     chatLaunchRequest: github.ponyhuang.gimi.domain.conversation.model.ChatLaunchRequest? = null,
@@ -255,16 +257,16 @@ fun ChatRoute(
         },
         recentState = historyState.recentConversations,
         onRecentAction = onRecentAction,
-        onNewConversationClick = {
-            val targetMode = historyMode
-            chatMode = targetMode
-            if (targetMode == ChatMode.CHATBOT) chatbotViewModel.onAction(ChatbotAction.NewConversation)
-            else viewModel.onAction(ChatAction.NewConversation)
-            onReturnToChat()
-            drawerOpen = false
-        },
         onModelServicesClick = {
             onConfigureModels()
+            drawerOpen = false
+        },
+        onPluginsClick = {
+            onOpenPlugins()
+            drawerOpen = false
+        },
+        onLocalEnvironmentClick = {
+            onOpenLocalEnvironment()
             drawerOpen = false
         },
         onPersonalizeClick = {

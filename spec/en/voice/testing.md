@@ -47,6 +47,7 @@ in `data:modelcatalog` (covering both Realtime templates):
 | `RealtimeVoiceCallNotificationContentTest` | Snapshot collapse priority, high-frequency voice updates do not change the snapshot, state reset drives service exit |
 
 Related tests outside `data:voice`: `core:audio`'s `VoiceActivitySegmenterTest` /
+`AmbientNoiseFloorTrackerTest` / `UtteranceCommitGateTest` /
 `PcmPlaybackReferenceTest` / `PcmLevelTest`; `:data:modelaccess`'s
 `CascadedVoiceModelTest` / `LiveConnectionContractTest` / `VoiceSentenceBufferTest` /
 `RealtimeToolRoundRunnerTest`; and `data:agent`

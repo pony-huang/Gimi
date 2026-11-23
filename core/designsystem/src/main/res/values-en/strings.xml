@@ -5,6 +5,10 @@
     <string name="picker_no_search_results">No matching options</string>
     <string name="picker_clear_search">Clear search</string>
     <string name="gimi_sheet_drag_handle">Drag to resize</string>
+    <string name="gimi_sheet_action_search">Search</string>
+    <string name="gimi_sheet_action_close">Close</string>
+    <string name="gimi_sheet_search_exit">Exit search</string>
+    <string name="voice_picker_search_hint">Type keywords to search voices</string>
     <!-- Voice picker sheet: migrated from :feature:modelsettings, shared by the chat voice page and default model settings (see AGENTS.md exception). -->
     <string name="voice_picker_search">Search name, voice ID, trait or scene</string>
     <string name="voice_picker_current">Current: %1$s</string>
@@ -18,11 +22,8 @@
     <string name="voice_picker_input_note">Enter a voice ID directly. Leave it empty to use this model\'s default voice.</string>
     <string name="voice_picker_input_label">Voice ID</string>
     <string name="voice_picker_default_hint">Default voice %1$s</string>
-    <string name="voice_picker_naming_template">Base voice ID format: %1$s</string>
-    <string name="voice_picker_open_docs">View the official voice list</string>
     <string name="voice_picker_confirm">Confirm</string>
     <string name="voice_picker_back">Back</string>
-    <string name="voice_filter_all">All</string>
     <string name="voice_gender_female">Female</string>
     <string name="voice_gender_male">Male</string>
     <string name="voice_gender_child">Child</string>

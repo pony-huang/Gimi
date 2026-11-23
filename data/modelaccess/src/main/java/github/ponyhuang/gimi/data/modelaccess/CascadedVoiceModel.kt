@@ -274,32 +274,55 @@ class CascadedVoiceModel(
             val clientSentences = ConcurrentLinkedQueue<String>()
             val generation = async {
                 val buffer = VoiceSentenceBuffer()
-                generate(contents, answer) { body ->
-                    emit(LlmResponse(content = Content.fromText(Role.MODEL, body), partial = true))
-                    buffer.append(body).forEach { clientSentences.add(it) }
-                    // 逐次投递：服务端拿到半句就能开始合成，首包不必等整句。
-                    session.send(body)
+                try {
+                    generate(contents, answer) { body ->
+                        emit(LlmResponse(content = Content.fromText(Role.MODEL, body), partial = true))
+                        buffer.append(body).forEach { sentence ->
+                            clientSentences.add(sentence)
+                            // 逐句投递：缓冲切句后按完整句子投递，避免逐 token 发送频繁触发厂商 RPM 限流。
+                            session.send(sentence)
+                        }
+                    }
+                    buffer.finish().takeIf { it.isNotEmpty() }?.let { sentence ->
+                        clientSentences.add(sentence)
+                        session.send(sentence)
+                    }
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = cause)
                 }
-                buffer.finish().takeIf { it.isNotEmpty() }?.let { clientSentences.add(it) }
-                // 让服务端把缓冲里的文本合成并下发完毕，此后本轮音频才算完整。
-                session.flush()
+                try {
+                    // 让服务端把缓冲里的文本合成并下发完毕，此后本轮音频才算完整。
+                    session.flush()
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
+                }
             }
             val playback = async {
-                session.segments.collect { segment ->
-                    // 假设服务端片段与客户端切句一一对应（_subtitle_enable + sentence 切分）；
-                    // 若服务端拆分/合并片段，这里回退用服务端字幕文本兜底。
-                    val segmentText = clientSentences.poll() ?: segment.text.value
-                    emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
-                        Transcription(text = segmentText, finished = false) else null,
-                        customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
-                    segment.audio.collect { bytes ->
-                        emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(
-                            Part(inlineData = Blob(mimeType = "audio/pcm;rate=24000", data = bytes)),
-                        )), partial = true))
+                try {
+                    session.segments.collect { segment ->
+                        // 假设服务端片段与客户端切句一一对应（_subtitle_enable + sentence 切分）；
+                        // 若服务端拆分/合并片段，这里回退用服务端字幕文本兜底。
+                        val segmentText = clientSentences.poll() ?: segment.text.value
+                        emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
+                            Transcription(text = segmentText, finished = false) else null,
+                            customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
+                        segment.audio.collect { bytes ->
+                            emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(
+                                Part(inlineData = Blob(mimeType = "audio/pcm;rate=24000", data = bytes)),
+                            )), partial = true))
+                        }
+                        emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
+                            Transcription(finished = true) else null,
+                            customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_END to true)))
                     }
-                    emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
-                        Transcription(finished = true) else null,
-                        customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_END to true)))
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                 }
             }
             generation.await()

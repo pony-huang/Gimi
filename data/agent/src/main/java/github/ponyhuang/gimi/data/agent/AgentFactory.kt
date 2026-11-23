@@ -63,6 +63,7 @@ class AgentFactory @Inject constructor(
             modelConfig,
             // Chatbot 形态用厂商随回答返回的会话标题，省掉标题插件的独立快模型请求。
             conversationTitleEnabled = spec.profile == AgentProfile.CHATBOT,
+            chatbotConnectionId = spec.selection?.connectionId.takeIf { spec.profile == AgentProfile.CHATBOT },
         )
         val agent = when (spec.profile) {
             AgentProfile.ASSISTANT -> assistantAgent(model, spec)

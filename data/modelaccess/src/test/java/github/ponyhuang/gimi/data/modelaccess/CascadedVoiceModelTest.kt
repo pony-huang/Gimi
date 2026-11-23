@@ -223,4 +223,64 @@ class CascadedVoiceModelTest : LiveConnectionContractTest() {
         receiving.await()
         connection.closeSession()
     }
+
+    @Test
+    fun sessionSynthesisBuffersStreamingDeltasIntoSentences() = runTest {
+        val sent = mutableListOf<String>()
+        val fakeSession = object : github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession {
+            override fun send(text: String) { sent += text }
+            override suspend fun flush() {}
+            override fun cancel() {}
+            override val segments: Flow<github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment> = flow {
+                for (s in sent) emit(github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment(MutableStateFlow(s), flowOf(byteArrayOf(1, 0))))
+            }
+            override suspend fun close() {}
+        }
+        every { synthesis.openSession() } returns fakeSession
+        every { textModel.generateContent(any(), true) } answers {
+            flowOf(
+                LlmResponse(content = Content.fromText(Role.MODEL, "你"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "好"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "。"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "天气"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "真好"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "。"), partial = true),
+            )
+        }
+        val connection = model.connect(manual)
+        connection.sendContent(Content.fromText(Role.USER, "你好"))
+        val responses = connection.receive().toList()
+        connection.closeSession()
+        assertTrue(responses.last().turnComplete == true)
+        assertEquals(listOf("你好。", "天气真好。"), sent)
+    }
+
+    @Test
+    fun sessionSynthesisWrapsTtsExceptionsIntoSynthesisFailure() = runTest {
+        val fakeSession = object : github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession {
+            override fun send(text: String) {}
+            override suspend fun flush() {
+                throw github.ponyhuang.gimi.data.modelaccess.minimax.speech.TtsSynthesisException(
+                    1002, "请求过于频繁", "rate limit exceeded(RPM)",
+                )
+            }
+            override fun cancel() {}
+            override val segments: Flow<github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment> = emptyFlow()
+            override suspend fun close() {}
+        }
+        every { synthesis.openSession() } returns fakeSession
+        every { textModel.generateContent(any(), true) } answers {
+            flowOf(LlmResponse(content = Content.fromText(Role.MODEL, "你好。"), partial = true))
+        }
+        val connection = model.connect(manual)
+        connection.sendContent(Content.fromText(Role.USER, "你好"))
+        try {
+            connection.receive().toList()
+            fail("Expected VoiceAudioBackendException")
+        } catch (e: github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException) {
+            assertEquals(github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure.Synthesis, e.failure)
+        } finally {
+            connection.closeSession()
+        }
+    }
 }

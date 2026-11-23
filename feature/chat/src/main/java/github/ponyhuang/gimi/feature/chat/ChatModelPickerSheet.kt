@@ -8,8 +8,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -41,7 +40,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -523,22 +524,24 @@ private fun ReasoningEffortSliderSection(
             }
             val interactionSource = remember { MutableInteractionSource() }
             val isDragging by interactionSource.collectIsDraggedAsState()
-            var gestureValue by remember { mutableStateOf<Float?>(null) }
-            // 连续位置只属于手势，业务配置仍为五档；松手后从当前位置平滑吸附到档位。
-            val animatedSliderValue by animateFloatAsState(
-                targetValue = gestureValue ?: sliderValue,
-                animationSpec = if (isDragging) snap() else spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-                label = "reasoning-effort-value",
-            )
+            // 连续位置由 SliderState 自持（拖动期间跟随手势）；非拖动期间从当前位置平滑吸附到业务档位。
+            val sliderState = rememberSliderState(value = sliderValue, trackRange = 0f..4f)
+            LaunchedEffect(isDragging, sliderValue) {
+                if (!isDragging && sliderState.value != sliderValue) {
+                    animate(
+                        initialValue = sliderState.value,
+                        targetValue = sliderValue,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    ) { value, _ -> sliderState.value = value }
+                }
+            }
             // 关闭为 0 档，极简/低/中/高依次为 1..4；滑到关闭即整体关闭思考模式。
             Slider(
-                value = animatedSliderValue,
+                state = sliderState,
                 onValueChange = { value ->
-                    if (!enabled) return@Slider
-                    gestureValue = value
                     val index = value.roundToInt().coerceIn(0, 4)
                     if (index == sliderValue.toInt()) return@Slider
                     if (index == 0) {
@@ -548,8 +551,6 @@ private fun ReasoningEffortSliderSection(
                         onEffortChange(ReasoningEffort.entries[index - 1])
                     }
                 },
-                onValueChangeFinished = { gestureValue = null },
-                valueRange = 0f..4f,
                 enabled = enabled,
                 interactionSource = interactionSource,
                 track = { state ->

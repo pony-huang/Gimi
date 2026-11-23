@@ -1,17 +1,13 @@
 package github.ponyhuang.gimi.ui.components
 
 import android.content.res.Configuration
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,7 +16,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,7 +52,7 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
  * 搜索有命中时按分类分组展示列表；无命中时把输入本身变成一个可选项；
  * 厂商没有内置音色表时（例如千问 Realtime）直接进入输入引导，不展示空列表。
  *
- * 外壳是统一的大尺寸选择对话框（与模型选择同款），搜索、筛选与新增入口
+ * 外壳是统一的大尺寸选择对话框（与模型选择同款），搜索与新增入口
  * 都在对话框内部：自定义音色入口在搜索框尾部，不随列表滚动。
  *
  * 模块归属说明（AGENTS.md 共享豁免，与 `LLMModelServiceIcon` 同类）：
@@ -70,8 +65,6 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
  * @param allowCustomInput 是否允许填写内置表之外的音色 ID（声音复刻、基础音色）。
  * @param isLoading 音色表是否仍在加载；加载中不把空列表当成「没有内置音色」。
  * @param defaultVoiceId 厂商缺省音色，仅在输入引导里作为提示展示。
- * @param namingTemplate 基础音色的命名模板说明，仅厂商提供时展示。
- * @param docsUrl 官方音色列表地址，仅厂商提供时展示跳转入口。
  * @param initialQuery 搜索框初值；生产调用保持空串，仅供预览构造「搜索中」状态。
  */
 @Composable
@@ -84,9 +77,6 @@ fun VoicePickerDialog(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
     defaultVoiceId: String = "",
-    namingTemplate: String? = null,
-    docsUrl: String? = null,
-    onOpenUrl: (String) -> Unit = {},
     initialQuery: String = "",
 ) {
     var customMode by rememberSaveable { mutableStateOf(false) }
@@ -101,13 +91,10 @@ fun VoicePickerDialog(
             canReturnToList = canReturnToList,
             currentVoiceId = currentVoiceId,
             defaultVoiceId = defaultVoiceId,
-            namingTemplate = namingTemplate,
-            docsUrl = docsUrl,
             onConfirm = { voiceId ->
                 onPick(voiceId)
                 onDismiss()
             },
-            onOpenUrl = onOpenUrl,
             onBack = { customMode = false },
             onDismiss = onDismiss,
         )
@@ -130,7 +117,7 @@ fun VoicePickerDialog(
     }
 }
 
-/** 音色列表态：统一选择对话框外壳 + 搜索 + 性别筛选 + 分类分组。 */
+/** 音色列表态：统一选择对话框外壳 + 搜索 + 分类分组。 */
 @Composable
 private fun VoiceListDialog(
     title: String,
@@ -144,24 +131,17 @@ private fun VoiceListDialog(
     onOpenCustomInput: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var genderFilter by rememberSaveable { mutableStateOf(VoiceGender.Unspecified) }
-
     // optionTitle/groupTitle 是普通 lambda，不能在内部调 @Composable 文案函数；
-    // 在组合期先把性别与分类文案取好，供行渲染拼接。
+    // 在组合期先把性别（副标题）与分类（分组标题）文案取好。
     val genderLabels = VoiceGender.entries.associateWith { genderLabel(it) }
     val categoryLabels = VoiceCategory.entries.associateWith { categoryLabel(it) }
 
-    val genders = options.map { it.voiceGender }
-        .filter { it != VoiceGender.Unspecified }
-        .distinct()
-        .sortedBy { it.ordinal }
     val normalizedQuery = query.trim()
     val visible = options
         // 稳定排序保证同分类相邻，供分组标题合并。
         .sortedBy { it.category.ordinal }
         .filter { voice ->
-            (genderFilter == VoiceGender.Unspecified || voice.voiceGender == genderFilter) &&
-                (normalizedQuery.isEmpty() || voice.searchText().contains(normalizedQuery, ignoreCase = true))
+            normalizedQuery.isEmpty() || voice.searchText().contains(normalizedQuery, ignoreCase = true)
         }
 
     PickerSingleChoiceDialog(
@@ -197,32 +177,7 @@ private fun VoiceListDialog(
             )
         },
         filterBar = {
-            Column {
-                CurrentVoiceLabel(currentVoiceId, options)
-                if (genders.size > 1) {
-                    // 筛选条可以横向滚动：性别种类越多按钮越密，窄屏或大字号下最后一个筛选项
-                    // 会被挤出可视区，表现为「某个类型切不了」。
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        GenderChip(
-                            label = stringResource(R.string.voice_filter_all),
-                            selected = genderFilter == VoiceGender.Unspecified,
-                            onClick = { genderFilter = VoiceGender.Unspecified },
-                        )
-                        genders.forEach { gender ->
-                            GenderChip(
-                                label = genderLabel(gender),
-                                selected = genderFilter == gender,
-                                onClick = { genderFilter = gender },
-                            )
-                        }
-                    }
-                }
-            }
+            CurrentVoiceLabel(currentVoiceId, options)
         },
         groupTitle = { categoryLabels[it.category] },
         emptyContent = { VoiceEmptyState(isLoading, normalizedQuery, allowCustomInput, onPick) },
@@ -300,10 +255,7 @@ private fun VoiceInputDialog(
     canReturnToList: Boolean,
     currentVoiceId: String,
     defaultVoiceId: String,
-    namingTemplate: String?,
-    docsUrl: String?,
     onConfirm: (String) -> Unit,
-    onOpenUrl: (String) -> Unit,
     onBack: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -367,26 +319,6 @@ private fun VoiceInputDialog(
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (namingTemplate != null) {
-                    Text(
-                        text = stringResource(
-                            R.string.voice_picker_naming_template,
-                            namingTemplate,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-                if (docsUrl != null) {
-                    TextButton(
-                        onClick = { onOpenUrl(docsUrl) },
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        Text(stringResource(R.string.voice_picker_open_docs))
-                    }
-                }
             }
         },
         confirmButton = {
@@ -411,19 +343,6 @@ private fun voiceSubtitle(voice: TtsVoice, genderLabels: Map<VoiceGender, String
         genderLabels[voice.voiceGender].orEmpty().ifBlank { null },
         traitText.ifBlank { null },
     ).joinToString(" · ")
-}
-
-@Composable
-private fun GenderChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-    )
 }
 
 @Composable
@@ -485,8 +404,6 @@ private fun VoicePickerDialogPreview() {
             isLoading = false,
             onPick = {},
             onDismiss = {},
-            namingTemplate = "qwen-audio-3.0-tts-{plus|flash}-{后缀}",
-            docsUrl = "https://example.com",
         )
     }
 }
@@ -567,8 +484,6 @@ private fun VoicePickerDialogInputPreview() {
             onPick = {},
             onDismiss = {},
             defaultVoiceId = "longanqian_v3.1",
-            namingTemplate = "qwen-audio-3.0-tts-{plus|flash}-{后缀}",
-            docsUrl = "https://example.com",
         )
     }
 }

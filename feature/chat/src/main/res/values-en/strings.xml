@@ -133,8 +133,9 @@
 
     <string name="chat_stt_configure_default_first">Please configure the speech recognition model in Settings first</string>
 
-    <string name="chat_drawer_new_conversation">New chat</string>
     <string name="chat_drawer_auto_speak">Auto-play</string>
+    <string name="chat_drawer_plugins">Plugins</string>
+    <string name="chat_drawer_local_environment">Local environment</string>
     <string name="chat_drawer_auto_speak_subtitle">Read replies aloud automatically</string>
     <string name="chat_drawer_personalize">Personalization</string>
     <string name="chat_drawer_empty_history">No recent conversations</string>
@@ -215,21 +216,24 @@
     <string name="chat_timeline_tool_rejected">Rejected</string>
     <string name="chat_timeline_tool_awaiting_confirmation">Awaiting confirmation</string>
     <string name="chat_timeline_tool_unknown">Status unknown</string>
-    <string name="chat_drawer_manage">Manage</string>
-    <string name="chat_drawer_recent_conversations">Recents</string>
     <string name="chat_drawer_done">Done</string>
     <string name="chat_drawer_search">Search conversations</string>
     <string name="chat_drawer_clear_search">Clear search</string>
     <string name="chat_drawer_search_empty">No matching conversations</string>
     <string name="chat_drawer_selected_count">%1$d selected</string>
-    <string name="chat_drawer_select_all">Select all</string>
-    <string name="chat_drawer_deselect_all">Deselect all</string>
+    <string name="chat_drawer_multi_select">Multi-select</string>
     <string name="chat_drawer_delete_count">Delete %1$d conversations</string>
     <string name="chat_drawer_delete_selected">Delete</string>
     <string name="chat_drawer_deleting">Deleting…</string>
     <string name="chat_drawer_delete_confirm_title">Delete %1$d conversations?</string>
     <string name="chat_drawer_delete_confirm_message">This cannot be undone. The current conversation and active conversations will be kept.</string>
     <string name="chat_drawer_cancel">Cancel</string>
+    <string name="chat_time_compact_just_now">now</string>
+    <string name="chat_time_compact_minutes">%1$dm</string>
+    <string name="chat_time_compact_hours">%1$dh</string>
+    <string name="chat_time_compact_days">%1$dd</string>
+    <string name="chat_time_compact_months">%1$dmo</string>
+    <string name="chat_time_compact_years">%1$dy</string>
     <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
     <string name="chat_choice_show_full_text">Show full option</string>
     <string name="chat_choice_close_full_text">Close</string>
@@ -398,6 +402,7 @@
     <string name="voice_settings_pick_tts_voice">Select speaking voice</string>
     <string name="voice_settings_pick_realtime_voice">Select session voice</string>
     <string name="voice_settings_search_model">Search models or services</string>
+    <string name="voice_settings_search_hint">Type keywords to search models</string>
     <string name="voice_settings_no_models">No models available</string>
     <string name="voice_settings_mutation_blocked">Voice settings are locked during a call or active task</string>
     <string name="voice_capability_stt">speech transcription</string>
@@ -422,6 +427,7 @@
     <string name="voice_prompt_settings_section">Role presets</string>
     <string name="voice_prompt_settings_note">Roles apply to this Chatbot conversation across text and voice. Changes keep your history and take effect from the next reply.</string>
     <string name="voice_prompt_preset_create">Create role</string>
+    <string name="voice_prompt_preset_enable">Enable role preset %1$s</string>
     <string name="voice_prompt_preset_edit">Edit</string>
     <string name="voice_prompt_preset_edit_title">Edit preset</string>
     <string name="voice_prompt_preset_name">Name</string>
@@ -473,4 +479,10 @@
     <string name="voice_settings_chat_model">Conversation model</string>
     <string name="chatbot_role_chips_show_all">Show all</string>
     <string name="chatbot_role_chips_show_less">Show less</string>
+    <string name="chat_web_citations_title">Sources</string>
+    <string name="chat_web_citations_open">View cited sources</string>
+    <string name="chat_web_citations_close">Close sources</string>
+    <string name="chat_model_always_search">Always online</string>
+    <string name="chat_web_citations_open_failed">Could not open source link</string>
+    <string name="chat_web_citations_overflow">+%1$d</string>
 </resources>

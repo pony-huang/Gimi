@@ -24,6 +24,9 @@ import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -125,5 +128,65 @@ class SemiCascadedVoiceModelTest : LiveConnectionContractTest() {
         assertTrue(next.last().turnComplete == true)
         assertEquals("新轮。", next.mapNotNull { it.outputTranscription?.text }.joinToString(""))
         connection.closeSession()
+    }
+
+    @Test
+    fun sessionSynthesisBuffersStreamingDeltasIntoSentences() = runTest {
+        val sent = mutableListOf<String>()
+        val fakeSession = object : github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession {
+            override fun send(text: String) { sent += text }
+            override suspend fun flush() {}
+            override fun cancel() {}
+            override val segments: Flow<github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment> = flow {
+                for (s in sent) emit(github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment(MutableStateFlow(s), flowOf(byteArrayOf(1, 0))))
+            }
+            override suspend fun close() {}
+        }
+        every { synthesis.openSession(any(), any()) } returns fakeSession
+        every { llm.generateContent(any(), true) } answers {
+            flowOf(
+                LlmResponse(content = Content.fromText(Role.MODEL, "你"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "好"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "。"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "天气"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "真好"), partial = true),
+                LlmResponse(content = Content.fromText(Role.MODEL, "。"), partial = true),
+            )
+        }
+        val connection = model.connect(manual)
+        connection.sendContent(Content.fromText(Role.USER, "你好"))
+        val responses = connection.receive().toList()
+        connection.closeSession()
+        assertTrue(responses.last().turnComplete == true)
+        assertEquals(listOf("你好。", "天气真好。"), sent)
+    }
+
+    @Test
+    fun sessionSynthesisWrapsTtsExceptionsIntoSynthesisFailure() = runTest {
+        val fakeSession = object : github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession {
+            override fun send(text: String) {}
+            override suspend fun flush() {
+                throw github.ponyhuang.gimi.data.modelaccess.minimax.speech.TtsSynthesisException(
+                    1002, "请求过于频繁", "rate limit exceeded(RPM)",
+                )
+            }
+            override fun cancel() {}
+            override val segments: Flow<github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment> = emptyFlow()
+            override suspend fun close() {}
+        }
+        every { synthesis.openSession(any(), any()) } returns fakeSession
+        every { llm.generateContent(any(), true) } answers {
+            flowOf(LlmResponse(content = Content.fromText(Role.MODEL, "你好。"), partial = true))
+        }
+        val connection = model.connect(manual)
+        connection.sendContent(Content.fromText(Role.USER, "你好"))
+        try {
+            connection.receive().toList()
+            fail("Expected VoiceAudioBackendException")
+        } catch (e: github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException) {
+            assertEquals(github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure.Synthesis, e.failure)
+        } finally {
+            connection.closeSession()
+        }
     }
 }

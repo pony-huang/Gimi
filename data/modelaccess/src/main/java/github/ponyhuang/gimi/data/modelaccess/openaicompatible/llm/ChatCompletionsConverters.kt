@@ -15,6 +15,11 @@
  */
 package github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm
 
+import github.ponyhuang.gimi.domain.conversation.model.webCitationUtf16Offset
+import github.ponyhuang.gimi.domain.conversation.model.webCitationHost
+import github.ponyhuang.gimi.domain.conversation.model.WebSource
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
+import github.ponyhuang.gimi.domain.conversation.model.WebCitation
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.models.LlmRequest
@@ -452,7 +457,7 @@ private fun Schema.withObjectType(): Schema =
   if (type == Type.OBJECT) this else copy(type = Type.OBJECT)
 
 /** Converts a non-streaming Chat Completions response to an ADK [LlmResponse]. */
-internal fun ChatCompletionResponse.toLlmResponse(): LlmResponse {
+internal fun ChatCompletionResponse.toLlmResponse(includeWebCitations: Boolean = false): LlmResponse {
   // Some compatible servers return no choices, such as for a filtered request; Python reports it.
   val choice =
     choices.firstOrNull()
@@ -470,14 +475,32 @@ internal fun ChatCompletionResponse.toLlmResponse(): LlmResponse {
     addAll(calls.filterNotNull())
   }
   val finishReason = choice.finishReason.toFinishReason(droppedMalformedCall = null in calls)
+  val hasUsableTruncatedSearchReply = includeWebCitations && choice.finishReason == "length" && parts.isNotEmpty()
   return LlmResponse(
     content = if (parts.isEmpty()) null else Content(role = Role.MODEL, parts = parts),
     usageMetadata = usage?.toUsageMetadata(),
     finishReason = finishReason,
-    errorCode = finishReason?.takeIf { it != FinishReason.STOP }?.name,
-    errorMessage = finishErrorMessage(finishReason, choice.finishReason),
+    errorCode = finishReason?.takeIf { it != FinishReason.STOP && !hasUsableTruncatedSearchReply }?.name,
+    errorMessage = if (hasUsableTruncatedSearchReply) null else finishErrorMessage(finishReason, choice.finishReason),
     modelVersion = model,
+    customMetadata = if (includeWebCitations) message?.webCitations()?.takeIf { it.isNotEmpty() }
+      ?.let { mapOf(WebCitationMetadata.KEY to WebCitationMetadata.encode(it)) } else null,
   )
+}
+
+private fun ChatMessage.webCitations(): List<WebCitation> {
+  val text = contentText().orEmpty()
+  return (annotations as? JsonArray).orEmpty().mapNotNull { entry ->
+    val annotation = entry as? JsonObject ?: return@mapNotNull null
+    if ((annotation["type"] as? JsonPrimitive)?.content != "url_citation") return@mapNotNull null
+    val citation = annotation["url_citation"] as? JsonObject ?: return@mapNotNull null
+    val url = (citation["url"] as? JsonPrimitive)?.content
+      ?.takeIf { webCitationHost(it) != null } ?: return@mapNotNull null
+    val end = (citation["end_index"] as? JsonPrimitive)?.content?.toIntOrNull()
+      ?.let { webCitationUtf16Offset(text, it) }?.takeIf { it > 0 } ?: return@mapNotNull null
+    val title = (citation["title"] as? JsonPrimitive)?.content?.takeIf(String::isNotBlank)
+    WebCitation(WebSource(url, title), end)
+  }.sortedBy(WebCitation::endOffset).distinct()
 }
 
 private fun ChatToolCall.toFunctionCallPart(): Part? =

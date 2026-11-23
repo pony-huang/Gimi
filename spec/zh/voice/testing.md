@@ -39,6 +39,7 @@
 | `RealtimeVoiceCallNotificationContentTest` | 通知快照折叠优先级、高频语音更新不改快照、状态复位驱动服务退出 |
 
 相关但不在 `data:voice` 的：`core:audio` 的 `VoiceActivitySegmenterTest` /
+`AmbientNoiseFloorTrackerTest` / `UtteranceCommitGateTest` /
 `PcmPlaybackReferenceTest` / `PcmLevelTest`；`:data:modelaccess` 的
 `CascadedVoiceModelTest` / `LiveConnectionContractTest` / `VoiceSentenceBufferTest` /
 `RealtimeToolRoundRunnerTest`；`data:agent` 的 `AdkVoiceAudioBackendTest` / `VoiceAgentConversationTest` / `RealtimeAssistantToolsResolveTest` / `RealtimeModelBaseUrlTest`。

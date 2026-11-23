@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,10 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
 import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -66,23 +71,26 @@ fun ChatbotPromptSettingsScreen(
             item { PreferenceSectionNote(stringResource(if (state.canSelect) R.string.voice_prompt_settings_note else R.string.voice_role_management_note)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        title = stringResource(R.string.voice_prompt_preset_none),
-                        subtitle = stringResource(R.string.voice_prompt_preset_none_detail),
-                        showDivider = state.builtInPresets.isNotEmpty(),
-                        onClick = if (state.canSelect) ({ onAction(ChatbotPromptAction.Select(null)) }) else null,
-                        trailingContent = {
-                            // 单选状态由仓库持有，圆钮本身不响应点击，统一走行点击。
-                            // 不可点击的圆钮没有 48dp 最小触摸目标，会比下方可点击圆钮的圆心偏右；
-                            // 补一个等宽容器让所有圆钮的圆心落在同一条竖线上。
-                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                                if (state.canSelect) RadioButton(selected = state.selectedPresetId == null, onClick = null)
-                            }
-                        },
-                    )
+                    if (state.canSelect) {
+                        PreferenceListItem(
+                            icon = Icons.AutoMirrored.Filled.VolumeUp,
+                            title = stringResource(R.string.voice_prompt_preset_none),
+                            subtitle = stringResource(R.string.voice_prompt_preset_none_detail),
+                            showDivider = state.builtInPresets.isNotEmpty(),
+                            onClick = { onAction(ChatbotPromptAction.Select(null)) },
+                            trailingContent = {
+                                // 单选状态由仓库持有，圆钮本身不响应点击，统一走行点击。
+                                // 不可点击的圆钮没有 48dp 最小触摸目标，会比下方可点击圆钮的圆心偏右；
+                                // 补一个等宽容器让所有圆钮的圆心落在同一条竖线上。
+                                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                    RadioButton(selected = state.selectedPresetId == null, onClick = null)
+                                }
+                            },
+                        )
+                    }
                     state.builtInPresets.forEachIndexed { index, preset ->
                         var menuOpen by remember(preset.id) { mutableStateOf(false) }
+                        val enableDescription = stringResource(R.string.voice_prompt_preset_enable, preset.name)
                         PreferenceListItem(
                             icon = Icons.Default.AutoAwesome,
                             title = preset.name,
@@ -103,10 +111,24 @@ fun ChatbotPromptSettingsScreen(
                                             },
                                         )
                                     }
-                                    if (state.canSelect) RadioButton(
-                                        selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
-                                    )
+                                    if (state.canSelect) {
+                                        RadioButton(
+                                            selected = state.selectedPresetId == preset.id,
+                                            enabled = preset.enabled,
+                                            onClick = if (preset.enabled) {
+                                                { onAction(ChatbotPromptAction.Select(preset.id)) }
+                                            } else null,
+                                        )
+                                    } else {
+                                        Spacer(Modifier.width(4.dp))
+                                        GimiSwitch(
+                                            checked = preset.enabled,
+                                            onCheckedChange = { onAction(ChatbotPromptAction.ToggleEnabled(preset.id, it)) },
+                                            modifier = Modifier.semantics {
+                                                contentDescription = enableDescription
+                                            },
+                                        )
+                                    }
                                 }
                             },
                         )
@@ -119,6 +141,7 @@ fun ChatbotPromptSettingsScreen(
                 PreferenceGroupCard {
                     state.presets.forEach { preset ->
                         var menuOpen by remember(preset.id) { mutableStateOf(false) }
+                        val enableDescription = stringResource(R.string.voice_prompt_preset_enable, preset.name)
                         PreferenceListItem(
                             icon = Icons.Default.EditNote,
                             title = preset.name,
@@ -146,10 +169,24 @@ fun ChatbotPromptSettingsScreen(
                                             },
                                         )
                                     }
-                                    if (state.canSelect) RadioButton(
-                                        selected = state.selectedPresetId == preset.id,
-                                        onClick = { onAction(if (state.canSelect) ChatbotPromptAction.Select(preset.id) else ChatbotPromptAction.ViewPrompt(preset.id)) },
-                                    )
+                                    if (state.canSelect) {
+                                        RadioButton(
+                                            selected = state.selectedPresetId == preset.id,
+                                            enabled = preset.enabled,
+                                            onClick = if (preset.enabled) {
+                                                { onAction(ChatbotPromptAction.Select(preset.id)) }
+                                            } else null,
+                                        )
+                                    } else {
+                                        Spacer(Modifier.width(4.dp))
+                                        GimiSwitch(
+                                            checked = preset.enabled,
+                                            onCheckedChange = { onAction(ChatbotPromptAction.ToggleEnabled(preset.id, it)) },
+                                            modifier = Modifier.semantics {
+                                                contentDescription = enableDescription
+                                            },
+                                        )
+                                    }
                                 }
                             },
                         )
@@ -293,8 +330,8 @@ private fun ChatbotPromptViewDialog(
 }
 
 private val PreviewPresets = listOf(
-    ChatbotRolePreset("p1", "简洁速答", "直接给结论，单句回答，不超过两句话。"),
-    ChatbotRolePreset("p2", "口语陪练", "全程使用简单日常的英语与我对话，我答错时温和纠正。"),
+    ChatbotRolePreset("p1", "简洁速答", "直接给结论，单句回答，不超过两句话。", enabled = true),
+    ChatbotRolePreset("p2", "口语陪练", "全程使用简单日常的英语与我对话，我答错时温和纠正。", enabled = false),
 )
 
 private val PreviewBuiltInPresets = listOf(
@@ -303,24 +340,26 @@ private val PreviewBuiltInPresets = listOf(
         name = "贴吧嘴臭老哥",
         description = "模仿贴吧老哥的嘴臭风格，犀利吐槽、情绪宣泄，适合闲聊发泄。",
         content = "# Role and Objective\n\n你是「贴吧嘴臭老哥」……",
+        enabled = true,
     ),
     ChatbotRolePreset(
         id = "builtin.emotional_companion",
         name = "情感陪伴师",
         description = "温柔细腻的情绪支持与陪伴，会共情、能恋爱式互动，适合低落时寻求慰藉。",
         content = "# Role and Objective\n\n你是「情感陪伴師」……",
+        enabled = false,
     ),
 )
 
 @Composable
-private fun ChatbotPromptPagePreview(dark: Boolean, empty: Boolean = false) {
+private fun ChatbotPromptPagePreview(dark: Boolean, empty: Boolean = false, canSelect: Boolean = false) {
     github.ponyhuang.gimi.ui.theme.GimiTheme(darkTheme = dark) {
         ChatbotPromptSettingsScreen(
             state = ChatbotPromptUiState(
                 presets = if (empty) emptyList() else PreviewPresets,
                 builtInPresets = if (empty) emptyList() else PreviewBuiltInPresets,
-                canSelect = true,
-                selectedPresetId = if (empty) null else "p2",
+                canSelect = canSelect,
+                selectedPresetId = if (empty || !canSelect) null else "p2",
             ),
             onAction = {},
         )

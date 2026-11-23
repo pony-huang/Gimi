@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUse
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
@@ -111,6 +112,35 @@ class RealtimeVoiceViewModelTest {
             val state = awaitItem()
             assertTrue(state.cascadedAvailable)
             assertFalse(state.realtimeAvailable)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun unkeyedRealtimeModelIsMissingFromVoiceSettingsAndCallSummary() = runTest {
+        val configured = configuredSettings()
+        val instance = configured.instances.single()
+        val settings = configured.copy(instances = listOf(instance.copy(
+            connections = instance.connections.map { connection ->
+                if (connection.capability == ServiceCapability.Realtime) {
+                    connection.copy(credential = CredentialSource.Independent(""))
+                } else {
+                    connection
+                }
+            },
+        )))
+        val defaults = FakeDefaultsRepository(defaultsFixture().copy(pipeline = VoicePipeline.NATIVE_REALTIME))
+        val viewModel = viewModel(settings = settings, defaults = defaults, lookup = FakeVoiceConfigLookup())
+        viewModel.prepare("conversation", ModelSelection(instance.id, "chat", "chat-model"), "当前聊天")
+
+        viewModel.uiState.test {
+            runCurrent()
+            val state = expectMostRecentItem()
+            assertEquals("Chat", state.chatModelName)
+            assertTrue(VoiceConfigField.REALTIME_MODEL in state.draft.missing)
+            assertTrue(state.settings.realtimeRows.isEmpty())
+            assertFalse(state.realtimeAvailable)
+            assertEquals("", state.modelName)
             cancelAndIgnoreRemainingEvents()
         }
     }

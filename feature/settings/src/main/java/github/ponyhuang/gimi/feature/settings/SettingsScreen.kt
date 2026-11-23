@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Hub
@@ -134,7 +133,7 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenSkills,
                             ),
                             SettingsNavigationItem(
-                                icon = Icons.Default.Code,
+                                icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_linux),
                                 title = stringResource(R.string.settings_sandbox_title),
                                 subtitle = stringResource(R.string.settings_sandbox_subtitle),
                                 action = SettingsAction.OpenSandbox,

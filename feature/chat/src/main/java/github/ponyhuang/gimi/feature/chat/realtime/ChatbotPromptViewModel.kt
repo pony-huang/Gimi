@@ -31,16 +31,15 @@ class ChatbotPromptViewModel @Inject constructor(
 
     val uiState: StateFlow<ChatbotPromptUiState> = combine(
         repository.presets,
+        repository.builtInPresets,
         combine(repository.selectedPresetIds, conversationId) { selections, id -> id to selections[id] },
-        editing,
-        confirmDelete,
-        viewing,
-    ) { presets, selectedPresetId, editing, confirmDelete, viewing ->
+        combine(editing, confirmDelete, viewing) { e, c, v -> Triple(e, c, v) },
+    ) { presets, builtInPresets, (id, selectedPresetId), (editing, confirmDelete, viewing) ->
         ChatbotPromptUiState(
             presets = presets,
-            builtInPresets = repository.builtInPresets,
-            selectedPresetId = selectedPresetId.second,
-            canSelect = selectedPresetId.first != null,
+            builtInPresets = builtInPresets,
+            selectedPresetId = selectedPresetId,
+            canSelect = id != null,
             editing = editing,
             confirmDelete = confirmDelete,
             viewing = viewing,
@@ -50,7 +49,7 @@ class ChatbotPromptViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = ChatbotPromptUiState(
             presets = repository.presets.value,
-            builtInPresets = repository.builtInPresets,
+            builtInPresets = repository.builtInPresets.value,
             selectedPresetId = null,
         ),
     )
@@ -59,6 +58,7 @@ class ChatbotPromptViewModel @Inject constructor(
         if (callState.value.configurationLocked) return
         when (action) {
             is ChatbotPromptAction.Select -> conversationId.value?.let { repository.selectPreset(it, action.presetId) }
+            is ChatbotPromptAction.ToggleEnabled -> repository.setEnabled(action.presetId, action.enabled)
             ChatbotPromptAction.StartCreate ->
                 editing.value = ChatbotRolePreset(id = "", name = "", content = "")
             is ChatbotPromptAction.StartEdit ->
@@ -75,7 +75,7 @@ class ChatbotPromptViewModel @Inject constructor(
             is ChatbotPromptAction.ViewPrompt ->
                 viewing.value = findPreset(action.presetId)
             ChatbotPromptAction.CopyViewedPreset -> {
-                editing.value = viewing.value?.copy(id = "")
+                editing.value = viewing.value?.copy(id = "", enabled = true)
                 viewing.value = null
             }
             ChatbotPromptAction.DismissViewPrompt -> viewing.value = null
@@ -90,12 +90,12 @@ class ChatbotPromptViewModel @Inject constructor(
         if (name.isEmpty() || content.isEmpty()) return
         // 新建草稿用空 id 表示，保存时补一个稳定 id：仓库要求 id 非空，空 id 落库会被拒绝。
         val id = target.id.ifBlank { UUID.randomUUID().toString() }
-        repository.upsertPreset(target.copy(id = id, name = name, content = content, description = action.description.trim()))
+        repository.upsertPreset(target.copy(id = id, name = name, content = content, description = action.description.trim(), enabled = target.enabled))
         editing.value = null
     }
 
     /** 官方预设与自建预设共用一套 id 空间，查找时先官方后自建。 */
     private fun findPreset(presetId: String): ChatbotRolePreset? =
-        repository.builtInPresets.firstOrNull { it.id == presetId }
+        repository.builtInPresets.value.firstOrNull { it.id == presetId }
             ?: repository.presets.value.firstOrNull { it.id == presetId }
 }

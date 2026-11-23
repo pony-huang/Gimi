@@ -175,10 +175,6 @@ data class VoiceSettingsUiState(
     val isSynthesisVoiceLoading: Boolean = false,
     /** 合成服务是否允许填写内置音色表之外的音色 ID（声音复刻、基础音色）。 */
     val synthesisVoiceCustomInputAllowed: Boolean = false,
-    /** 开放自由填写厂商（千问）的音色 ID 命名模板；null 表示不展示。 */
-    val synthesisVoiceIdTemplate: String? = null,
-    /** 开放自由填写厂商的官方音色列表页；null 表示不展示。 */
-    val synthesisVoiceDocsUrl: String? = null,
     /** 所选实时模型在该厂商下的可选会话音色。 */
     val realtimeVoiceOptions: List<TtsVoice> = emptyList(),
     val realtimeCustomVoiceAllowed: Boolean = false,
@@ -623,8 +619,9 @@ class RealtimeVoiceViewModel @Inject constructor(
             val chatSelection = callSnapshot.arguments.selection ?: modelSettings.assistantSelection
             val availability = pipelineAvailability(settingsSnapshot.effective, modelSettings, chatSelection)
             val committedConfig = VoiceConfigResolver.resolve(defaultsRepository.defaults.value, committedOverrides, lookup)
+            val settingsUi = voiceSettingsState(settingsSnapshot)
             val primarySelection = if (committedConfig.pipeline == VoicePipeline.NATIVE_REALTIME) {
-                committedConfig.realtimeModel
+                settingsUi.realtimeRows.selectionRow(committedConfig.realtimeModel)?.selection()
             } else {
                 chatSelection
             }
@@ -651,7 +648,7 @@ class RealtimeVoiceViewModel @Inject constructor(
                 settingsSaving = saving,
                 semiCascadedSupported = modelSettings.instances.resolveConnection(chatSelection)?.model?.isOmniLlm == true,
                 draft = draftUi,
-                settings = voiceSettingsState(settingsSnapshot),
+                settings = settingsUi,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), RealtimeVoiceUiState())
 
@@ -951,23 +948,11 @@ class RealtimeVoiceViewModel @Inject constructor(
             }
         // Realtime 候选只列已接入原生全双工适配器的模板：带 Realtime 标记但没有适配器的模型
         // 会静默回落到级联链路（而级联要求 STT/TTS 能力），选它只会得到起不来的会话。
-        val realtimeRows = configuredInstances
-            .filter { instance ->
-                val templateId = instance.templateId
-                templateId != null && voiceCapabilities.isSupported(templateId, ModelCapability.Realtime)
-            }
-            .flatMap { instance ->
-                instance.connections.flatMap { connection ->
-                    connection.models.filter { ModelCapability.Realtime in it.capabilities }.map { model ->
-                        VoiceModelRow(
-                            instance = instance,
-                            connection = connection,
-                            model = model,
-                            capability = ModelCapability.Realtime,
-                        )
-                    }
-                }
-            }
+        val realtimeRows = configuredInstances.voiceModelRows(
+            voiceCapabilities,
+            predicate = { ModelCapability.Realtime in it.capabilities },
+            requiredCapability = { ModelCapability.Realtime },
+        ).filter { it.isSupported }
         val realtimeSupport = snapshot.effective.realtimeModel
             ?.let { selection -> snapshot.settings.instances.resolveConnection(selection)?.templateId }
             ?.let { voiceCapabilities.realtimeSupport(it) }
@@ -987,8 +972,6 @@ class RealtimeVoiceViewModel @Inject constructor(
             },
             isSynthesisVoiceLoading = snapshot.isSynthesisVoiceLoading,
             synthesisVoiceCustomInputAllowed = voiceCatalog.allowsCustomVoice(synthesisTemplateId),
-            synthesisVoiceIdTemplate = voiceCatalog.customVoiceIdTemplate(synthesisTemplateId),
-            synthesisVoiceDocsUrl = voiceCatalog.customVoiceListUrl(synthesisTemplateId),
             realtimeVoiceOptions = snapshot.effective.realtimeModel
                 ?.let { selection -> realtimeSupport?.voicesFor(selection.modelId) }
                 .orEmpty(),

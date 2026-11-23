@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.conversation.mapper
 
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.types.FunctionCall
@@ -128,21 +129,32 @@ object EventMapper {
      * - 如果再 `sortedBy { it.timestamp }`，会丢掉 `id` 那个 tie-breaker，反而引入非确定性。
      *   DAO 查询结果 = append 顺序 = runner emit 顺序 = 用户 streaming 时看到的顺序。
      */
-    fun fromSession(session: Session): List<Message> =
-        session.events.mapNotNull { event ->
-            // 双保险：即使 fromEvent 未来新增抛错点，一个坏事件也只会丢自己，
-            // 不能让 loadMessages 的 catch-all 把整个会话历史吞成空列表。
-            runCatching { fromEvent(event) }
-                .onFailure { Log.w(TAG, "Skipping unreadable event ${event.id}", it) }
-                .getOrNull()
-        }.fold(mutableListOf<Message>()) { messages, message ->
-            if (message.author == A2uiGenerationTaskCodec.AUTHOR) {
-                val updated = message.functionResponses.fold(messages.toList()) { current, response -> current.updateA2uiTask(response) }
-                messages.clear()
-                messages.addAll(updated)
-            } else messages.add(message)
-            messages
-        }.interruptA2uiTasks()
+    fun fromSession(session: Session): List<Message> {
+        val mapped = session.events.mapNotNull { event ->
+            // 损坏的历史记录只影响自身，停止快照的判定也留在同一条记录的容错范围内。
+            runCatching {
+                fromEvent(event)?.let { message ->
+                    message to (event.customMetadata?.get(WebCitationMetadata.STOPPED_REPLY_KEY) as? String)
+                }
+            }.onFailure { Log.w(TAG, "Skipping unreadable event ${event.id}", it) }.getOrNull()
+        }
+        val finishedReplies = mapped.asSequence().filter { (message, stoppedInvocation) ->
+            stoppedInvocation == null && message.role == MessageRole.Assistant && !message.partial &&
+                message.error == null && message.functionCalls.isEmpty() && message.functionResponses.isEmpty() &&
+                message.textParts.any { !it.thought && it.text.isNotBlank() }
+        }.mapNotNull { (message, _) -> message.invocationId }.toSet()
+        return mapped.asSequence()
+            .filterNot { (_, stoppedInvocation) -> stoppedInvocation in finishedReplies }
+            .map { (message, _) -> message }
+            .fold(mutableListOf<Message>()) { messages, message ->
+                if (message.author == A2uiGenerationTaskCodec.AUTHOR) {
+                    val updated = message.functionResponses.fold(messages.toList()) { current, response -> current.updateA2uiTask(response) }
+                    messages.clear()
+                    messages.addAll(updated)
+                } else messages.add(message)
+                messages
+            }.interruptA2uiTasks()
+    }
 
     // ── 内部 helper ─────────────────────────────────────────────────────
 
@@ -228,7 +240,8 @@ object EventMapper {
     ): Message {
         var working = Messages.fromAssistant(
             id = event.id,
-            invocationId = event.invocationId,
+            invocationId = event.invocationId
+                ?: event.customMetadata?.get(WebCitationMetadata.STOPPED_REPLY_KEY) as? String,
             author = event.author,
             timestamp = event.timestamp,
         )
@@ -250,6 +263,7 @@ object EventMapper {
         return working.copy(
             partial = event.partial,
             turnComplete = event.turnComplete,
+            webCitations = WebCitationMetadata.decode(event.customMetadata?.get(WebCitationMetadata.KEY)),
         )
     }
 

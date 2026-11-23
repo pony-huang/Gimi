@@ -112,6 +112,50 @@ class ChatbotViewModelTest {
         } finally { holder.clear(); advanceUntilIdle() }
     }
 
+    @Test fun `finished turn keeps message identity across the reload`() = runTest(main.dispatcher) {
+        val store = FakeConversationStore().apply { emitOnRefresh = false }
+        val gate = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.RENDEZVOUS)
+        val execution = mockk<ChatAgentExecution>()
+        coEvery { execution.send(any(), any(), any()) } coAnswers {
+            flow {
+                // 流式增量与收尾完整事件同 id（ADK 同一次模型调用共享 Event.id）。
+                emit(replyEvent(text = "reply").copy(partial = true, turnComplete = false))
+                gate.receive()
+                // 收尾落盘：用户事件 id 与乐观插入的不同、助手事件 id 与流式消息相同。
+                store.appendUserMessage(requireNotNull(store.current()), Messages.fromUser("hello").copy(id = "user-event"))
+                store.appendUserMessage(
+                    requireNotNull(store.current()),
+                    Messages.fromAssistant(id = "event-1", author = "Chatbot").copy(
+                        textParts = listOf(github.ponyhuang.gimi.domain.conversation.model.TextPart("event-1:0", "reply")),
+                        turnComplete = true,
+                    ),
+                )
+                emit(replyEvent())
+            }
+        }
+        val vm = viewModel(store, agent(execution), mockk(relaxed = true))
+        val holder = ViewModelStore().apply { put("test", vm) }
+        try {
+            advanceUntilIdle()
+            vm.send("hello", emptyList()) {}
+            advanceUntilIdle()
+            // 流式中途（第一个增量后挂起在 gate）：记录流式期身份。
+            val streaming = vm.uiState.value.chat
+            val streamingUserId = streaming.messages.last { it.role == MessageRole.User }.id
+            assertEquals("流式消息直接采用真实事件 id", "event-1", streaming.messages.last { it.role == MessageRole.Assistant }.id)
+
+            gate.send(Unit)
+            advanceUntilIdle()
+
+            // 收尾 reload 后身份保持：乐观用户消息不换 id，回答沿用事件 id，仅标志位翻为完成态。
+            val chat = vm.uiState.value.chat
+            assertEquals("用户消息身份跨 reload 保持", streamingUserId, chat.messages.last { it.role == MessageRole.User }.id)
+            assertEquals("回答消息 id 与落盘事件同源", "event-1", chat.messages.last { it.role == MessageRole.Assistant }.id)
+            assertEquals("reply", chat.messages.last { it.role == MessageRole.Assistant }.textParts.single().text)
+            assertFalse(chat.messages.last { it.role == MessageRole.Assistant }.partial)
+        } finally { gate.close(); holder.clear(); advanceUntilIdle() }
+    }
+
     @Test fun `switching sessions keeps generation alive until explicit stop`() = runTest(main.dispatcher) {
         val store = FakeConversationStore()
         val execution = mockk<ChatAgentExecution>()
@@ -383,19 +427,24 @@ class ChatbotViewModelTest {
         } finally { holder.clear(); advanceUntilIdle() }
     }
 
-    @Test fun `openai instances stay out of the chatbot model list`() = runTest(main.dispatcher) {
+    @Test fun `openai completions are eligible but the search model requires explicit selection`() = runTest(main.dispatcher) {
         val openai = ModelServiceInstance(
             "openai-service", "OpenAI", "openai", true, true, false, "fake-key",
             listOf(ServiceConnection("openai-chat", ServiceCapability.Conversation, ApiProtocol.OpenaiChatcompletions,
-                "https://api.openai.com/v1", models = listOf(Model("gpt-5", "GPT-5")))),
+                "https://api.openai.com/v1", models = listOf(
+                    Model("gpt-5-search-api", "GPT-5 Search"), Model("gpt-5", "GPT-5"),
+                ))),
         )
         val vm = viewModel(FakeConversationStore(), agent(mockk()), mockk(relaxed = true), instances = listOf(openai, minimaxInstance()))
         val holder = ViewModelStore().apply { put("test", vm) }
         try {
             advanceUntilIdle()
-            // OpenAI 没有 message（Anthropic Messages）连接：不参与 Chatbot，首个可选模型回落 MiniMax。
-            assertEquals("minimax-text", vm.uiState.value.selection?.modelId)
-            assertTrue(vm.uiState.value.chat.availableLLMModelSettings.none { it.templateId == "openai" })
+            assertEquals("gpt-5", vm.uiState.value.selection?.modelId)
+            val searchSelection = ModelSelection("openai-service", "openai-chat", "gpt-5-search-api")
+            assertTrue(vm.uiState.value.chat.availableLLMModelSettings.any { it.templateId == "openai" })
+            vm.onAction(ChatbotAction.SelectModel(searchSelection))
+            advanceUntilIdle()
+            assertEquals(searchSelection, vm.uiState.value.selection)
         } finally { holder.clear(); advanceUntilIdle() }
     }
 

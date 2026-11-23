@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import androidx.compose.ui.platform.LocalUriHandler
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +30,8 @@ internal fun ChatbotRouteContent(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val sourceOpenFailed = stringResource(R.string.chat_web_citations_open_failed)
     val configure = stringResource(R.string.chat_notice_configure_chat_model)
     val sendBusy = stringResource(R.string.chatbot_send_busy)
     val protected = stringResource(R.string.chat_drawer_current_session_protected)
@@ -59,7 +62,8 @@ internal fun ChatbotRouteContent(
                 else message.textParts,
             error = when (outcome) {
                 ChatbotTurnOutcome.FAILED -> failure
-                ChatbotTurnOutcome.STOPPED, ChatbotTurnOutcome.INTERRUPTED -> stopped
+                ChatbotTurnOutcome.STOPPED, ChatbotTurnOutcome.INTERRUPTED ->
+                    stopped.takeIf { message.textParts.none { !it.thought && it.text.isNotBlank() } }
                 ChatbotTurnOutcome.VOICE_INTERRUPTED -> voiceInterrupted
                 else -> null
             },
@@ -77,6 +81,13 @@ internal fun ChatbotRouteContent(
         onToggleSpeechPlayback = viewModel::togglePlayback,
         onOpenVoice = onOpenVoice,
         onOpenDocument = { openDocumentAttachment(context, it) },
+        onOpenWebSource = { url ->
+            try {
+                uriHandler.openUri(url)
+            } catch (_: IllegalArgumentException) {
+                Toast.makeText(context, sourceOpenFailed, Toast.LENGTH_SHORT).show()
+            }
+        },
         onToggleTimeline = viewModel::toggleTimeline,
         onToolConfirmation = {}, onToolConfirmationAlwaysAllow = {}, onFullAccessChange = {},
         onSelectModel = { viewModel.onAction(ChatbotAction.SelectModel(it)) },

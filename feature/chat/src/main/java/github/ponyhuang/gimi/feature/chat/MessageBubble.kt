@@ -1,5 +1,10 @@
 package github.ponyhuang.gimi.feature.chat
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import github.ponyhuang.gimi.domain.conversation.model.WebSource
+import github.ponyhuang.gimi.domain.conversation.model.webCitationHost
 import android.content.ClipData
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +82,7 @@ fun MessageBubble(
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
         {},
     modifier: Modifier = Modifier,
+    onOpenWebSource: ((String) -> Unit)? = null,
     a2uiContent: @Composable () -> Unit = {},
 ) {
     val role = message.role
@@ -133,19 +140,49 @@ fun MessageBubble(
         return
     }
 
+    val citations = remember(message.webCitations, onOpenWebSource != null) {
+        if (onOpenWebSource == null) emptyList() else message.webCitations
+            .filter { webCitationHost(it.source.url) != null }
+            .sortedBy { it.endOffset }
+    }
+    val sources = remember(citations) { citations.map { it.source }.distinctBy { it.url } }
+    val numbers = remember(sources) { sources.mapIndexed { index, source -> source.url to index + 1 }.toMap() }
+    var showSources by remember(message.id) { mutableStateOf(false) }
+    val defaultUriHandler = LocalUriHandler.current
+    val citationUriHandler = remember(defaultUriHandler, numbers, onOpenWebSource) {
+        if (numbers.isEmpty() || onOpenWebSource == null) defaultUriHandler
+        else object : UriHandler {
+            override fun openUri(uri: String) {
+                if (uri in numbers) onOpenWebSource(uri) else defaultUriHandler.openUri(uri)
+            }
+        }
+    }
+    if (showSources && onOpenWebSource != null && sources.isNotEmpty()) {
+        WebCitationSheet(sources, { showSources = false }, onOpenWebSource)
+    }
+
     ChatMessageBubble(
         role = role.toChatBubbleRole(),
         modifier = modifier,
         assistantHorizontalInset = 4.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            visibleTextParts.forEach { part ->
-                RenderTextPart(
-                    part = part,
-                    partial = message.partial,
-                    chunkChannel = partChannelProvider(part.id),
-                    fillAvailableWidth = fillsBubbleWidth,
-                )
+            var textOffset = 0
+            message.textParts.filterNot { it.thought }.forEach { part ->
+                val partStart = textOffset
+                textOffset += part.text.length
+                if (!part.hasVisibleContent) return@forEach
+                val displayText = remember(part.text, citations, partStart, numbers) {
+                    if (citations.isEmpty()) part.text else part.text.withWebCitationLinks(citations, partStart, numbers)
+                }
+                CompositionLocalProvider(LocalUriHandler provides citationUriHandler) {
+                    RenderTextPart(
+                        part = part.copy(text = displayText),
+                        partial = message.partial,
+                        chunkChannel = partChannelProvider(part.id),
+                        fillAvailableWidth = fillsBubbleWidth,
+                    )
+                }
             }
 
             MessageAttachments(
@@ -161,6 +198,8 @@ fun MessageBubble(
                     text = text,
                     speechPlaybackState = speechPlaybackState,
                     onToggleSpeechPlayback = onToggleSpeechPlayback,
+                    sources = sources,
+                    onShowSources = { showSources = true },
                 )
             }
         }
@@ -269,6 +308,8 @@ private fun AssistantMessageActions(
     text: String,
     speechPlaybackState: SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
+    sources: List<WebSource>,
+    onShowSources: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -310,6 +351,15 @@ private fun AssistantMessageActions(
                     modifier = Modifier.size(16.dp),
                 )
             }
+        }
+        if (sources.isNotEmpty()) {
+            VerticalDivider(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .height(16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            WebCitationStack(sources, onShowSources)
         }
     }
 }

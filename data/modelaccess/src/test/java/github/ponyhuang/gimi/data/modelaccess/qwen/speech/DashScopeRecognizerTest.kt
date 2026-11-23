@@ -6,6 +6,7 @@ import github.ponyhuang.gimi.domain.voice.model.SpeechContextRole
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -158,19 +159,19 @@ class DashScopeRecognizerTest {
 
     @Test
     fun recognizeDoesNotReplayAudioWhenTaskFails() = runTest {
-        var audioMessages = 0
+        val audioMessages = AtomicInteger()
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
-                when (actionOf(text)) {
-                    "run-task" -> {
-                        webSocket.send(DashScopeTestEvents.taskStarted())
-                        webSocket.send(DashScopeTestEvents.taskFailed("InvalidParameter", "参数错误"))
-                    }
+                if (actionOf(text) == "run-task") {
+                    webSocket.send(DashScopeTestEvents.taskStarted())
                 }
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                audioMessages++
+                // 收到首帧后再返回失败，确保用例覆盖已发送音频后的行为。
+                if (audioMessages.incrementAndGet() == 1) {
+                    webSocket.send(DashScopeTestEvents.taskFailed("InvalidParameter", "参数错误"))
+                }
             }
         }))
 
@@ -181,7 +182,8 @@ class DashScopeRecognizerTest {
         assertTrue(error is DashScopeTaskException)
         assertEquals("InvalidParameter", (error as DashScopeTaskException).errorCode)
         // 失败后不得重放音频：语音识别按音频时长计费，重放会产生重复费用。
-        assertEquals(1, audioMessages)
+        assertEquals(1, audioMessages.get())
+        assertEquals(1, server.requestCount)
     }
 
     @Test

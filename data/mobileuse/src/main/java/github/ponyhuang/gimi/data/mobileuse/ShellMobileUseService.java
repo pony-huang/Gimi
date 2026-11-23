@@ -44,6 +44,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private final MobileFrameBuffer frames = new MobileFrameBuffer();
     private String captureError;
     private int[] previousPixels;
+    private int[] currentPixels;
     private final MobileFrameMailbox<PendingFrame> pendingFrames = new MobileFrameMailbox<>();
     private final Runnable encodeFrameTask = this::encodePendingFrame;
     private Handler frameHandler;
@@ -273,21 +274,21 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         previewInteractive = false;
     }
 
-    @Override public synchronized boolean touch(int displayId, int action, float x, float y, long id, long eventTimeMs) {
+    @Override public synchronized boolean touch(int displayId, int action, float x, float y, long gestureDownTime, long eventTimeMs) {
         requireDisplay(displayId);
         if (previewBinding == null || !previewInteractive) return false;
         if (!Float.isFinite(x) || !Float.isFinite(y) || action < 0 || action > 3) return false;
         if (action == 0) {
             cancelGesture(displayId);
-            if (x < 0 || y < 0 || x >= displayGeometry.width || y >= displayGeometry.height || id < 0) return false;
-            if (!inject(displayId,MotionEvent.ACTION_DOWN,x,y,id,eventTimeMs)) return false;
-            gestureId = id;
+            if (x < 0 || y < 0 || x >= displayGeometry.width || y >= displayGeometry.height || gestureDownTime < 0) return false;
+            if (!inject(displayId,MotionEvent.ACTION_DOWN,x,y,gestureDownTime,eventTimeMs)) return false;
+            gestureId = gestureDownTime;
         } else {
-            if (gestureId != id) return false;
+            if (gestureId != gestureDownTime) return false;
             int nativeAction = action == 1 ? MotionEvent.ACTION_MOVE : action == 2 ? MotionEvent.ACTION_UP : MotionEvent.ACTION_CANCEL;
             x = Math.max(0,Math.min(x,displayGeometry.width-1));
             y = Math.max(0,Math.min(y,displayGeometry.height-1));
-            boolean accepted = inject(displayId,nativeAction,x,y,id,eventTimeMs);
+            boolean accepted = inject(displayId,nativeAction,x,y,gestureDownTime,eventTimeMs);
             if (action == 2 || action == 3) gestureId = -1;
             touchX = x; touchY = y;
             return accepted;
@@ -351,6 +352,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
             int pixelStride = plane.getPixelStride();
             int width = geometry.width;
             int height = geometry.height;
+            int totalPixels = width * height;
             int[] samples = new int[64 * 96];
             for (int sy = 0; sy < 96; sy++) {
                 for (int sx = 0; sx < 64; sx++) {
@@ -360,7 +362,10 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
                             + (pixels.get(offset + 2) & 255) * 29) >> 8;
                 }
             }
-            int[] colors = new int[width * height];
+            if (currentPixels == null || currentPixels.length != totalPixels) {
+                currentPixels = new int[totalPixels];
+            }
+            int[] colors = currentPixels;
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     int offset = y * rowStride + x * pixelStride;
@@ -391,7 +396,10 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
                 synchronized (this) {
                     // 发布前以 generation 复核：旋转或换 Surface 之后开始的编码不会污染新缓存。
                     frames.publish(generation, width, height, now, jpeg, samples);
+                    // 缓冲交换：仅在内容发生改变时将 currentPixels 换入 previousPixels，避免每帧重复分配。
+                    int[] swap = previousPixels;
                     previousPixels = colors;
+                    currentPixels = (swap != null && swap.length == totalPixels) ? swap : new int[totalPixels];
                     captureError = null;
                 }
             } finally {
@@ -432,6 +440,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         frames.reset();
         captureError = null;
         previousPixels = null;
+        currentPixels = null;
         if (display != null) {
             if (windowManagerService != null && previousImePolicy != null) {
                 try {
@@ -507,6 +516,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         long generation = frames.reset();
         captureError = null;
         previousPixels = null;
+        currentPixels = null;
         // 一帧等待编码时，acquireLatestImage 仍需至少两个可获取槽位才能丢弃旧帧。
         ImageReader result = ImageReader.newInstance(geometry.width, geometry.height, PixelFormat.RGBA_8888, 3);
         frameHandler = new Handler(displayThread.getLooper());

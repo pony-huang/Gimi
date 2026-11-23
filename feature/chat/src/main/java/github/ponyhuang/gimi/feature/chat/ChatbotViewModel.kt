@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.model.WebCitation
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,8 +24,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogReposito
 import github.ponyhuang.gimi.domain.voice.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository
+import github.ponyhuang.gimi.domain.conversation.usecase.toView
 import github.ponyhuang.gimi.domain.voice.usecase.markdownToSpeechText
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -198,9 +199,8 @@ class ChatbotViewModel @Inject constructor(
                 val uploadSupported = instance.templateId in FILE_UPLOAD_TEMPLATE_IDS
                 // Chatbot 的工具开关在会话内自己管理，实例级"厂商工具"偏好不参与门控。
                 instance.copy(isFileUploadEnabled = uploadSupported, isOfficialToolsEnabled = true, connections = instance.connections
-                    // Chatbot 只支持 message（Anthropic Messages）协议连接：OpenAI 没有该协议
-                    // 连接，不参与 Chatbot（暂不支持）；双协议厂商只暴露 Messages 连接。
-                    .filter { it.capability == ServiceCapability.Conversation && it.protocol == ApiProtocol.Anthropic }
+                    .filter { it.capability == ServiceCapability.Conversation &&
+                        supportsChatbotProtocol(instance.templateId, it.protocol) }
                     .map { connection -> connection.copy(models = connection.models.map { model ->
                         model.copy(multimodal = model.multimodal.copy(
                             audioInput = null,
@@ -233,7 +233,9 @@ class ChatbotViewModel @Inject constructor(
 
     private fun firstSelection(): ModelSelection? = instances.firstNotNullOfOrNull { instance ->
         instance.connections.firstNotNullOfOrNull { connection ->
-            connection.models.firstOrNull()?.let { ModelSelection(instance.id, connection.id, it.id) }
+            connection.models.firstOrNull {
+                instance.templateId != "openai" || it.id != OPENAI_CHATBOT_SEARCH_MODEL
+            }?.let { ModelSelection(instance.id, connection.id, it.id) }
         }
     }
 
@@ -288,7 +290,7 @@ class ChatbotViewModel @Inject constructor(
     }
 
     fun onAction(action: ChatbotAction) {
-        if (action == ChatbotAction.Stop) { activeId?.let { runs[it]?.cancel() }; return }
+        if (action == ChatbotAction.Stop) { activeId?.let { runs[it]?.cancel(ChatbotStopped()) }; return }
         if (action == ChatbotAction.ConsumeNotice) { _uiState.update { it.copy(notice = null) }; return }
         viewModelScope.launch { operation {
             when (action) {
@@ -410,11 +412,11 @@ class ChatbotViewModel @Inject constructor(
             notify(ChatbotNotice.SEND_BUSY)
             return
         }
-        val accumulator = ChatbotRunAccumulator(runId = UUID.randomUUID().toString())
+        val accumulator = ChatbotRunAccumulator()
         runs[id] = viewModelScope.launch {
             var lease: AgentRunLease? = null
             try {
-                requireMessageConnection(selected)
+                requireChatbotConnection(selected)
                 require(attachments.size <= 20 && attachments.none { it.category == AttachmentCategory.AUDIO || it.sizeBytes > 100L * 1024 * 1024 })
                 lease = runtimeGate.acquire(AgentTaskSource.CHATBOT, id)
                 // 文件上传按厂商矩阵收口：不支持的厂商忽略文档附件（不上传也不发送）。
@@ -455,7 +457,9 @@ class ChatbotViewModel @Inject constructor(
                 }
                 if (speechSettings.autoSpeakEnabled.value && activeId == id) {
                     accumulator.text().takeIf(String::isNotBlank)?.let { reply ->
-                        playback.play(accumulator.messageId + ":speech", markdownToSpeechText(reply))
+                        // 有正文必有内容事件；播放 key 与气泡上的 message.id（落盘事件 id）一致。
+                        val replyId = requireNotNull(accumulator.messageId)
+                        playback.play("$replyId:speech", markdownToSpeechText(reply))
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -485,12 +489,18 @@ class ChatbotViewModel @Inject constructor(
         }
     }
 
-    /** 收尾时以 ADK 落盘事件为准替换本地历史，并刷新抽屉行（标题与预览由共享仓储解析）。 */
+    /**
+     * 收尾时以 ADK 落盘事件为准刷新本地历史，并刷新抽屉行（标题与预览由共享仓储解析）。
+     * 采用走 [adoptLoadedHistory] 身份保持式合并：内容等价的消息保留内存身份，
+     * 避免收尾换 id 触发整轮 item key 变化与静态重 parse（气泡刷新式闪烁）。
+     */
     private suspend fun reload(id: String) {
-        streaming.remove(id)
+        val live = streaming.remove(id)
         if (activeId == id) {
             val revision = conversations.conversationContentRevisions.value[id] ?: 0L
-            messages = conversations.loadMessages(id).orEmpty()
+            // 把流式消息一并纳入配对：内容等价时保留其对象身份（partial/turnComplete 同步为落盘值）。
+            // 配合累计器采用真实事件 id，收尾 reload 前后回答 item 的 key 与渲染状态全程稳定。
+            messages = adoptLoadedHistory(messages + listOfNotNull(live), conversations.loadMessages(id).orEmpty())
             loadedRevision = revision
         }
         conversations.refreshConversation(id)
@@ -506,17 +516,17 @@ class ChatbotViewModel @Inject constructor(
             val latest = conversations.loadMessages(id).orEmpty()
             // 加载期间切会话或起了新任务：放弃本次读取，避免旧快照覆盖新状态。
             if (activeId != id || runs[id]?.isActive == true) return
-            messages = latest
+            messages = adoptLoadedHistory(messages, latest)
             loadedRevision = revision
             publish()
         }
     }
 
-    /** Chatbot 只支持 message（Anthropic Messages）协议连接；模型选择解析失败同样视为配置问题。 */
-    private fun requireMessageConnection(selection: ModelSelection?) {
+    /** 发送与候选列表采用同一协议规则。 */
+    private fun requireChatbotConnection(selection: ModelSelection?) {
         val connection = selection?.let { catalog.resolveConnection(it) }
             ?: throw ChatbotRunException(ChatbotRunFailure.CONFIGURATION)
-        if (connection.protocol != ApiProtocol.Anthropic) {
+        if (!supportsChatbotProtocol(templateIdOf(selection), connection.protocol)) {
             throw ChatbotRunException(ChatbotRunFailure.CONFIGURATION)
         }
     }
@@ -727,22 +737,36 @@ private fun List<DraftAttachment>.toFileAttachments(): List<FileAttachment> = ma
  *
  * 工具调用按调用 id 去重：SSE 下同一次调用会分多次增量下发。
  * 完成语义交给 ADK 落盘事件；这里只维护流式展示与停止原因。
+ *
+ * [messageId] 采用首个内容事件的真实 `Event.id`：ADK 同一次模型调用的流式增量与收尾完整事件
+ * 共享同一 Event.id，且 partial 事件永不落库 —— 落盘历史的助手消息 id 与流式消息 id 因此同源。
+ * 收尾 reload 后回答 item 的 LazyColumn key 不变，气泡不会被销毁重建整段重 parse（闪烁）；
+ * 自动朗读的播放 key 也与气泡上的 message.id 一致。
  */
-private class ChatbotRunAccumulator(private val runId: String) {
-    val messageId: String = "$runId:assistant"
+private class ChatbotRunAccumulator {
+    var messageId: String? = null
+        private set
     private val text = StringBuilder()
     private val thinking = StringBuilder()
     private val activities = linkedMapOf<String, FunctionCallView>()
+    private var webCitations = emptyList<WebCitation>()
     var finishReason: ChatFinishReason? = null
         private set
 
     fun accept(event: ChatRunEvent) {
+        if (event.webCitations.isNotEmpty()) webCitations = event.webCitations
         // 错误事件的停止原因不代表拒答（协议适配层把服务异常也归到 SAFETY），失败由异常路径处理。
         if (event.errorCode == null && event.errorMessage.isNullOrBlank()) {
             event.finishReason?.let { finishReason = it }
         }
+        if (messageId == null && event.author != "user" &&
+            (event.parts.any { it.text != null } || event.functionCalls.isNotEmpty())
+        ) {
+            messageId = event.id
+        }
         event.functionCalls.forEach { call ->
-            activities[call.id ?: call.name] = FunctionCallView(call.id.orEmpty(), call.name, call.args.toString())
+            // 与历史回放同一 toView 口径：收尾 reload 后调用 chip 的参数摘要不变，避免文案跳变。
+            activities[call.id ?: call.name] = call.toView()
         }
         if (event.partial) {
             event.parts.forEach { part ->
@@ -761,12 +785,15 @@ private class ChatbotRunAccumulator(private val runId: String) {
     /** 当前流式助手消息；调用方只在累计器有内容后附加到列表。 */
     fun message(): Message? {
         if (text.isBlank() && thinking.isBlank() && activities.isEmpty()) return null
-        return Messages.fromAssistant(id = messageId, author = "Chatbot").copy(
+        // 有内容必然已消费过内容事件，messageId 一定已采用。
+        val id = requireNotNull(messageId)
+        return Messages.fromAssistant(id = id, author = "Chatbot").copy(
             textParts = listOf(
-                TextPart("$messageId:thinking", thinking.toString(), true),
-                TextPart("$messageId:text", text.toString()),
+                TextPart("$id:thinking", thinking.toString(), true),
+                TextPart("$id:text", text.toString()),
             ).filter { it.text.isNotEmpty() },
             functionCalls = activities.values.toList(),
+            webCitations = webCitations,
             partial = true,
             turnComplete = false,
         )

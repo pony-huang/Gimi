@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.agent.conversation
 
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.FinishReason
 import com.google.adk.kt.types.FunctionResponse
@@ -185,6 +186,7 @@ class AdkChatAgentRepository @Inject constructor(
         timestamp = timestamp,
         finishReason = finishReason.toChatFinishReason(),
         conversationTitle = customMetadata?.get(CONVERSATION_TITLE_METADATA_KEY) as? String,
+        webCitations = WebCitationMetadata.decode(customMetadata?.get(WebCitationMetadata.KEY)),
     )
 
     /** ADK 的停止原因归一到 domain 自己的枚举；未知取值一律按 OTHER 处理。 */

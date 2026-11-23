@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -78,6 +79,7 @@ private fun UploadedFilesPreview() {
                 files = listOf(
                     UploadedFileEntry("file-1", "deepseek", "产品需求.pdf", "application/pdf", 2516582, 1794662400),
                     UploadedFileEntry("file-2", "deepseek", "接口说明.md", "text/markdown", 12288, 1794576000),
+                    UploadedFileEntry("file-3", "deepseek", "2026年度第四季度AI模型能力评测与语音链路架构方案最终交付版.pdf", "application/pdf", 15516582, 1794662400),
                 ),
                 onAttach = {},
                 onDelete = {},
@@ -120,11 +122,15 @@ private fun UploadedFileRow(
                 text = entry.displayName,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = uploadedFileMeta(entry),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

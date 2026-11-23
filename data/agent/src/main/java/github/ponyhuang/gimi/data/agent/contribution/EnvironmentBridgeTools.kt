@@ -22,7 +22,7 @@ class EnvironmentBridgeTools @Inject constructor(
     private val environment: EnvironmentRepository,
 ) {
     fun tools(): List<BaseTool> = listOf(
-        tool("prepare_skill", "Prepare an enabled skill's complete directory for local execution. Returns skill_path. Inspect dependency files and use execute/start_job to install missing dependencies. Keep the returned directory unchanged.", listOf("name")),
+        tool("prepare_skill", "Prepare an enabled skill's complete directory for local execution. Returns skill_path. Inspect dependency files and use execute to install missing dependencies. Keep the returned directory unchanged.", listOf("name")),
         tool("import_file_to_environment", "Copy an authorized content URI from search_documents/search_media_files or an App workspace file path into this conversation's inputs. Returns Linux path. name is a filename including extension.", listOf("source", "name")),
         tool("publish_environment_file", "Publish one completed file from this conversation's Linux workspace to the App shared workspace. Returns the App file path for opening and sharing.", listOf("path")),
     )

@@ -1,5 +1,8 @@
 package github.ponyhuang.gimi.data.modelaccess.deepseek.llm
 
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.MessagesWebSearchStream
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.collectMessagesResponse
+import github.ponyhuang.gimi.data.modelaccess.anthropic.llm.withMessagesWebSearch
 import com.anthropic.client.AnthropicClient
 import com.anthropic.errors.AnthropicException
 import com.anthropic.errors.AnthropicServiceException
@@ -11,7 +14,6 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.types.FinishReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.future.await
 
@@ -37,6 +39,7 @@ class DeepSeekMessageChat(
     private val client: AnthropicClient,
     maxTokens: Int = 8196,
     private val conversationTitleEnabled: Boolean = false,
+    private val webSearchReplayScope: String? = null,
     private val requestConverter: (LlmRequest) -> MessageCreateParams =
         DeepSeekMessageRequestConverter(name, maxTokens)::convert,
 ) : Model {
@@ -55,11 +58,15 @@ class DeepSeekMessageChat(
         logger.debug { "DeepSeek Messages request: ${request.contents.size} contents, stream=$stream" }
         val messages = client.async().messages()
         if (stream) {
-            emitAll(messages.createStreaming(params).toDeepSeekMessageResponses())
+            val web = webSearchReplayScope?.let { MessagesWebSearchStream() }
+            val (message, title) = collectMessagesResponse(messages.createStreaming(params), web) { it.conversationTitle() }
+            emit(message.toDeepSeekMessageLlmResponse(title).withMessagesWebSearch(
+                message, webSearchReplayScope, web ?: MessagesWebSearchStream(),
+            ))
         } else {
             // 与官方 JVM 一致：取消立即停止等待；SDK future 本身不保证取消底层单次 HTTP。
             val message = messages.create(params).await()
-            emit(message.toDeepSeekMessageLlmResponse(message.conversationTitle()))
+            emit(message.toDeepSeekMessageLlmResponse(message.conversationTitle()).withMessagesWebSearch(message, webSearchReplayScope))
         }
     }.catch { error ->
         // 保留应用现有的错误响应契约；Flow.catch 不吞掉协程取消，参数/转换异常仍向外传播。

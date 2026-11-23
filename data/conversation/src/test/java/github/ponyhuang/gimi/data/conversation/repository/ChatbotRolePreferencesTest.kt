@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import io.mockk.every
 import io.mockk.mockk
 import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
+import github.ponyhuang.gimi.domain.conversation.repository.contentFor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.fail
@@ -108,7 +109,7 @@ class ChatbotRolePreferencesTest {
     @Test
     fun builtInPresetsAreExposedAndCanBeSelected() {
         val repository = newRepository()
-        val builtIn = repository.builtInPresets.first()
+        val builtIn = repository.builtInPresets.value.first()
 
         repository.selectPreset("conversation", builtIn.id)
 
@@ -119,7 +120,7 @@ class ChatbotRolePreferencesTest {
     @Test
     fun upsertingABuiltInPresetIdIsRejected() {
         val repository = newRepository()
-        val builtIn = repository.builtInPresets.first()
+        val builtIn = repository.builtInPresets.value.first()
         try {
             repository.upsertPreset(builtIn.copy(name = "篡改"))
             fail("Expected built-in preset ids to be read-only")
@@ -131,7 +132,7 @@ class ChatbotRolePreferencesTest {
     @Test
     fun deletingABuiltInPresetIsIgnored() {
         val repository = newRepository()
-        val builtIn = repository.builtInPresets.first()
+        val builtIn = repository.builtInPresets.value.first()
         repository.selectPreset("conversation", builtIn.id)
 
         repository.deletePreset(builtIn.id)
@@ -152,7 +153,7 @@ class ChatbotRolePreferencesTest {
     @Test
     fun selectionsAreIsolatedAndNewConversationsUseDefaultRole() {
         val repository = newRepository()
-        val roleId = repository.builtInPresets.first().id
+        val roleId = repository.builtInPresets.value.first().id
         repository.selectPreset("first", roleId)
         assertNull(repository.selectedPresetIds.value["second"])
         assertEquals(roleId, newRepository().selectedPresetIds.value["first"])
@@ -171,6 +172,74 @@ class ChatbotRolePreferencesTest {
         repository.deletePreset("custom")
         assertEquals(emptyMap<String, String>(), repository.selectedPresetIds.value)
         assertEquals(emptyMap<String, String>(), newRepository().selectedPresetIds.value)
+    }
+
+    @Test
+    fun disablingAndReEnablingBuiltInPresetPersistsAcrossInstances() {
+        val repository = newRepository()
+        val roleId = repository.builtInPresets.value.first().id
+        assertEquals(true, repository.builtInPresets.value.first().enabled)
+
+        repository.setEnabled(roleId, false)
+        assertEquals(false, repository.builtInPresets.value.first { it.id == roleId }.enabled)
+        assertEquals(false, newRepository().builtInPresets.value.first { it.id == roleId }.enabled)
+
+        repository.setEnabled(roleId, true)
+        assertEquals(true, repository.builtInPresets.value.first { it.id == roleId }.enabled)
+        assertEquals(true, newRepository().builtInPresets.value.first { it.id == roleId }.enabled)
+    }
+
+    @Test
+    fun disablingBuiltInPresetUnselectsFromActiveConversation() {
+        val repository = newRepository()
+        val roleId = repository.builtInPresets.value.first().id
+        repository.selectPreset("c1", roleId)
+        assertEquals(roleId, repository.selectedPresetIds.value["c1"])
+
+        repository.setEnabled(roleId, false)
+        assertNull(repository.selectedPresetIds.value["c1"])
+        assertNull(newRepository().selectedPresetIds.value["c1"])
+    }
+
+    @Test
+    fun disablingAndReEnablingCustomPresetPersistsAcrossInstances() {
+        val repository = newRepository()
+        repository.upsertPreset(ChatbotRolePreset("p1", "自定义", "正文", enabled = true))
+        repository.selectPreset("c1", "p1")
+
+        repository.setEnabled("p1", false)
+        assertEquals(false, repository.presets.value.first { it.id == "p1" }.enabled)
+        assertEquals(false, newRepository().presets.value.first { it.id == "p1" }.enabled)
+        assertNull(repository.selectedPresetIds.value["c1"])
+
+        repository.setEnabled("p1", true)
+        assertEquals(true, repository.presets.value.first { it.id == "p1" }.enabled)
+        assertEquals(true, newRepository().presets.value.first { it.id == "p1" }.enabled)
+    }
+
+    @Test
+    fun cannotSelectDisabledPreset() {
+        val repository = newRepository()
+        val builtInId = repository.builtInPresets.value.first().id
+        repository.setEnabled(builtInId, false)
+
+        repository.selectPreset("c1", builtInId)
+        assertNull(repository.selectedPresetIds.value["c1"])
+
+        repository.upsertPreset(ChatbotRolePreset("p1", "自定义", "正文", enabled = false))
+        repository.selectPreset("c2", "p1")
+        assertNull(repository.selectedPresetIds.value["c2"])
+    }
+
+    @Test
+    fun contentForRespectsEnabledState() {
+        val repository = newRepository()
+        repository.upsertPreset(ChatbotRolePreset("p1", "自定义", "自定义正文", enabled = true))
+        repository.selectPreset("c1", "p1")
+        assertEquals("自定义正文", repository.contentFor("c1"))
+
+        repository.setEnabled("p1", false)
+        assertNull(repository.contentFor("c1"))
     }
 
 }

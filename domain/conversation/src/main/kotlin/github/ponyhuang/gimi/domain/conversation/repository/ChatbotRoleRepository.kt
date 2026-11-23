@@ -8,12 +8,14 @@ import kotlinx.coroutines.flow.StateFlow
  * @property name 供列表展示的短名称。
  * @property content 预设正文；选中后作为当前会话的人设正文，输出规范由各入口追加。
  * @property description 列表副标题用的简短说明；为空时界面回退展示正文。
+ * @property enabled 是否启用；禁用后不可在会话中选中，已选中的会话自动回退为默认角色。
  */
 data class ChatbotRolePreset(
     val id: String,
     val name: String,
     val content: String,
     val description: String = "",
+    val enabled: Boolean = true,
 )
 
 /**
@@ -25,7 +27,7 @@ interface ChatbotRoleRepository {
     val presets: StateFlow<List<ChatbotRolePreset>>
 
     /** 随应用发布的官方预设，只读；与用户自建预设一起参与选中项解析。 */
-    val builtInPresets: List<ChatbotRolePreset>
+    val builtInPresets: StateFlow<List<ChatbotRolePreset>>
 
     /** 会话 ID 到角色 ID 的映射；缺失项表示默认角色。 */
     val selectedPresetIds: StateFlow<Map<String, String>>
@@ -40,14 +42,20 @@ interface ChatbotRoleRepository {
     fun deletePreset(presetId: String)
 
     /**
+     * 设置指定预设的启用状态；禁用时若该预设当前被任意会话选中，对应会话的选中态自动回退为 null。
+     * 官方预设与用户自建预设均支持启用与禁用。
+     */
+    fun setEnabled(presetId: String, enabled: Boolean)
+
+    /**
      * 设置指定会话的角色；null 表示回到内置角色。
-     * 传入既不是官方预设也不是用户自建预设的 id 会被忽略并归一化为 null，避免悬空选中。
+     * 传入既不是官方预设也不是用户自建预设（或已被禁用）的 id 会被忽略并归一化为 null，避免悬空选中。
      */
     fun selectPreset(conversationId: String, presetId: String?)
 }
 
-/** 解析指定会话的角色正文，已删除或未选择的角色回到内置指令。 */
+/** 解析指定会话的角色正文，已删除、禁用或未选择的角色回到内置指令。 */
 fun ChatbotRoleRepository.contentFor(conversationId: String?): String? {
     val id = selectedPresetIds.value[conversationId] ?: return null
-    return (builtInPresets + presets.value).firstOrNull { it.id == id }?.content
+    return (builtInPresets.value + presets.value).firstOrNull { it.id == id && it.enabled }?.content
 }

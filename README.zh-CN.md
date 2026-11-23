@@ -156,6 +156,7 @@
 - [知乎开放平台](https://developer.zhihu.com/docs)
 - [网易云音乐 ncm-cli](https://music.163.com/st/ncmcli)
 - [RikkaApps/Shizuku](https://shizuku.rikka.app)
+- [Iconify](https://iconify.design)
 - [lobehub/lobe-icons](https://github.com/lobehub/lobe-icons)
 
 ## 开源协议

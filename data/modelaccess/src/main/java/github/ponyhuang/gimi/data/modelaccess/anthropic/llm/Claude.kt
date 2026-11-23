@@ -26,7 +26,8 @@ class Claude(
     override val name: String,
     private val client: AnthropicClient,
     maxTokens: Int = 8196,
-    private val requestConverter: (LlmRequest) -> MessageCreateParams = ClaudeRequestConverter(name, maxTokens)::convert,
+    private val webSearchReplayScope: String? = null,
+    private val requestConverter: (LlmRequest) -> MessageCreateParams = ClaudeRequestConverter(name, maxTokens, webSearchReplayScope)::convert,
 ) : Model {
 
     init {
@@ -34,10 +35,27 @@ class Claude(
     }
 
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
-        val params = requestConverter(request)
+        var params = requestConverter(request)
         logger.debug { "Claude request: ${request.contents.size} contents, stream=$stream" }
         val messages = client.async().messages()
-        if (stream) {
+        if (webSearchReplayScope != null) {
+            val web = MessagesWebSearchStream()
+            val initialMessages = params.messages()
+            val blocks = mutableListOf<com.anthropic.models.messages.ContentBlock>()
+            repeat(5) {
+                val message = if (stream) collectMessagesResponse(messages.createStreaming(params), web).first
+                    else messages.create(params).await()
+                blocks += message.content()
+                val complete = message.toBuilder().content(blocks.toList()).build()
+                if (message.stopReason().orElse(null)?.asString() != "pause_turn") {
+                    emit(complete.toClaudeLlmResponse().withMessagesWebSearch(complete, webSearchReplayScope, web))
+                    return@flow
+                }
+                // pause_turn 继续同一轮，回传已收到的完整内容序列。
+                params = params.toBuilder().messages(initialMessages + complete.asMessagesContinuation()).build()
+            }
+            error("Claude web search exceeded the continuation limit")
+        } else if (stream) {
             emitAll(messages.createStreaming(params).toClaudeResponses())
         } else {
             // 与官方 JVM 一致：取消立即停止等待；SDK future 本身不保证取消底层单次 HTTP。

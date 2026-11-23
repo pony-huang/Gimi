@@ -5,6 +5,8 @@ import androidx.a2ui.compose.runtime.A2uiComponentScope
 import androidx.a2ui.compose.ui.A2uiComponent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,12 +38,12 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Speaker
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,7 +51,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -359,11 +360,9 @@ private fun MusicPlayerRepeatButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MusicPlayerProgress(data: MusicPlayerData, onSeek: (Long) -> Unit) {
     var now by remember(data) { mutableLongStateOf(System.currentTimeMillis()) }
-    var dragging by remember(data) { mutableStateOf<Float?>(null) }
     // 只外推快照进度，不轮询服务；曲目结束时停在末尾，不擅自切歌。
     LaunchedEffect(data) {
         while (data.isPlaying && data.durationMs != null && data.fetchedAtEpochMs > 0) {
@@ -372,21 +371,29 @@ private fun MusicPlayerProgress(data: MusicPlayerData, onSeek: (Long) -> Unit) {
         }
     }
     val duration = data.durationMs
-    val position = dragging?.toLong() ?: data.positionAt(now)
     val enabled =
         data.canSeek && data.playbackContext == MusicPlaybackContext.NOW_PLAYING && duration != null && data.progressMs != null
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val isDragging by interactionSource.collectIsDraggedAsState()
+    // 进度条按曲目时长建域；拖动期间 value 由手势接管，其余时间随外推进度写回。
+    val sliderState = remember(duration) {
+        SliderState(value = (data.positionAt(now) ?: 0L).toFloat(), trackRange = 0f..(duration ?: 1L).toFloat())
+    }
+    val position = if (isDragging) sliderState.value.toLong() else data.positionAt(now)
+    LaunchedEffect(position, duration, isDragging) {
+        if (!isDragging) sliderState.value = (position ?: 0L).toFloat()
+    }
     Slider(
-        value = dragging ?: (position ?: 0L).toFloat(),
-        onValueChange = { dragging = it },
+        state = sliderState,
+        onValueChange = { /* 值由 SliderState 自持，手势进度无需在此记录 */ },
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
         onValueChangeFinished = {
             // 松手后仅派发一次工具事件，不在拖动中连续发送付费/远程请求。
-            dragging?.let { onSeek(it.toLong().coerceIn(0L, duration ?: 0L)) }
-            dragging = null
+            onSeek(sliderState.value.toLong().coerceIn(0L, duration ?: 0L))
         },
-        enabled = enabled,
-        valueRange = 0f..(duration ?: 1L).toFloat(),
-        modifier = Modifier.fillMaxWidth(),
+        interactionSource = interactionSource,
         thumb = {
             Box(
                 Modifier

@@ -33,7 +33,6 @@
     <string name="modelsettings_official_tools_enabled_summary">开启后，可在聊天的工具面板中选择 %1$s 支持的工具；不会自动调用。</string>
     <string name="modelsettings_official_tools_deepseek_summary">开启后，可使用网页搜索查找实时信息，或通过网页抓取读取指定页面正文，也可供其他模型调用。</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
-    <string name="modelsettings_no_browser">未找到可用的浏览器</string>
     <string name="modelsettings_notice_service_not_found">未找到该服务</string>
     <string name="modelsettings_notice_connection_succeeded">连接成功</string>
     <string name="modelsettings_notice_connection_failed">连接失败，请检查密钥、接口地址或网络后重试。</string>
@@ -89,10 +88,9 @@
     <string name="modelsettings_key_testing">正在测试…</string>
 
     <!-- Service configuration workflow -->
-    <string name="modelsettings_add_service">添加服务</string>
+    <string name="modelsettings_add_service">添加服务商</string>
     <string name="modelsettings_provider_added">已添加 · 点击编辑</string>
     <string name="modelsettings_service_paused_count">已暂停 · %1$d 个模型</string>
-    <string name="modelsettings_search_provider">搜索服务商</string>
     <string name="modelsettings_choose_provider">选择服务商</string>
     <string name="modelsettings_empty_title">添加第一个模型服务</string>
     <string name="modelsettings_empty_summary">接入对话与语音模型，或配置自定义 LLM。</string>
@@ -179,7 +177,6 @@
     <!-- 音色选择器文案已迁至 :core:designsystem（voice_picker_* / voice_gender_* / voice_group_*），供语音页与设置页共用。 -->
 
     <!-- 统一模型服务：列表、添加目录与默认模型入口 -->
-    <string name="modelsettings_search_service">搜索服务名称或厂商</string>
     <string name="modelsettings_list_section_preferences">使用偏好</string>
     <string name="modelsettings_defaults_entry_title">默认模型</string>
     <string name="modelsettings_defaults_entry_subtitle">选择对话、语音输入与朗读使用的模型</string>
@@ -296,7 +293,7 @@
     <string name="modelsettings_role_recognition">语音识别</string>
     <string name="modelsettings_role_synthesis">语音合成</string>
     <string name="modelsettings_role_realtime">实时语音模型</string>
-    <string name="modelsettings_dialog_add_service">添加服务…</string>
+    <string name="modelsettings_dialog_add_service">添加服务商…</string>
     <!-- 反馈文案 -->
     <string name="modelsettings_notice_models_synced">已获取 %1$d 个模型</string>
     <string name="modelsettings_notice_instance_missing">未找到该模型服务</string>

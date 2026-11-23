@@ -262,6 +262,8 @@ internal fun AppEntryContent(
             onOpenSettings = { navigate(SettingsDestination.Settings) },
             onOpenPersonalization = { navigate(RecommendationDestination.Settings) },
             onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
+            onOpenPlugins = { navigate(PluginDestination.Settings) },
+            onOpenLocalEnvironment = { navigate(EnvironmentDestination.Local) },
             sharedMediaUris = sharedMediaUris,
             onSharedMediaConsumed = onSharedMediaConsumed,
         ),

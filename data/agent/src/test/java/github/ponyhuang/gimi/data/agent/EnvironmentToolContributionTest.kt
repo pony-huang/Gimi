@@ -16,6 +16,8 @@ import github.ponyhuang.gimi.domain.environment.RuntimeVersion
 import github.ponyhuang.gimi.domain.environment.EnvironmentStatus
 import io.mockk.mockk
 import java.io.IOException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,10 +33,11 @@ class EnvironmentToolContributionTest {
         var connected = true
         var keepAlive = false
         var liveOutput = ""
-        var executed = 0
         var executeError: IOException? = null
-        var executeResult = EnvironmentCommandResult("out", "", 0)
+        var executeResult: EnvironmentCommandResult? = null
         val started = mutableListOf<Pair<String, String>>()
+        val input = mutableListOf<Triple<String, String, String>>()
+        var queryError: IOException? = null
         val stopped = mutableListOf<Pair<String, String>>()
         private val jobs = linkedMapOf<String, EnvironmentCommandResult?>()
 
@@ -47,19 +50,21 @@ class EnvironmentToolContributionTest {
         override suspend fun variables(): Map<String, String> = emptyMap()
         override suspend fun saveVariables(values: Map<String, String>) {}
         override suspend fun listDirectory(path: String): List<EnvironmentDirectoryEntry> = emptyList()
-        override suspend fun execute(session: String, command: String, timeoutMillis: Long): EnvironmentCommandResult {
-            executed++
-            executeError?.let { throw it }
-            return executeResult
-        }
+        override suspend fun execute(session: String, command: String, timeoutMillis: Long): EnvironmentCommandResult =
+            error("Unexpected synchronous execution")
         override suspend fun readFile(session: String, path: String): ByteArray = byteArrayOf()
         override suspend fun writeFile(session: String, path: String, content: ByteArray) {}
         override suspend fun startJob(session: String, command: String, keepAlive: Boolean): String {
             this.keepAlive = keepAlive
             started += session to command
-            return "job-1".also { jobs[it] = null }
+            executeError?.let { throw it }
+            return "job-1".also { jobs[it] = executeResult }
+        }
+        override suspend fun writeJobInput(session: String, id: String, chars: String) {
+            input += Triple(session, id, chars)
         }
         override suspend fun queryJob(session: String, id: String): EnvironmentJobStatus {
+            queryError?.let { throw it }
             val result = jobs.getValue(id)
             return if (result == null) EnvironmentJobStatus(true, stdout = liveOutput)
             else EnvironmentJobStatus(false, result.stdout, result.stderr, result.exitCode, result.timedOut)
@@ -94,7 +99,7 @@ class EnvironmentToolContributionTest {
         assertTrue(contribution.toolCatalog(AgentToolCatalogContext(null)).none { it.source == "environment:local" })
         val result = execute.run(context(), mapOf("command" to "echo probe")) as Map<*, *>
         assertTrue(result.containsKey("error"))
-        assertEquals(0, repository.executed)
+        assertTrue(repository.started.isEmpty())
     }
 
     @Test fun disconnectedRuntimeHidesAndRejectsCachedTools() = runTest {
@@ -104,16 +109,16 @@ class EnvironmentToolContributionTest {
         assertTrue(enabledTools().isEmpty())
         val result = execute.run(context(), mapOf("command" to "echo probe")) as Map<*, *>
         assertTrue(result.containsKey("error"))
-        assertEquals(0, repository.executed)
+        assertTrue(repository.started.isEmpty())
     }
 
-    @Test fun enabledEnvironmentDeclaresFourLowercaseTools() = runTest {
+    @Test fun enabledEnvironmentDeclaresThreeLowercaseTools() = runTest {
         repository.enabled = true
-        val expected = setOf("execute", "start_job", "query_job", "stop_job")
+        val expected = setOf("execute", "write_stdin", "terminate")
         val always = enabledTools()
         // 全小写、无前缀：模型可见的工具名与其它执行环境保持一致。
         assertEquals(expected, always.map { it.name }.toSet())
-        assertEquals(4, always.size)
+        assertEquals(3, always.size)
         assertEquals(expected, always.map { it.declaration()!!.name }.toSet())
         val source = contribution.candidateSources(spec(ToolAccessMode.ON_DEMAND)).single()
         assertEquals("environment:local", source.id)
@@ -134,11 +139,11 @@ class EnvironmentToolContributionTest {
     @Test fun managedJobsReturnLiveOutputAndRequireExplicitKeepAliveFlag() = runTest {
         repository.enabled = true
         val tools = enabledTools()
-        val start = tools.first { it.name == "start_job" }
-        start.run(context(), mapOf("command" to "cli login", "keep_alive" to true))
+        val start = tools.first { it.name == "execute" }
+        start.run(context(), mapOf("command" to "cli login", "keep_alive" to true, "yield_time_ms" to 0))
         assertEquals(true, repository.keepAlive)
         repository.liveOutput = "Open login link"
-        val response = tools.first { it.name == "query_job" }.run(context(), mapOf("id" to "job-1")) as Map<*, *>
+        val response = tools.first { it.name == "write_stdin" }.run(context(), mapOf("id" to "job-1")) as Map<*, *>
         assertEquals(true, response["running"])
         assertEquals("Open login link", response["stdout"])
         assertTrue((start.run(context(), mapOf("command" to "cli login", "keep_alive" to "true")) as Map<*, *>).containsKey("error"))
@@ -154,18 +159,18 @@ class EnvironmentToolContributionTest {
         val execute = enabledTools().first { it.name == "execute" }
         val result = execute.run(context(), emptyMap()) as Map<*, *>
         assertTrue((result["error"] as String).contains("command is required"))
-        assertEquals(0, repository.executed)
+        assertTrue(repository.started.isEmpty())
     }
 
     @Test fun jobToolsRouteToSessionScopedRepositoryCalls() = runTest {
         repository.enabled = true
         val tools = enabledTools()
-        val start = tools.first { it.name == "start_job" }
-        val startedResult = start.run(context(), mapOf("command" to "pip install requests")) as Map<*, *>
+        val start = tools.first { it.name == "execute" }
+        val startedResult = start.run(context(), mapOf("command" to "pip install requests", "yield_time_ms" to 0)) as Map<*, *>
         assertEquals("job-1", startedResult["id"])
         assertEquals("4:users1" to "pip install requests", repository.started.single())
 
-        val stop = tools.first { it.name == "stop_job" }
+        val stop = tools.first { it.name == "terminate" }
         val stoppedResult = stop.run(context(), mapOf("id" to "job-1")) as Map<*, *>
         assertEquals(true, stoppedResult["stopped"])
         assertEquals("4:users1" to "job-1", repository.stopped.single())
@@ -174,12 +179,19 @@ class EnvironmentToolContributionTest {
     @Test fun queryJobReportsRunningThenCompletedResult() = runTest {
         repository.enabled = true
         val tools = enabledTools()
-        val start = tools.first { it.name == "start_job" }
-        start.run(context(), mapOf("command" to "apt-get install -y python3"))
+        val start = tools.first { it.name == "execute" }
+        val initial = start.run(context(), mapOf("command" to "read line", "yield_time_ms" to 1)) as Map<*, *>
+        assertEquals(true, initial["running"])
+        assertEquals("job-1", initial["id"])
 
-        val query = tools.first { it.name == "query_job" }
+        val query = tools.first { it.name == "write_stdin" }
         val running = query.run(context(), mapOf("id" to "job-1")) as Map<*, *>
         assertEquals(true, running["running"])
+
+        assertTrue(repository.input.isEmpty())
+        query.run(context(), mapOf("id" to "job-1", "chars" to "hello\n"))
+        assertEquals(Triple("4:users1", "job-1", "hello\n"), repository.input.single())
+        assertEquals(1, repository.started.size)
 
         repository.complete("job-1", EnvironmentCommandResult("done", "warning", 2, timedOut = false))
         val completed = query.run(context(), mapOf("id" to "job-1")) as Map<*, *>
@@ -192,9 +204,9 @@ class EnvironmentToolContributionTest {
     @Test fun jobToolsRejectMissingArguments() = runTest {
         repository.enabled = true
         val tools = enabledTools()
-        val start = tools.first { it.name == "start_job" }
-        assertTrue((start.run(context(), emptyMap()) as Map<*, *>)["error"].toString().contains("command required"))
-        val query = tools.first { it.name == "query_job" }
+        val start = tools.first { it.name == "execute" }
+        assertTrue((start.run(context(), emptyMap()) as Map<*, *>)["error"].toString().contains("command is required"))
+        val query = tools.first { it.name == "write_stdin" }
         assertTrue((query.run(context(), emptyMap()) as Map<*, *>)["error"].toString().contains("id required"))
     }
 
@@ -206,7 +218,7 @@ class EnvironmentToolContributionTest {
         repository.enabled = false
         val result = execute.run(context(), mapOf("command" to "ls")) as Map<*, *>
         assertEquals("Local environment is disabled.", result["error"])
-        assertEquals(0, repository.executed)
+        assertTrue(repository.started.isEmpty())
     }
 
     @Test fun repositoryFailureBecomesNonReplayableEnvironmentError() = runTest {
@@ -229,5 +241,48 @@ class EnvironmentToolContributionTest {
         assertEquals("warn", result["stderr"])
         assertEquals(3, result["exit_code"])
         assertEquals("error", result["status"])
+        assertEquals(false, result["running"])
+    }
+
+    @Test fun fastSuccessfulCommandReturnsExitCodeWithoutAHandle() = runTest {
+        repository.enabled = true
+        repository.executeResult = EnvironmentCommandResult("done", "", 0)
+        val execute = enabledTools().first { it.name == "execute" }
+        val result = execute.run(context(), mapOf("command" to "printf done")) as Map<*, *>
+        assertEquals("ok", result["status"])
+        assertEquals(0, result["exit_code"])
+        assertEquals(null, result["id"])
+        assertEquals(1, repository.started.size)
+    }
+
+    @Test fun invalidWaitWindowDoesNotStartCommand() = runTest {
+        repository.enabled = true
+        val execute = enabledTools().first { it.name == "execute" }
+        for (invalid in listOf(-1, 30_001, 1.5, "100")) {
+            val result = execute.run(context(), mapOf("command" to "echo bad", "yield_time_ms" to invalid)) as Map<*, *>
+            assertTrue(result.containsKey("error"))
+        }
+        assertTrue(repository.started.isEmpty())
+    }
+
+    @Test fun firstQueryFailurePreservesTheJobHandle() = runTest {
+        repository.enabled = true
+        repository.queryError = IOException("session unavailable")
+        val execute = enabledTools().first { it.name == "execute" }
+        val result = execute.run(context(), mapOf("command" to "echo once")) as Map<*, *>
+        assertEquals("error", result["status"])
+        assertEquals("job-1", result["id"])
+        assertEquals(1, repository.started.size)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun cancellationWhileWaitingStopsTheUnreturnedJob() = runTest {
+        repository.enabled = true
+        val execute = enabledTools().first { it.name == "execute" }
+        val call = launch { execute.run(context(), mapOf("command" to "sleep 60")) }
+        runCurrent()
+        call.cancel()
+        call.join()
+        assertEquals("4:users1" to "job-1", repository.stopped.single())
     }
 }

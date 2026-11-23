@@ -41,6 +41,7 @@ internal val chatCompletionsJson = Json {
 internal data class ChatCompletionRequest(
   val model: String,
   val messages: List<ChatMessage>,
+  @SerialName("web_search_options") val webSearchOptions: JsonObject? = null,
   val tools: List<ChatTool>? = null,
   @SerialName("tool_choice") val toolChoice: String? = null,
   @SerialName("response_format") val responseFormat: ChatResponseFormat? = null,
@@ -79,6 +80,7 @@ internal data class StreamOptions(@SerialName("include_usage") val includeUsage:
 internal data class ChatMessage(
   val role: String? = null,
   val content: JsonElement? = null,
+  val annotations: JsonElement? = null,
   @SerialName("tool_calls") val toolCalls: List<ChatToolCall>? = null,
   @SerialName("tool_call_id") val toolCallId: String? = null,
 )

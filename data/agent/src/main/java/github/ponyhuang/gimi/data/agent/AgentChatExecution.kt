@@ -1,5 +1,10 @@
 package github.ponyhuang.gimi.data.agent
 
+import github.ponyhuang.gimi.domain.conversation.model.ChatbotStopped
+import github.ponyhuang.gimi.domain.conversation.model.WebCitationMetadata
+import github.ponyhuang.gimi.domain.conversation.model.WebCitation
+import kotlinx.coroutines.CancellationException
+import android.util.Log
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
 import com.google.adk.kt.agents.ToolExecutionMode
@@ -85,6 +90,7 @@ class AgentChatExecution internal constructor(
             role = Role.USER,
             parts = parts,
         )
+        val stopSnapshot = if (emitSessionTitle) StoppedChatbotReply() else null
         return runner.runAsync(
             userId = userId,
             sessionId = sessionId,
@@ -99,12 +105,71 @@ class AgentChatExecution internal constructor(
             ),
         ).withAsyncA2uiCreates().transform { event ->
             captureConfirmations(event)
+            stopSnapshot?.accept(event)
             emit(event)
             // SDK 错误事件也属于失败；立即结束收集，避免被记为已完成而无法恢复。
             if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
                 throw IllegalStateException(event.errorMessage ?: event.errorCode)
             }
+        }.onCompletion { cause ->
+            if (cause is ChatbotStopped || (cause is CancellationException && cause.cause is ChatbotStopped)) {
+                withContext(NonCancellable) {
+                    try {
+                        stopSnapshot?.save()
+                    } catch (failure: Exception) {
+                        Log.w("AgentChatExecution", "Could not save the stopped Chatbot reply", failure)
+                    }
+                }
+            }
         }.withSessionTitleOnCompletion().flushSessionOnCompletion().flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+    }
+
+    private inner class StoppedChatbotReply {
+        private var reply: Event? = null
+        private val text = StringBuilder()
+        private var citations = emptyList<WebCitation>()
+
+        fun accept(event: Event) {
+            if (!event.partial || event.author == Role.USER) return
+            val addition = event.content?.parts.orEmpty().filterNot { it.thought == true }
+                .mapNotNull { it.text }.joinToString("")
+            if (addition.isNotEmpty()) {
+                if (reply == null) reply = event
+                text.append(addition)
+            }
+            event.customMetadata?.get(WebCitationMetadata.KEY)?.let { citations = WebCitationMetadata.decode(it) }
+        }
+
+        suspend fun save() {
+            val event = reply ?: return
+            val invocation = event.invocationId ?: return
+            val body = text.toString().takeIf(String::isNotBlank) ?: return
+            val id = "$invocation:stopped-chatbot-reply"
+            val key = SessionKey(AgentChatRunner.APP_NAME, userId, sessionId)
+            val service = runner.sessionService
+            service.flush(key)
+            val session = service.getSession(key) ?: return
+            if (session.events.any {
+                it.id == id || (it.invocationId == invocation && it.author == event.author &&
+                    it.isFinalResponse && it.content?.parts.orEmpty().any { part ->
+                        part.thought != true && !part.text.isNullOrBlank()
+                    })
+            }) return
+            // 快照独立于原 invocation 的执行检查点，恢复运行时仍可找到原用户事件。
+            val marker = WebCitationMetadata.STOPPED_REPLY_KEY
+            service.appendEvent(session, Event(
+                id = id,
+                author = event.author,
+                branch = event.branch,
+                content = Content(role = Role.MODEL, parts = listOf(
+                    Part(text = body, partMetadata = mapOf(marker to invocation)),
+                )),
+                customMetadata = mapOf(
+                    marker to invocation,
+                    WebCitationMetadata.KEY to WebCitationMetadata.encode(citations.filter { it.endOffset <= body.length }),
+                ),
+            ))
+        }
     }
 
     /**

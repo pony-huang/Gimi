@@ -15,6 +15,7 @@
  */
 package github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm
 
+import kotlinx.serialization.json.JsonObject
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.models.LlmRequest
@@ -43,6 +44,7 @@ internal constructor(
   private val client: ChatCompletionsClient,
   override val name: String,
   private val audioEncoding: InputAudioDataEncoding = InputAudioDataEncoding.OPENAI_BASE64,
+  private val webSearch: Boolean = false,
 ) : Model {
 
   /**
@@ -67,7 +69,8 @@ internal constructor(
     apiKey: String? = null,
     httpOptions: HttpOptions? = null,
     audioEncoding: InputAudioDataEncoding = InputAudioDataEncoding.OPENAI_BASE64,
-  ) : this(apiKeyClient(apiKey, httpOptions), name, audioEncoding)
+    webSearch: Boolean = false,
+  ) : this(apiKeyClient(apiKey, httpOptions), name, audioEncoding, webSearch)
 
   /**
    * Creates a [OpenAiCompatibleChatCompletions] model that calls [apiKeyProvider] before each request, for a key
@@ -105,7 +108,14 @@ internal constructor(
 
   @OptIn(FrameworkInternalApi::class)
   private fun generate(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
-    val chatRequest = request.toChatCompletionRequest(name, audioEncoding)
+    val requestPayload = request.toChatCompletionRequest(name, audioEncoding)
+    if (webSearch) {
+      // 只发一次完整请求，避免流式缺少引用后再次触发付费搜索。
+      val searchRequest = requestPayload.copy(webSearchOptions = JsonObject(emptyMap()), stream = false)
+      emit(client.create(searchRequest).toLlmResponse(includeWebCitations = true))
+      return@flow
+    }
+    val chatRequest = requestPayload
     logger.debug { "Chat Completions request: ${request.contents.size} contents, stream=$stream" }
     if (stream) {
       val aggregator = StreamingResponseAggregator()

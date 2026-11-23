@@ -274,28 +274,52 @@ class SemiCascadedVoiceModel(
             val clientSentences = ConcurrentLinkedQueue<String>()
             val generation = async {
                 val buffer = VoiceSentenceBuffer()
-                generate(contents, answer) { body ->
-                    emit(LlmResponse(content = Content.fromText(Role.MODEL, body), partial = true))
-                    buffer.append(body).forEach { clientSentences.add(it) }
-                    session.send(body)
+                try {
+                    generate(contents, answer) { body ->
+                        emit(LlmResponse(content = Content.fromText(Role.MODEL, body), partial = true))
+                        buffer.append(body).forEach { sentence ->
+                            clientSentences.add(sentence)
+                            // 逐句投递：缓冲切句后按完整句子投递，避免逐 token 发送频繁触发厂商 RPM 限流。
+                            session.send(sentence)
+                        }
+                    }
+                    buffer.finish().takeIf { it.isNotEmpty() }?.let { sentence ->
+                        clientSentences.add(sentence)
+                        session.send(sentence)
+                    }
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = cause)
                 }
-                buffer.finish().takeIf { it.isNotEmpty() }?.let { clientSentences.add(it) }
-                session.flush()
+                try {
+                    session.flush()
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
+                }
             }
             val playback = async {
-                session.segments.collect { segment ->
-                    val segmentText = clientSentences.poll() ?: segment.text.value
-                    emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
-                        Transcription(text = segmentText, finished = false) else null,
-                        customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
-                    segment.audio.collect { bytes ->
-                        emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(
-                            Part(inlineData = Blob(mimeType = "audio/pcm;rate=24000", data = bytes)),
-                        )), partial = true))
+                try {
+                    session.segments.collect { segment ->
+                        val segmentText = clientSentences.poll() ?: segment.text.value
+                        emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
+                            Transcription(text = segmentText, finished = false) else null,
+                            customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
+                        segment.audio.collect { bytes ->
+                            emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(
+                                Part(inlineData = Blob(mimeType = "audio/pcm;rate=24000", data = bytes)),
+                            )), partial = true))
+                        }
+                        emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
+                            Transcription(finished = true) else null,
+                            customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_END to true)))
                     }
-                    emit(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
-                        Transcription(finished = true) else null,
-                        customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_END to true)))
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                 }
             }
             generation.await()

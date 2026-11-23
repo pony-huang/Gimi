@@ -71,6 +71,14 @@ clamping kills the loop but degrades to half duplex.
 ### VAD and segmentation
 - **Rebuild the input tensor every frame.** Reusing it leaves the input
   permanently zero — speech is never detected.
+- **The start gate is calibrated for noisy places, and a commit gate sits
+  before recognition.** Start confirmation only rejects transients; crowd
+  speech is speech to the VAD and opens turns normally. The segment output
+  therefore carries a VAD profile, and a whole-segment gate (peak probability,
+  speech-frame share among non-silent frames — never the whole segment, whose
+  fixed silence tail would dilute short utterances — plus peak level vs the
+  ambient noise floor) decides whether spending recognition is worthwhile;
+  rejection shares the empty-recognition semantics.
 - **The utterance cap lives in two places with different behavior.** The
   segmenter truncates and hands the audio over; the downstream input guard
   throws. Only truncation is reachable, so a long monologue splits into turns
@@ -95,8 +103,13 @@ differ entirely in transport — keep this table current when adding a provider:
   flags**; sending them wastes the whole request. Streaming is picked by
   model id.
 - **Empty result means no generation.** Only finals become this turn's input;
-  partials only refresh the UI. A blank result returns to listening with no
-  answer and no context slot — why a cough buys nothing.
+partials only refresh the UI. A blank result returns to listening with no
+answer and no context slot — why a cough buys nothing.
+- **Native realtime uplink is locally VAD-gated at all times.** Silence
+frames are not sent; the server sees the pre-roll plus locally confirmed
+speech only, so vendor server-VAD robustness differences cannot turn crowd
+noise into phantom turns. Server VAD still owns turn boundaries and barge-in
+semantics — over the filtered stream.
 - **Keep MiMo's protocol separate.** It shares chat-completions but its audio
   is a data-URI, its language option is vendor-specific, synthesis text sits
   in the assistant message and its voice table is its own — do not fold it
@@ -167,8 +180,10 @@ first byte to device -> phase=Speaking / speakingText=that sentence
 sentence out -> spokenText += sentence / phase=Thinking
 segment flow closes -> playback.join() -> phase=Listening -> finishTurn()
 ```
-**② Empty recognition**: final is blank (cough, noise) → straight back to
-listening, no generation, no context slot, no model spend.
+**② Empty or rejected recognition**: the commit gate drops marginal segments
+before recognition, and a final that is still blank (cough, noise) returns
+straight to listening — no generation, no context slot, no model spend in
+either path.
 **③ Interrupted turn**: user speaks during speaking → speech onset wins,
 stops playback, cancels generation, clears the current sentence, back to
 listening. Played-out sentences stay in heard context; the unplayed remainder

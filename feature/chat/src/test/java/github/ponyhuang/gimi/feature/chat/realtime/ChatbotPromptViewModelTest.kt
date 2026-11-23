@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -109,7 +110,29 @@ class ChatbotPromptViewModelTest {
         viewModel.onAction(ChatbotPromptAction.Save("我的角色", "自定义正文"))
         assertEquals("我的角色", repository.presets.value.single().name)
         assertTrue(repository.presets.value.single().id != "builtin.demo")
-        assertEquals("官方人设", repository.builtInPresets.single().name)
+        assertEquals("官方人设", repository.builtInPresets.value.single().name)
+    }
+
+    @Test
+    fun togglingPresetEnabledUpdatesRepository() = runTest {
+        val repository = FakePromptRepository()
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController())
+
+        viewModel.onAction(ChatbotPromptAction.ToggleEnabled("builtin.demo", false))
+        assertEquals(false, repository.builtInPresets.value.single().enabled)
+
+        viewModel.onAction(ChatbotPromptAction.ToggleEnabled("builtin.demo", true))
+        assertEquals(true, repository.builtInPresets.value.single().enabled)
+    }
+
+    @Test
+    fun togglingPresetEnabledIsBlockedWhenConfigurationLocked() = runTest {
+        val repository = FakePromptRepository()
+        val call = MutableStateFlow(RealtimeVoiceCallState(active = true))
+        val viewModel = ChatbotPromptViewModel(repository, voiceCallController(call))
+
+        viewModel.onAction(ChatbotPromptAction.ToggleEnabled("builtin.demo", false))
+        assertEquals(true, repository.builtInPresets.value.single().enabled)
     }
 
     @Test
@@ -134,9 +157,9 @@ class ChatbotPromptViewModelTest {
 
     /** 内存假仓库：只保留行为，不落盘。 */
     private class FakePromptRepository(
-        override val builtInPresets: List<ChatbotRolePreset> = listOf(
+        override val builtInPresets: StateFlow<List<ChatbotRolePreset>> = MutableStateFlow(listOf(
             ChatbotRolePreset("builtin.demo", "官方人设", "# Role and Objective\n正文", "官方说明"),
-        ),
+        )),
     ) : ChatbotRoleRepository {
         override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
         override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -147,6 +170,23 @@ class ChatbotPromptViewModelTest {
 
         override fun deletePreset(presetId: String) {
             presets.value = presets.value.filterNot { it.id == presetId }
+            selectedPresetIds.value = selectedPresetIds.value.filterValues { it != presetId }
+        }
+
+        override fun setEnabled(presetId: String, enabled: Boolean) {
+            val builtInFlow = builtInPresets as? MutableStateFlow<List<ChatbotRolePreset>>
+            val currentBuiltIn = builtInFlow?.value
+            if (currentBuiltIn?.any { it.id == presetId } == true) {
+                builtInFlow.value = currentBuiltIn.map {
+                    if (it.id == presetId) it.copy(enabled = enabled) else it
+                }
+                if (!enabled) selectedPresetIds.value = selectedPresetIds.value.filterValues { it != presetId }
+            } else {
+                presets.value = presets.value.map {
+                    if (it.id == presetId) it.copy(enabled = enabled) else it
+                }
+                if (!enabled) selectedPresetIds.value = selectedPresetIds.value.filterValues { it != presetId }
+            }
         }
 
         override fun selectPreset(conversationId: String, presetId: String?) {

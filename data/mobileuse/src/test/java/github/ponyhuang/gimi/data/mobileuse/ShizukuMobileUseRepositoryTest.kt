@@ -275,8 +275,8 @@ class ShizukuMobileUseRepositoryTest {
         repository.setEnabled(true)
         repository.registerExecution("task", "chat")
         repository.takeScreenshot("task")
-        // shell 无法输入中文（平台 input text 抛 NPE）：必须在进入 shell 前拒绝并指路 mobile_type。
-        for (command in listOf("input text 'QQ飞车'", "input -d 10 text QQ飞车")) {
+        // shell 无法输入中文（平台 input text 抛 NPE）：必须在进入 shell 前拒绝并指路 mobile_type（复合命令亦然）。
+        for (command in listOf("input text 'QQ飞车'", "input -d 10 text QQ飞车", "sleep 1 && input text QQ飞车")) {
             val result = repository.runShell("task", command)
             assertEquals("invalid_argument", result.status)
             assertEquals("not_sent", result.actionStatus)
@@ -294,13 +294,20 @@ class ShizukuMobileUseRepositoryTest {
         every { remote.runShell(10, "input -d 10 text QQ") } returns shellPayload()
         every { remote.runShell(10, "input -d 3 tap 100 200") } returns shellPayload()
         every { remote.runShell(10, "echo input text QQ") } returns shellPayload()
+        every { remote.runShell(10, "sleep 1 && input -d 10 tap 100 200") } returns shellPayload()
+        every { remote.runShell(10, "am start -n test/.A ; input -d 10 keyevent 4") } returns shellPayload()
         assertEquals("shell_completed", repository.runShell("task", "input text QQ").status)
         assertEquals("shell_completed", repository.runShell("task", "input -d 3 tap 100 200").status)
-        // 非 input 开头的命令不改写，避免误改复合命令或 echo 内容。
+        // 非 input 开头的命令不改写，避免误改 echo 内容等参数。
         assertEquals("shell_completed", repository.runShell("task", "echo input text QQ").status)
+        // 复合命令中的 input 自动注入目标副屏编号
+        assertEquals("shell_completed", repository.runShell("task", "sleep 1 && input tap 100 200").status)
+        assertEquals("shell_completed", repository.runShell("task", "am start -n test/.A ; input keyevent 4").status)
         verify(exactly = 1) { remote.runShell(10, "input -d 10 text QQ") }
         verify(exactly = 1) { remote.runShell(10, "input -d 3 tap 100 200") }
         verify(exactly = 1) { remote.runShell(10, "echo input text QQ") }
+        verify(exactly = 1) { remote.runShell(10, "sleep 1 && input -d 10 tap 100 200") }
+        verify(exactly = 1) { remote.runShell(10, "am start -n test/.A ; input -d 10 keyevent 4") }
         repository.setEnabled(false)
     }
 
@@ -374,6 +381,56 @@ class ShizukuMobileUseRepositoryTest {
         assertEquals("clicked", result.status)
         assertEquals("delivered", result.actionStatus)
         verify(exactly = 1) { remote.tap(10, 540, 1200) }
+        repository.setEnabled(false)
+    }
+
+    @Test
+    fun controlClickOnAnimatedDisplayRejectsStaleMovedAndManuallyInterruptedTargets() = runBlocking {
+        val remote = connectAnimatedRemote()
+        val button = MobileElement("search", "accessibility", MobileBounds(490, 1150, 590, 1250),
+            text = "Search", windowId = 1, windowLayer = 0, actions = listOf("click"))
+        var current = button
+        mockkObject(MobileTextAccessibilityService.Companion)
+        val accessibility = mockk<MobileTextAccessibilityService> {
+            every { lastChangeMs(10) } returns 0
+            every { snapshot(10, 1080, 2400) } answers {
+                val path = listOf(1)
+                MobileAccessibilitySnapshot("available",
+                    windows = listOf(MobileWindowState(1, 0, MobileBounds(0, 0, 1080, 2400))),
+                    targets = mapOf("search" to MobileNodeTarget(current, path, current, path, current)))
+            }
+            every { forgetDisplay(10) } returns Unit
+        }
+        every { MobileTextAccessibilityService.current() } returns accessibility
+        every { remote.touch(any(), any(), any(), any(), any(), any()) } returns true
+        repository.setEnabled(true)
+        repository.registerExecution("feed", "chat")
+        suspend fun observeId() = repository.takeScreenshot("feed").observation!!.clickCandidates.single().id
+
+        val old = observeId()
+        val moved = observeId()
+        assertEquals("not_sent", repository.clickElement("feed", old).actionStatus)
+        current = button.copy(bounds = MobileBounds(510, 1150, 610, 1250))
+        assertEquals("not_sent", repository.clickElement("feed", moved).actionStatus)
+
+        current = button
+        val interrupted = observeId()
+        val session = repository.displaySession.value!!.id
+        repository.manualTouch(session, MobileTouch(MobileTouchAction.DOWN, 15f, 15f, 100, 100))
+        assertEquals("not_sent", repository.clickElement("feed", interrupted).actionStatus)
+        assertTrue(repository.takeScreenshot("feed").observation!!.clickCandidates.isEmpty())
+        repository.manualTouch(session, MobileTouch(MobileTouchAction.UP, 15f, 15f, 100, 101))
+        assertEquals("not_sent", repository.clickElement("feed", interrupted).actionStatus)
+
+        val fresh = observeId()
+        every { remote.tap(10, 540, 1200) } answers {
+            every { remote.capture() } throws RemoteException("capture interrupted")
+            true
+        }
+        assertEquals("delivered", repository.clickElement("feed", fresh).actionStatus)
+        assertEquals("not_sent", repository.clickElement("feed", fresh).actionStatus)
+        verify(exactly = 1) { remote.tap(10, 540, 1200) }
+        verify(exactly = 1) { remote.tap(any(), any(), any()) }
         repository.setEnabled(false)
     }
 

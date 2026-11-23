@@ -14,12 +14,15 @@ if command -v npm >/dev/null 2>&1; then
 fi
 
 # 命令作为位置参数传入，避免拼接命令文本改变引号与重定向语义。
+# Preserve stdin explicitly; an asynchronous shell command otherwise reads /dev/null.
+exec 3<&0
 if [ -x /bin/bash ]; then
-    /bin/bash -o pipefail -c "$1" &
+    /bin/bash -o pipefail -c "$1" <&3 3<&- &
 else
-    /bin/sh -c "$1" &
+    /bin/sh -c "$1" <&3 3<&- &
 fi
 command_pid=$!
+exec 3<&-
 wait "$command_pid"
 command_status=$?
 if [ "$2" = "1" ] && [ "$command_status" -eq 0 ]; then

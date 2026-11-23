@@ -28,7 +28,6 @@
     <string name="modelsettings_official_tools_enabled_summary">When enabled, tools supported by %1$s appear in the chat tools panel. They are not called automatically.</string>
     <string name="modelsettings_official_tools_deepseek_summary">Enable DeepSeek web search for current information and web fetch to read page content. These tools can also be used by other models.</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
-    <string name="modelsettings_no_browser">No browser available</string>
     <string name="modelsettings_notice_service_not_found">Service not found</string>
     <string name="modelsettings_notice_connection_succeeded">Connection succeeded</string>
     <string name="modelsettings_notice_connection_failed">Connection failed. Check the key, API address, or network and retry.</string>
@@ -81,10 +80,9 @@
     <string name="modelsettings_key_testing">Testing…</string>
 
     <!-- Service configuration workflow -->
-    <string name="modelsettings_add_service">Add service</string>
+    <string name="modelsettings_add_service">Add provider</string>
     <string name="modelsettings_provider_added">Added · Tap to edit</string>
     <string name="modelsettings_service_paused_count">Paused · %1$d models</string>
-    <string name="modelsettings_search_provider">Search providers</string>
     <string name="modelsettings_choose_provider">Choose a provider</string>
     <string name="modelsettings_empty_title">Add your first model service</string>
     <string name="modelsettings_empty_summary">Connect chat and speech models, or set up a custom LLM.</string>
@@ -170,7 +168,6 @@
 
     <!-- Voice picker copy moved to :core:designsystem (voice_picker_* / voice_gender_* / voice_group_*) shared by the chat voice page and default model settings. -->
     <!-- Unified model services: list, add catalog and default-model entries -->
-    <string name="modelsettings_search_service">Search services or providers</string>
     <string name="modelsettings_list_section_preferences">Preferences</string>
     <string name="modelsettings_defaults_entry_title">Default models</string>
     <string name="modelsettings_defaults_entry_subtitle">Choose models for chat, speech input and reading aloud</string>
@@ -282,7 +279,7 @@
     <string name="modelsettings_role_recognition">Speech recognition</string>
     <string name="modelsettings_role_synthesis">Speech synthesis</string>
     <string name="modelsettings_role_realtime">Realtime voice model</string>
-    <string name="modelsettings_dialog_add_service">Add a service…</string>
+    <string name="modelsettings_dialog_add_service">Add a provider…</string>
     <string name="modelsettings_notice_models_synced">Fetched %1$d models</string>
     <string name="modelsettings_notice_instance_missing">Model service not found</string>
     <string name="modelsettings_notice_saved">Service saved</string>

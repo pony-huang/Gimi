@@ -418,13 +418,25 @@ class AdkVoiceAudioBackend @Inject constructor(
                     tts.send(sentence)
                 }
                 // 让服务端把缓冲里的文本合成并下发完毕，此后本轮音频才算完整。
-                tts.flush()
+                try {
+                    tts.flush()
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
+                }
             }
             val playback = async {
-                tts.segments.collect { segment ->
-                    val sentence = synchronized(clientSentences) { clientSentences.removeFirstOrNull() }
-                        ?: segment.text.value
-                    deliver(VoiceAudioEvent.Audio(MutableStateFlow(sentence), segment.audio, UUID.randomUUID().toString()))
+                try {
+                    tts.segments.collect { segment ->
+                        val sentence = synchronized(clientSentences) { clientSentences.removeFirstOrNull() }
+                            ?: segment.text.value
+                        deliver(VoiceAudioEvent.Audio(MutableStateFlow(sentence), segment.audio, UUID.randomUUID().toString()))
+                    }
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                 }
             }
             // 先等生成侧：失败即抛出并取消片段消费；成功后片段流已在 flush 请求下走向收尾。

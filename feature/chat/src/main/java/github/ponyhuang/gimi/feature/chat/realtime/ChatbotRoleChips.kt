@@ -102,7 +102,7 @@ private fun ChatbotRoleChips(
                 enabled = state.canSelect,
                 onClick = { onSelect(null) },
             )
-            for (preset in state.builtInPresets + state.presets) {
+            for (preset in (state.builtInPresets + state.presets).filter { it.enabled }) {
                 RoleChip(
                     label = preset.name,
                     selected = state.selectedPresetId == preset.id,

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.modelaccess
 
+import java.security.MessageDigest
+import github.ponyhuang.gimi.domain.modelcatalog.model.OPENAI_CHATBOT_SEARCH_MODEL
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
@@ -71,63 +73,85 @@ class DefaultAgentLLMModelFactory @Inject constructor(
      * @param conversationTitleEnabled 是否请求厂商随回答返回会话标题（DeepSeek 内联标题）。
      *   仅 Chatbot 形态开启：助手形态的标题由标题插件的独立快模型请求生成。
      */
-    fun createModel(cfg: ModelConfig, conversationTitleEnabled: Boolean = false): Model = AttachmentResolvingModel(
-        documentIngestMode = cfg.documentIngestMode,
-        audioDelegate = if (cfg.templateId == "mimo") lazy { createMiMoAudioModel(cfg) } else null,
-        delegate = when (cfg.baseType) {
-            // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
-            // 实例开启文件上传时改用 fork 的 file 块适配器：ADK 官方实现是 final class 且
-            // 无转换器注入点，无法发出 file 引用块（2026-11 ADK 1.5.0 现状）。
-            ApiProtocol.OpenaiChatcompletions ->
-                if (cfg.documentIngestMode == FileIngestMode.FILE_REFERENCE) {
-                    OpenAiCompatibleChatCompletions(
-                        name = cfg.modelId,
-                        apiKey = cfg.apiKey,
-                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
-                        audioEncoding = audioEncodingFor(cfg),
-                    )
-                } else {
-                    ChatCompletions(
-                        name = cfg.modelId,
-                        apiKey = cfg.apiKey,
-                        httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
-                    )
-                }
+    fun createModel(
+        cfg: ModelConfig,
+        conversationTitleEnabled: Boolean = false,
+        chatbotConnectionId: String? = null,
+    ): Model {
+        val replayScope = chatbotConnectionId?.let { connectionId ->
+            val identity = listOf(cfg.templateId, cfg.baseType.name, cfg.serviceId, connectionId, cfg.fullBaseUrl)
+                .joinToString(separator = "\n")
+            MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        }
+        return AttachmentResolvingModel(
+            documentIngestMode = cfg.documentIngestMode,
+            audioDelegate = if (cfg.templateId == "mimo") lazy { createMiMoAudioModel(cfg) } else null,
+            delegate = when (cfg.baseType) {
+                // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
+                // 实例开启文件上传时改用 fork 的 file 块适配器：ADK 官方实现是 final class 且
+                // 无转换器注入点，无法发出 file 引用块（2026-11 ADK 1.5.0 现状）。
+                ApiProtocol.OpenaiChatcompletions ->
+                    if (conversationTitleEnabled && cfg.templateId == "openai" && cfg.modelId == OPENAI_CHATBOT_SEARCH_MODEL) {
+                        OpenAiCompatibleChatCompletions(
+                            name = cfg.modelId,
+                            apiKey = cfg.apiKey,
+                            httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                            webSearch = true,
+                        )
+                    } else if (cfg.documentIngestMode == FileIngestMode.FILE_REFERENCE) {
+                        OpenAiCompatibleChatCompletions(
+                            name = cfg.modelId,
+                            apiKey = cfg.apiKey,
+                            httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                            audioEncoding = audioEncodingFor(cfg),
+                        )
+                    } else {
+                        ChatCompletions(
+                            name = cfg.modelId,
+                            apiKey = cfg.apiKey,
+                            httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
+                        )
+                    }
 
-            ApiProtocol.Anthropic ->
-                if (isOfficialDeepSeekAnthropicEndpoint(cfg.toRuntimeMetadata())) {
-                    // 仅官方端点走 DeepSeek 专属适配器：首轮注入 title 参数、转换器注入
-                    // latest_reminder；第三方代理回落通用 Claude 适配器，零扩展字段风险。
-                    DeepSeekMessageChat(
-                        name = cfg.modelId,
-                        conversationTitleEnabled = conversationTitleEnabled,
-                        requestConverter = DeepSeekMessageToolLoadingRequestConverter(
-                            cfg.modelId, 8196,
-                            toolLoadingMode(cfg.toRuntimeMetadata()),
-                            latestReminder = { latestReminderContent() },
-                        )::convert,
-                        client = AnthropicOkHttpClient.builder()
-                            .baseUrl(cfg.fullBaseUrl)
-                            .apiKey(cfg.apiKey)
-                            .build(),
-                    )
-                } else {
-                    Claude(
-                        name = cfg.modelId,
-                        client = AnthropicOkHttpClient.builder()
-                            .baseUrl(cfg.fullBaseUrl)
-                            .apiKey(cfg.apiKey)
-                            .build(),
-                    )
-                }
+                ApiProtocol.Anthropic ->
+                    if (isOfficialDeepSeekAnthropicEndpoint(cfg.toRuntimeMetadata())) {
+                        // 仅官方端点走 DeepSeek 专属适配器：首轮注入 title 参数、转换器注入
+                        // latest_reminder；第三方代理回落通用 Claude 适配器，零扩展字段风险。
+                        DeepSeekMessageChat(
+                            name = cfg.modelId,
+                            conversationTitleEnabled = conversationTitleEnabled,
+                            webSearchReplayScope = replayScope,
+                            requestConverter = DeepSeekMessageToolLoadingRequestConverter(
+                                cfg.modelId, 8196,
+                                toolLoadingMode(cfg.toRuntimeMetadata()),
+                                latestReminder = { latestReminderContent() },
+                                webSearchReplayScope = replayScope,
+                            )::convert,
+                            client = AnthropicOkHttpClient.builder()
+                                .baseUrl(cfg.fullBaseUrl)
+                                .apiKey(cfg.apiKey)
+                                .build(),
+                        )
+                    } else {
+                        Claude(
+                            name = cfg.modelId,
+                            webSearchReplayScope = replayScope.takeIf { cfg.templateId == "anthropic" },
+                            client = AnthropicOkHttpClient.builder()
+                                .baseUrl(cfg.fullBaseUrl)
+                                .apiKey(cfg.apiKey)
+                                .build(),
+                        )
+                    }
 
-            // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
-            ApiProtocol.Gemini -> Gemini(
-                name = cfg.modelId,
-                apiKey = cfg.apiKey,
-            )
-        },
-    )
+                // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
+                ApiProtocol.Gemini -> Gemini(
+                    name = cfg.modelId,
+                    apiKey = cfg.apiKey,
+                )
+            },
+        )
+    }
 
     override fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatModel(modelServices.fastSelection.value)

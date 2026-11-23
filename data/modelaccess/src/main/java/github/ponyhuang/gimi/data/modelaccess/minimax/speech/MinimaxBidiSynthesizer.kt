@@ -193,12 +193,17 @@ internal class MinimaxBidiSession(
         } catch (error: Throwable) {
             cause = error
         } finally {
-            current?.close()
+            if (cause != null) {
+                current?.chunks?.close(cause)
+                segmentQueue.close(cause)
+            } else {
+                current?.close()
+                segmentQueue.close()
+            }
             failure = cause
             val terminal = cause ?: IOException("语音合成会话提前结束")
             if (!started.isCompleted) started.completeExceptionally(terminal)
             flushSignal?.completeExceptionally(terminal)
-            segmentQueue.close()
             finished.complete(Unit)
         }
     }

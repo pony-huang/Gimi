@@ -52,6 +52,7 @@ class RuntimeUpdateViewModelTest {
         override suspend fun readFile(session: String, path: String): ByteArray = error("Unused")
         override suspend fun writeFile(session: String, path: String, content: ByteArray) = Unit
         override suspend fun startJob(session: String, command: String, keepAlive: Boolean): String = error("Unused")
+        override suspend fun writeJobInput(session: String, id: String, chars: String) = error("Unused")
         override suspend fun queryJob(session: String, id: String): EnvironmentJobStatus = error("Unused")
         override suspend fun stopJob(session: String, id: String) = Unit
     }

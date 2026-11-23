@@ -1,10 +1,7 @@
 package github.ponyhuang.gimi.feature.modelsettings.add
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
@@ -17,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -48,67 +44,49 @@ fun AddServiceRoute(
         title = stringResource(R.string.modelsettings_add_service),
         onBack = onBack,
     ) { scaffoldModifier ->
-        AddServiceScreen(state, viewModel::onAction, onOpenTemplate, onOpenCustom, scaffoldModifier)
+        AddServiceScreen(state, onOpenTemplate, onOpenCustom, scaffoldModifier)
     }
 }
 
 @Composable
 internal fun AddServiceScreen(
     state: AddServiceUiState,
-    onAction: (AddServiceAction) -> Unit,
     onOpenTemplate: (String) -> Unit,
     onOpenCustom: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePageContainer(modifier, style = PreferenceStyle.Compact) {
-        Column(Modifier.fillMaxSize()) {
-            GimiSearchField(
-                state.query,
-                { onAction(AddServiceAction.QueryChanged(it)) },
-                placeholder = stringResource(R.string.modelsettings_search_provider),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            val normalizedQuery = state.query.trim()
-            val customMatches = normalizedQuery.isBlank() ||
-                stringResource(R.string.modelsettings_custom_llm_title)
-                    .contains(normalizedQuery, ignoreCase = true)
-            val templates = state.templates.filter { template ->
-                normalizedQuery.isBlank() || template.name.contains(normalizedQuery, ignoreCase = true)
-            }
-            LazyColumn(Modifier.fillMaxSize()) {
-                if (customMatches) {
-                    item {
-                        PreferenceSectionTitle(stringResource(R.string.modelsettings_section_compatible))
-                        PreferenceGroupCard {
-                            PreferenceListItem(
-                                icon = Icons.Outlined.Code,
-                                title = stringResource(R.string.modelsettings_custom_llm_title),
-                                subtitle = stringResource(R.string.modelsettings_custom_llm_subtitle),
-                                subtitleMaxLines = 2,
-                                onClick = onOpenCustom,
-                            )
-                        }
-                    }
+        LazyColumn(Modifier.fillMaxSize()) {
+            item {
+                PreferenceSectionTitle(stringResource(R.string.modelsettings_section_compatible))
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Outlined.Code,
+                        title = stringResource(R.string.modelsettings_custom_llm_title),
+                        subtitle = stringResource(R.string.modelsettings_custom_llm_subtitle),
+                        subtitleMaxLines = 2,
+                        onClick = onOpenCustom,
+                    )
                 }
-                item {
-                    PreferenceSectionTitle(stringResource(R.string.modelsettings_section_built_in))
-                    // 多实例说明紧跟分组标题；底部不再重复展示。
-                    PreferenceSectionNote(stringResource(R.string.modelsettings_add_service_note))
-                    if (templates.isEmpty()) {
-                        PreferenceSectionNote(stringResource(R.string.modelsettings_no_matches))
-                    } else {
-                        PreferenceGroupCard {
-                            templates.forEachIndexed { index, template ->
-                                PreferenceListItem(
-                                    title = template.name,
-                                    subtitle = template.capabilitySummary(),
-                                    leadingIcon = { iconModifier ->
-                                        LLMModelServiceIcon(template.id, iconModifier, contentPadding = 2.dp)
-                                    },
-                                    showDivider = index < templates.lastIndex,
-                                    onClick = { onOpenTemplate(template.id) },
-                                )
-                            }
+            }
+            item {
+                PreferenceSectionTitle(stringResource(R.string.modelsettings_section_built_in))
+                // 多实例说明紧跟分组标题；底部不再重复展示。
+                PreferenceSectionNote(stringResource(R.string.modelsettings_add_service_note))
+                if (state.templates.isEmpty()) {
+                    PreferenceSectionNote(stringResource(R.string.modelsettings_no_matches))
+                } else {
+                    PreferenceGroupCard {
+                        state.templates.forEachIndexed { index, template ->
+                            PreferenceListItem(
+                                title = template.name,
+                                subtitle = template.capabilitySummary(),
+                                leadingIcon = { iconModifier ->
+                                    LLMModelServiceIcon(template.id, iconModifier, contentPadding = 2.dp)
+                                },
+                                showDivider = index < state.templates.lastIndex,
+                                onClick = { onOpenTemplate(template.id) },
+                            )
                         }
                     }
                 }
@@ -138,9 +116,9 @@ private fun github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceTemplate
         }
     }.joinToString(" · ")
 
-@Preview(name = "添加服务 · 浅色", showBackground = true, widthDp = 390, heightDp = 720, locale = "zh")
+@Preview(name = "添加服务商 · 浅色", showBackground = true, widthDp = 390, heightDp = 720, locale = "zh")
 @Preview(
-    name = "添加服务 · 深色", showBackground = true, widthDp = 390, heightDp = 720, locale = "zh",
+    name = "添加服务商 · 深色", showBackground = true, widthDp = 390, heightDp = 720, locale = "zh",
     uiMode = Configuration.UI_MODE_NIGHT_YES,
 )
 @Composable
@@ -164,7 +142,6 @@ private fun AddServicePreview() {
                     ),
                 ),
             ),
-            onAction = {},
             onOpenTemplate = {},
             onOpenCustom = {},
         )

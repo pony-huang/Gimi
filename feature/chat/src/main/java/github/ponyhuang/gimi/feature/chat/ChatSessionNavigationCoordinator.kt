@@ -60,7 +60,9 @@ internal class ChatSessionNavigationCoordinator(
             if (!canReload() || runtime.runToken !== runToken) return
             if (runtime.loadedContentRevision > revision) return
             runtime.closePartChannels()
-            runtime.messages = messages
+            // 身份保持式采用：内容等价的消息保留内存身份，避免收尾/外部写入换 id
+            // 触发整轮 item key 变化与静态重 parse（气泡刷新式闪烁）。
+            runtime.messages = adoptLoadedHistory(runtime.messages, messages)
             runtime.loadedContentRevision = revision
             publishRuntime(runtime)
         }

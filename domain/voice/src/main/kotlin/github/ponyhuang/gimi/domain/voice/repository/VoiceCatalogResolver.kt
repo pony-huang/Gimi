@@ -23,10 +23,4 @@ interface VoiceCatalogResolver {
 
     /** 该服务是否允许填写内置表之外的音色 ID。 */
     fun allowsCustomVoice(serviceId: String?): Boolean
-
-    /** 自定义音色 ID 的命名模板；仅对开放自由填写的服务非空。 */
-    fun customVoiceIdTemplate(serviceId: String?): String?
-
-    /** 自定义音色的官方音色列表页；仅对开放自由填写的服务非空。 */
-    fun customVoiceListUrl(serviceId: String?): String?
 }

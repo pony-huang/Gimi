@@ -33,6 +33,9 @@ sealed interface ChatbotPromptAction {
     data object ConfirmDelete : ChatbotPromptAction
     data object DismissDelete : ChatbotPromptAction
 
+    /** 启用或禁用预设；官方与自建预设均支持。 */
+    data class ToggleEnabled(val presetId: String, val enabled: Boolean) : ChatbotPromptAction
+
     /** 查看官方预设的完整提示词；官方预设只读，不进入编辑流程。 */
     data class ViewPrompt(val presetId: String) : ChatbotPromptAction
     /** 将查看中的角色复制到可编辑的新角色草稿。 */

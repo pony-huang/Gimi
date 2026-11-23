@@ -176,12 +176,6 @@ fun RealtimeVoiceRoute(
             seen = count
         }
     }
-    // 音色抽屉的「查看官方音色列表」：外链是 Android 副作用，归 Route。
-    val onOpenUrl: (String) -> Unit = { url ->
-        runCatching {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        }
-    }
     val routing = state.voice.audioRouting
     val currentDeviceName = voiceAudioDeviceName(routing.devices.firstOrNull { it.id == routing.currentDeviceId })
     val routingMessage = stringResource(
@@ -248,7 +242,6 @@ fun RealtimeVoiceRoute(
         onOpenVoiceSettings = viewModel::openVoiceSettings,
         onCloseVoiceSettings = viewModel::closeVoiceSettings,
         onResetVoiceSettings = viewModel::resetVoiceSettings,
-        onOpenUrl = onOpenUrl,
         onToggleMute = viewModel::toggleMute,
         onRetry = viewModel::retry,
         onEnd = hangUp,

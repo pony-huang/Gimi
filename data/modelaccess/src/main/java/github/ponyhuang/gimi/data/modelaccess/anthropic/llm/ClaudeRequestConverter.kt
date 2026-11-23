@@ -52,6 +52,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 internal class ClaudeRequestConverter(
     private val name: String,
     private val defaultMaxTokens: Int,
+    private val webSearchReplayScope: String? = null,
 ) {
     private val jsonMapper = jsonMapper()
 
@@ -159,7 +160,7 @@ internal class ClaudeRequestConverter(
     }
 
     internal fun contentToAnthropicMessageParam(content: Content): MessageParam? {
-        val blocks = content.parts.mapNotNull { it.toContentBlockParam() }
+        val blocks = content.messagesRequestBlocks(webSearchReplayScope) { it.toContentBlockParam() }
         if (blocks.isEmpty()) return null
         return MessageParam.builder()
             .role(toClaudeRole(content.role.toString()))

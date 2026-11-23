@@ -289,8 +289,6 @@ fun RealtimeVoiceScreen(
     onSelectPipeline: (VoicePipeline) -> Unit = {},
     onSelectFieldModel: (VoiceConfigField, ModelSelection?) -> Unit = { _, _ -> },
     onSelectVoice: (VoicePipeline, String?) -> Unit = { _, _ -> },
-    /** 音色抽屉的「查看官方音色列表」外链。 */
-    onOpenUrl: (String) -> Unit = {},
     onEditInput: () -> Unit = {},
     onOpenDocument: (FileAttachment) -> Unit = {},
     /** 页面切换过渡进度（0f = 文字聊天页，1f = 实时语音页），驱动背景、粒子球与底部输入坞分层动效。 */
@@ -307,8 +305,11 @@ fun RealtimeVoiceScreen(
     var modeSheetOpen by remember { mutableStateOf(false) }
     // 抽屉层级由单一状态表达：点行进入下一页、点返回或选完退回上一页，全程只有一个抽屉。
     var sheetPage by remember { mutableStateOf<VoiceSheetPage>(VoiceSheetPage.Entry) }
+    // 搜索态提升到宿主：返回键要先收搜索再逐级返回，两个选择页共用同一份开关。
+    var sheetSearching by remember { mutableStateOf(false) }
     val closeVoiceSettings = {
         modeSheetOpen = false
+        sheetSearching = false
         onCloseVoiceSettings()
     }
     DisposableEffect(Unit) {
@@ -324,6 +325,8 @@ fun RealtimeVoiceScreen(
         }
         sheetPage = sheetPage.parent
     }
+    // 翻页即收起搜索态：搜索是选择页的临时模式，不跨页残留。
+    LaunchedEffect(sheetPage) { sheetSearching = false }
     val status = when {
         uiState.ending -> R.string.voice_ending
         uiState.settingsSaving -> R.string.voice_settings_saving
@@ -571,6 +574,8 @@ fun RealtimeVoiceScreen(
                     }
                 },
             ) {
+                // 系统返回先收搜索，再走逐级返回；注册在抽屉内容里，优先于抽屉自身的返回关闭。
+                BackHandler(enabled = sheetSearching) { sheetSearching = false }
                 // 标题与主体共用同一份翻页规格，左右滑动才会同步。
                 AnimatedContent(
                     targetState = sheetPage,
@@ -591,11 +596,14 @@ fun RealtimeVoiceScreen(
                                         else -> settings.realtimeRows
                                     },
                                     currentSelection = draftFieldValue(draft, field) as ModelSelection?,
+                                    isSearching = sheetSearching,
+                                    onSearchingChange = { sheetSearching = it },
                                     onPick = { selection ->
                                         onSelectFieldModel(field, selection)
                                         sheetPage = page.parent
                                     },
                                     onBack = { sheetPage = page.parent },
+                                    onClose = closeVoiceSettings,
                                 )
                             }
                             is VoiceSheetPage.VoicePicker -> {
@@ -605,8 +613,9 @@ fun RealtimeVoiceScreen(
                                         title = stringResource(R.string.voice_settings_pick_realtime_voice),
                                         currentVoiceId = draft.realtimeVoice.value ?: settings.realtimeDefaultVoice,
                                         options = settings.realtimeVoiceOptions,
-                                        allowCustomInput = settings.realtimeCustomVoiceAllowed,
                                         isLoading = false,
+                                        isSearching = sheetSearching,
+                                        onSearchingChange = { sheetSearching = it },
                                         // 清空输入等于回到该模型的缺省音色，因此空串要落成 null 而不是一个空覆盖值。
                                         onPick = { voiceId ->
                                             val picked = voiceId.ifBlank { null }
@@ -614,7 +623,7 @@ fun RealtimeVoiceScreen(
                                             sheetPage = page.parent
                                         },
                                         onBack = { sheetPage = page.parent },
-                                        defaultVoiceId = settings.realtimeDefaultVoice,
+                                        onClose = closeVoiceSettings,
                                     )
                                 } else {
                                     VoicePickerPage(
@@ -624,18 +633,16 @@ fun RealtimeVoiceScreen(
                                             else -> draft.cascadedVoice.value.orEmpty()
                                         },
                                         options = settings.synthesisVoiceOptions,
-                                        allowCustomInput = settings.synthesisVoiceCustomInputAllowed,
                                         isLoading = settings.isSynthesisVoiceLoading,
+                                        isSearching = sheetSearching,
+                                        onSearchingChange = { sheetSearching = it },
                                         onPick = { voiceId ->
                                             val picked = voiceId.ifBlank { null }
                                             onSelectVoice(pipeline, picked)
                                             sheetPage = page.parent
                                         },
                                         onBack = { sheetPage = page.parent },
-                                        // 命名规则与官方音色列表只对开放自定义输入的厂商（千问）有意义。
-                                        namingTemplate = settings.synthesisVoiceIdTemplate,
-                                        docsUrl = settings.synthesisVoiceDocsUrl,
-                                        onOpenUrl = onOpenUrl,
+                                        onClose = closeVoiceSettings,
                                     )
                                 }
                             }
@@ -753,9 +760,7 @@ private fun VoiceSheetEntryPage(
         voiceOptions.firstOrNull { it.id == id }?.name ?: id
     } ?: stringResource(R.string.voice_settings_default_voice)
     val modelName = if (pipeline == VoicePipeline.NATIVE_REALTIME) {
-        draft.realtimeModel.value?.let { selection ->
-            settings.realtimeRows.selectionRow(selection)?.model?.name ?: selection.modelId
-        }.orEmpty()
+        settings.realtimeRows.selectionRow(draft.realtimeModel.value)?.model?.name.orEmpty()
     } else {
         uiState.chatModelName
     }.ifBlank { stringResource(R.string.voice_settings_not_configured) }
@@ -1034,11 +1039,9 @@ private fun voiceFieldSubtitle(
     name: String?,
     overridden: Boolean,
     dirty: Boolean,
-    missing: Boolean,
 ): String {
     val value = name ?: stringResource(R.string.voice_settings_not_configured)
     val markers = buildList {
-        if (missing && name != null) add(stringResource(R.string.voice_field_missing))
         when {
             dirty -> add(stringResource(R.string.voice_settings_unsaved))
             overridden -> add(stringResource(R.string.voice_field_overridden))
@@ -1062,9 +1065,8 @@ private fun VoiceConfigModelRow(
     onClick: () -> Unit,
     showDivider: Boolean = false,
 ) {
-    val selection = field.value
-    val selectedRow = rows.selectionRow(selection)
-    val name = selection?.let { selectedRow?.model?.name ?: it.modelId }
+    val selectedRow = if (missing) null else rows.selectionRow(field.value)
+    val name = selectedRow?.model?.let { it.name.ifBlank { it.id } }
     PreferenceListItem(
         leadingIcon = { iconModifier ->
             LLMModelServiceIcon(
@@ -1074,7 +1076,7 @@ private fun VoiceConfigModelRow(
             )
         },
         title = stringResource(titleRes),
-        subtitle = voiceFieldSubtitle(name, field.overridden, field.dirty, missing),
+        subtitle = voiceFieldSubtitle(name, field.overridden, field.dirty),
         onClick = onClick,
         showDivider = showDivider,
     )
@@ -1097,9 +1099,9 @@ private fun VoiceConfigVoiceRow(
         icon = Icons.Default.GraphicEq,
         title = stringResource(titleRes),
         subtitle = if (field.substituted) {
-            stringResource(R.string.voice_voice_substituted, voiceFieldSubtitle(name, field.overridden, field.dirty, false))
+            stringResource(R.string.voice_voice_substituted, voiceFieldSubtitle(name, field.overridden, field.dirty))
         } else {
-            voiceFieldSubtitle(name, field.overridden, field.dirty, false)
+            voiceFieldSubtitle(name, field.overridden, field.dirty)
         },
         onClick = onClick,
     )

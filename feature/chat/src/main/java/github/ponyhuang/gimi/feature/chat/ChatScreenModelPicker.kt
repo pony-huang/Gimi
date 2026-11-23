@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.modelcatalog.model.OPENAI_CHATBOT_SEARCH_MODEL
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -182,23 +183,28 @@ fun ModelTitleAndPicker(
     /** 会话因包含厂商 file 引用附件而锁定的厂商模板 ID；null 表示未锁定。 */
     lockedVendor: String? = null,
     modelSwitchCreatesNewSession: Boolean = false,
+    indicateAlwaysOnSearch: Boolean = false,
 ) {
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用实例 → 对话连接 → 第一个模型"。两个都没有则 null（空态）。
-    val displayedModel: EnabledModelRow? = remember(instances, currentSelection) {
+    val displayedModel: EnabledModelRow? = remember(instances, currentSelection, indicateAlwaysOnSearch) {
         instances.resolveSelection(currentSelection) ?: instances.asSequence()
             .filter { it.isConfiguredForChat() }
             .flatMap { instance -> instance.chatRows() }
-            .firstOrNull()
+            .firstOrNull { row ->
+                !indicateAlwaysOnSearch || row.instance.templateId != "openai" || row.model.id != OPENAI_CHATBOT_SEARCH_MODEL
+            }
     }
     val displayedModelName = displayedModel?.model?.name
     // 若会话没有显式选择或选择已失效，选择器应与标题/runner 的回退结果一致，
     // 使用户看到当前正在使用的模型已被勾选。
-    val effectiveSelection: ModelSelection? = remember(instances, currentSelection) {
+    val effectiveSelection: ModelSelection? = remember(instances, currentSelection, displayedModel, indicateAlwaysOnSearch) {
         if (instances.resolveSelection(currentSelection) != null) {
             currentSelection
         } else {
-            instances.firstConfiguredChatSelection()
+            if (indicateAlwaysOnSearch) displayedModel?.let {
+                ModelSelection(it.instance.id, it.connection.id, it.model.id)
+            } else instances.firstConfiguredChatSelection()
         }
     }
     // 抽屉候选：所有已启用且已配置实例下的普通聊天模型。
@@ -212,7 +218,9 @@ fun ModelTitleAndPicker(
     val reasoningSupported = displayedModel?.connection?.protocol != ApiProtocol.OpenaiChatcompletions
     // chip 上的思考强度标签：思考开启且当前协议支持时显示档位名，否则省略。
     // 会话里留存的档位在切到不支持协议的模型后不再展示，切回后原样恢复。
-    val effortLabel = toolConfiguration?.let {
+    val effortLabel = if (indicateAlwaysOnSearch && displayedModel?.instance?.templateId == "openai" &&
+        displayedModel.model.id == OPENAI_CHATBOT_SEARCH_MODEL
+    ) stringResource(R.string.chat_model_always_search) else toolConfiguration?.let {
         if (it.thinkingEnabled && reasoningSupported) reasoningEffortLabel(it.reasoningEffort) else null
     }
 
@@ -234,7 +242,7 @@ fun ModelTitleAndPicker(
             effortLabel = effortLabel,
             onClick = when {
                 loadState == CatalogLoadState.Loading -> null
-                displayedModelName == null -> onConfigureModels
+                displayedModelName == null && enabledModels.isEmpty() -> onConfigureModels
                 else -> {
                     {
                         if (isAgentRunning) {

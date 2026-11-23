@@ -42,6 +42,15 @@ data class MobileElement(
     val selectionEnd: Int = -1,
 )
 
+/** 截图对应的可点击控件，编号仅在本次观察中有效，边界为截图像素。 */
+data class MobileClickCandidate(
+    val id: String,
+    val label: String,
+    val bounds: MobileBounds,
+    /** 所在行或父组的可见标签，用于区分同名控件。 */
+    val context: String? = null,
+)
+
 /**
  * 有时限的画面观察结果，不承诺页面业务加载完成。
  * @property id 随机观察编号；后续动作必须引用最新编号。
@@ -63,4 +72,7 @@ data class MobileObservation(
     val elements: List<MobileElement> = emptyList(),
     val truncated: Boolean = false,
     val actionModes: List<String> = emptyList(),
+    /** 与本次截图配对并允许按编号点击的控件。 */
+    val clickCandidates: List<MobileClickCandidate> = emptyList(),
+    val clickCandidatesTruncated: Boolean = false,
 )

@@ -37,10 +37,11 @@ private fun stubSimpleVoice(
 /** 后端只读预设状态；测试提供空仓库表示不使用自定义提示词。 */
 private fun emptyChatbotPrompts(): ChatbotRoleRepository = object : ChatbotRoleRepository {
     override val presets = MutableStateFlow(emptyList<ChatbotRolePreset>())
-    override val builtInPresets = emptyList<ChatbotRolePreset>()
+    override val builtInPresets = MutableStateFlow(emptyList<ChatbotRolePreset>())
     override val selectedPresetIds = MutableStateFlow<Map<String, String>>(emptyMap())
     override fun upsertPreset(preset: ChatbotRolePreset) {}
     override fun deletePreset(presetId: String) {}
+    override fun setEnabled(presetId: String, enabled: Boolean) {}
     override fun selectPreset(conversationId: String, presetId: String?) {}
 }
 

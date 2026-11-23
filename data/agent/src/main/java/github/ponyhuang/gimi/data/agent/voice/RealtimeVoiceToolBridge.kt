@@ -23,6 +23,7 @@ import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.domain.modelaccess.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.contribution.GuardedAppFunctionToolset
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
+import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTools
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -180,6 +181,8 @@ class RealtimeAssistantTools @Inject constructor(
                 .getOrDefault(emptyList())
         }
         val tools = (pluginTools + resolvedTools)
+            // 控件编号随下一次 Runner 请求中的截图传递，原生实时桥仅传 JSON 工具结果。
+            .filterNot { it.name == MobileUseTools.CLICK_ELEMENT }
             .filter { tool ->
                 cancellationAwareRunCatching { tool.declaration() != null }
                     .onFailure { Log.w(TAG, "工具 ${tool.name} 声明解析失败，跳过该工具", it) }

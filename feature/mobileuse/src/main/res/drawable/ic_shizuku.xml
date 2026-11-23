@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shizuku 应用图标（线性风格），源自官方品牌图形，色由使用处 tint 控制 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.5,5.5h29a4,4 0 0 1 4,4v29a4,4 0 0 1 -4,4h-29a4,4 0 0 1 -4,-4v-29a4,4 0 0 1 4,-4z"
+        android:strokeColor="#000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M28.31,33.96h1.44L35.5,24l-5.75,-9.96h-11.5l-2.81,4.87"
+        android:strokeColor="#000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M25.65,42.5l1.92,-5.28a13.3,13.3 0 0 0 0.16,-8.63l0.34,-0.62a12.13,12.13 0 0 0 1.14,-6.35a12,12 0 0 0 -5.92,0.3l-0.21,0.07a13.5,13.5 0 0 0 -3.49,-1.9a13.5,13.5 0 0 0 -3.91,-0.79l-0.11,-0.19a12.1,12.1 0 0 0 -4.34,-4A12,12 0 0 0 8,20.67q-0.09,0.34 -0.15,0.69a13.7,13.7 0 0 0 -2.35,1.92"
+        android:strokeColor="#000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M11.25,25.53a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0z M20.53,28.91a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0z"
+        android:strokeColor="#000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+</vector>

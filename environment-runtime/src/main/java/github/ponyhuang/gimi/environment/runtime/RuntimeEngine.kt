@@ -43,6 +43,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         val session: String,
         val stdout: RuntimeJobOutput,
         val stderr: RuntimeJobOutput,
+        val input: RuntimeJobInput,
         val task: FutureTask<Bundle>,
     )
     private val jobs = ConcurrentHashMap<String, Job>()
@@ -67,7 +68,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         processes.values.forEach { control -> pool.execute { control.terminate() } }
         processes.clear()
         synchronized(jobs) {
-            jobs.values.forEach { it.task.cancel(true) }
+            jobs.values.forEach { it.input.close(); it.task.cancel(true) }
             jobs.clear()
         }
     }
@@ -148,10 +149,21 @@ internal class RuntimeEngine private constructor(private val context: Context) {
                 val stdout = RuntimeJobOutput()
                 val stderr = RuntimeJobOutput()
                 val keepAlive = args.getBoolean("keepAlive")
-                val task = FutureTask { execute(session, command, 0, id, keepAlive, stdout, stderr) }
-                jobs[id] = Job(session, stdout, stderr, task)
+                val input = RuntimeJobInput()
+                val task = FutureTask {
+                    try { execute(session, command, 0, id, keepAlive, stdout, stderr, input) }
+                    finally { input.close() }
+                }
+                jobs[id] = Job(session, stdout, stderr, input, task)
                 pool.execute(task)
                 Bundle().apply { putString("id", id) }
+            }
+            "writeJobInput" -> {
+                val job = requireNotNull(jobs[args.getString("id")])
+                require(job.session == session)
+                check(!job.task.isDone) { "Job has ended" }
+                job.input.enqueue(requireNotNull(args.getString("chars")))
+                Bundle()
             }
             "queryJob" -> {
                 val job = requireNotNull(jobs[args.getString("id")])
@@ -168,6 +180,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
                 val id = requireNotNull(args.getString("id"))
                 val job = requireNotNull(jobs[id])
                 require(job.session == session)
+                job.input.close()
                 job.task.cancel(true)
                 jobs.remove(id, job)
                 Bundle()
@@ -197,6 +210,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         keepAlive: Boolean = false,
         stdoutOutput: RuntimeJobOutput = RuntimeJobOutput(),
         stderrOutput: RuntimeJobOutput = RuntimeJobOutput(),
+        input: RuntimeJobInput? = null,
     ): Bundle {
         check(enabled); require(command.length <= 100_000 && timeout >= 0)
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
@@ -237,6 +251,8 @@ internal class RuntimeEngine private constructor(private val context: Context) {
             processes.remove(id, control)
             throw IOException("Environment disabled or job stopped")
         }
+        val writer = input?.let { pool.submit { it.writeTo(process.outputStream) } }
+        if (input == null) process.outputStream.close()
         val stdout = pool.submit { capture(process.inputStream, stdoutOutput) }
         val stderr = pool.submit { capture(process.errorStream, stderrOutput) }
         try {
@@ -252,6 +268,7 @@ internal class RuntimeEngine private constructor(private val context: Context) {
         } finally {
             control.terminate()
             runCatching { process.inputStream.close(); process.errorStream.close() }
+            writer?.cancel(true)
             stdout.cancel(true)
             stderr.cancel(true)
             processes.remove(id, control)

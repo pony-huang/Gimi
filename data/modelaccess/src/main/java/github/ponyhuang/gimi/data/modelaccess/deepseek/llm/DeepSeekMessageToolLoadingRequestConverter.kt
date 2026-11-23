@@ -28,8 +28,9 @@ internal class DeepSeekMessageToolLoadingRequestConverter(
     private val loadingMode: ToolLoadingMode,
     /** 每次请求取一次 latest_reminder 内容；null 或空白表示本轮不注入。 */
     private val latestReminder: (() -> String?)? = null,
+    webSearchReplayScope: String? = null,
 ) {
-    private val standard = DeepSeekMessageRequestConverter(name, maxTokens, latestReminder)
+    private val standard = DeepSeekMessageRequestConverter(name, maxTokens, latestReminder, webSearchReplayScope)
     private val jsonMapper = jsonMapper()
 
     fun convert(request: LlmRequest): MessageCreateParams {

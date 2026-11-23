@@ -1,9 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.defaults
 
 import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -11,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelRole
@@ -33,7 +29,6 @@ fun DefaultModelSettingsRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val noBrowser = stringResource(R.string.modelsettings_no_browser)
 
     LaunchedEffect(openRole) {
         when (openRole) {
@@ -69,7 +64,6 @@ fun DefaultModelSettingsRoute(
                 dialog.toRole()?.let(onAddService)
             },
             modifier = scaffoldModifier,
-            onOpenUrl = { url -> context.openUrl(url, noBrowser) },
         )
     }
 }
@@ -82,13 +76,4 @@ private fun DefaultModelDialog.toRole(): DefaultModelRole? = when (this) {
     DefaultModelDialog.Tts -> DefaultModelRole.SpeechSynthesis
     DefaultModelDialog.RealtimeModel -> DefaultModelRole.Realtime
     DefaultModelDialog.TtsVoice -> null
-}
-
-/** 打开外部链接；系统没有可用浏览器时用 Toast 说明，避免点击后毫无反馈。 */
-private fun Context.openUrl(url: String, noBrowser: String) {
-    try {
-        startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (_: ActivityNotFoundException) {
-        Toast.makeText(this, noBrowser, Toast.LENGTH_SHORT).show()
-    }
 }

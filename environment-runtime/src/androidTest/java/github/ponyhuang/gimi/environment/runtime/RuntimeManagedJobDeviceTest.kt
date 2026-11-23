@@ -57,6 +57,19 @@ class RuntimeManagedJobDeviceTest {
         throw AssertionError("Job did not reach expected state")
     }
 
+    @Test fun passesInputToTheManagedCommandAndRejectsOtherSessions() {
+        val id = start("printf READY; IFS= read -r line; printf '<%s>' \"\$line\"", false)
+        await(id) { it.getString("stdout").orEmpty().contains("READY") }
+        val input = args().apply { putString("id", id); putString("chars", "hello\n") }
+        val otherSession = Bundle(input).apply { putString("session", "$session-other") }
+        assertThrows(IllegalArgumentException::class.java) { engine.call("writeJobInput", otherSession) }
+        engine.call("writeJobInput", input)
+        val result = await(id) { !it.getBoolean("running") }
+        assertEquals(0, result.getInt("exitCode"))
+        assertEquals("READY<hello>", result.getString("stdout"))
+        assertThrows(IllegalStateException::class.java) { engine.call("writeJobInput", input) }
+    }
+
     @Test fun loginStyleDaemonRemainsAliveAndStopsWithJob() {
         val id = start("printf 'LOGIN_READY\n'; (while :; do printf x >> progress; sleep 1; done) >/dev/null 2>&1 &", true)
         val live = await(id) { it.getString("stdout").orEmpty().contains("LOGIN_READY") }

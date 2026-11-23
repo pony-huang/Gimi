@@ -68,6 +68,8 @@ interface EnvironmentRepository {
     suspend fun writeFile(session: String, path: String, content: ByteArray)
     /** keepAlive 保持成功启动命令的进程树存活，调用方须在授权完成或服务结束后 stopJob。 */
     suspend fun startJob(session: String, command: String, keepAlive: Boolean = false): String
+    /** 按顺序提交命令输入，写入由 Runtime 的任务线程完成。 */
+    suspend fun writeJobInput(session: String, id: String, chars: String)
     suspend fun queryJob(session: String, id: String): EnvironmentJobStatus
     suspend fun stopJob(session: String, id: String)
 }

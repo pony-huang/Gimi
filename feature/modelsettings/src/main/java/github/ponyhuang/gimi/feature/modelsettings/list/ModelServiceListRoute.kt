@@ -37,7 +37,6 @@ fun ModelServiceListRoute(
     ) { scaffoldModifier ->
         ModelServiceListScreen(
             state = state,
-            onAction = viewModel::onAction,
             onNavigateToDetail = onNavigateToDetail,
             onAddService = onAddService,
             onOpenDefaults = onOpenDefaults,

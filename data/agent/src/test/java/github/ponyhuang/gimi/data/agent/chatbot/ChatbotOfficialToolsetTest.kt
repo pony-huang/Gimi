@@ -96,6 +96,16 @@ class ChatbotOfficialToolsetTest {
         assertEquals(listOf("deepseek_web_search"), resolved.map { it.name })
     }
 
+    @Test fun nativeDeepSeekHonorsSessionSwitchOnTheOfficialEndpoint() = runTest {
+        val deck = ChatbotOfficialToolset(mockk<DefaultOfficialToolset>(), catalog)
+        val config = runtime("deepseek").copy(fullBaseUrl = "https://api.deepseek.com/anthropic")
+        val searchOnly = ConversationToolConfiguration(
+            enabledOfficialFunctionIds = mapOf("deepseek_web_search" to setOf("deepseek_web_search")),
+        )
+        assertEquals(listOf("deepseek_native_web_search"), deck.resolveTools(config, searchOnly).map { it.name })
+        assertEquals(emptyList<String>(), deck.resolveTools(config, ConversationToolConfiguration()).map { it.name })
+    }
+
     private fun tool(name: String): BaseTool = object : FunctionTool(name = name, description = name) {
         override fun declaration(): FunctionDeclaration = FunctionDeclaration(name = name, description = description)
         override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any = mapOf("ok" to true)

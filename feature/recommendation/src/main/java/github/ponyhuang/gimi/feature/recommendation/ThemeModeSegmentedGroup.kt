@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
@@ -30,10 +31,10 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
-/** 主题模式分段按钮的选项：模式、文案与图标一一对应，顺序固定 跟随系统|白天|夜间。 */
+/** 主题模式分段按钮的选项，包含模式、无障碍名称和显示图标。 */
 private data class ThemeModeOption(
     val mode: ThemeMode,
-    val labelRes: Int,
+    val contentDescriptionRes: Int,
     val icon: ImageVector,
 )
 
@@ -78,8 +79,9 @@ internal fun ThemeModeSegmentedGroup(
         Spacer(Modifier.height(12.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             options.forEachIndexed { index, option ->
+                val selected = themeMode == option.mode
                 SegmentedButton(
-                    selected = themeMode == option.mode,
+                    selected = selected,
                     onClick = { onThemeModeChange(option.mode) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                     colors = SegmentedButtonDefaults.colors(
@@ -87,16 +89,25 @@ internal fun ThemeModeSegmentedGroup(
                         activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         activeBorderColor = MaterialTheme.colorScheme.primary,
                     ),
-                    // material3 新版选中段渲染为内嵌胶囊，icon 槽会画到胶囊边界外；图标并入 label 保证随文字一起居中。
+                    // 将勾选标记和模式图标一起居中，避免独立 icon 槽超出选中段的内嵌胶囊。
                     icon = {},
                     label = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
+                                )
+                            }
                             Icon(
                                 imageVector = option.icon,
-                                contentDescription = null,
+                                contentDescription = stringResource(option.contentDescriptionRes),
                                 modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
                             )
-                            Text(stringResource(option.labelRes), maxLines = 1)
                         }
                     },
                 )

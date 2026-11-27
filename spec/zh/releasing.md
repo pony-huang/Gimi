@@ -8,7 +8,7 @@
 
 - `ci.yml` 将开发分支验证交给 `verify.yml`，在 Ubuntu / JDK 21 上运行发布工具测试、架构检查、JVM 单测、App Debug 打包、插件编译和 `app:lintDebug`。触发排除规则见下文“日常开发”。
 - `release.yml` 采用 NewPipe 式发版：推送 `v*` tag 触发发布，手动派发已有 tag 仅用于失败补跑。从准确的 tag 提交构建并校验正式签名的 App/插件 APK，完整上传到 Draft 后公开为不可变的 GitHub Release（预发布自动带 prerelease 标记），不发布到 Google Play。
-- `prepare_release.py`（可选辅助脚本，本地运行）在当前分支写入 `version.txt`、递增 `releaseVersionCode` 并追加 `CHANGELOG.md` 段落，版本提升随普通开发提交走。版本号由人显式输入，脚本只执行不推算（ADR-0001）。
+- `prepare_release.py`（可选辅助脚本，本地运行）在当前分支写入 `version.txt`、递增 `releaseVersionCode` 并追加 `CHANGELOG.md` 段落，版本提升随普通开发提交走。版本号由人显式输入，脚本只执行不推算。
 - App 和插件通过 `gimi.android.application` 共享 `version.txt` 和 `gradle.properties` 中的 `releaseVersionCode`。
 
 ## 首次启用
@@ -33,7 +33,7 @@
 
 ## 版本提升与更新日志
 
-唯一的版本名称文件是 `version.txt`，App 和所有插件通过公共 convention plugin 读取相同的版本名称与 `releaseVersionCode`。`version.txt` 是版本号唯一真源——任何工具不得推算或覆盖版本号，只能读取它，或按发版人显式输入写入（ADR-0001）。
+唯一的版本名称文件是 `version.txt`，App 和所有插件通过公共 convention plugin 读取相同的版本名称与 `releaseVersionCode`。`version.txt` 是版本号唯一真源——任何工具不得推算或覆盖版本号，只能读取它，或按发版人显式输入写入。
 
 版本提升是发版分支上的普通开发提交（NewPipe 式——没有版本 PR、没有机器人）。在分支上运行 `python3 .github/scripts/prepare_release.py <版本号>`：脚本校验版本推进且 tag 不存在后，更新 `version.txt`、递增 `releaseVersionCode`（现值 + 1），并按可达最高版本 tag 之后的 Conventional Commits 生成 `CHANGELOG.md` 段落（`feat` → 新功能与体验，`fix` → 修复；杂项不进正文）。审查三个文件，把提交摘要整理为中文用户说明，补充权限、插件、协议和数据重置等注意事项，然后随发版分支一起提交。
 

@@ -16,7 +16,7 @@ Workflow files under `.github/workflows/` are the source of truth:
 - `prepare_release.py` (optional helper, run locally) writes `version.txt`, increments
   `releaseVersionCode`, and appends the `CHANGELOG.md` section on the current branch, so the version
   bump travels as an ordinary development commit. Version numbers are entered by a human; the
-  script only executes (ADR-0001).
+  script only executes.
 - App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through
   `gimi.android.application`.
 
@@ -60,7 +60,7 @@ GitHub settings; editing the YAML does not enable them.
 `version.txt` is the only version name file; the app and every plugin read the same version name and
 `releaseVersionCode` through the shared convention plugin. `version.txt` is the single version
 source of truth — no tool may infer or overwrite the version number; it is either read from the
-file or written exactly as the releaser typed it (ADR-0001).
+file or written exactly as the releaser typed it.
 
 The version bump is an ordinary development commit on the release branch (NewPipe model — no
 version PR, no bot). Run `python3 .github/scripts/prepare_release.py <version>` on the branch:

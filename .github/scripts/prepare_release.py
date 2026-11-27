@@ -1,6 +1,6 @@
 """Bump version files on the current branch: version.txt, gradle.properties, and a CHANGELOG section.
 
-NewPipe 式发版（ADR-0001）：版本提升是普通开发提交的一部分——在发版分支上运行本脚本，
+NewPipe 式发版：版本提升是普通开发提交的一部分——在发版分支上运行本脚本，
 审查产物后自行 commit 并随分支合并 main；打 tag 推送后 CI 负责构建与发布。
 版本号由发版人显式输入，脚本只执行不推算。
 """

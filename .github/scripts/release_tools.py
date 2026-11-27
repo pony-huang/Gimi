@@ -125,7 +125,7 @@ def config(root=ROOT):
 
 
 def pretag(tag):
-    """本地打 tag 前的预检（ADR-0001）：tag 形态、与 version.txt 一致、tag 已提交且在 origin/main 历史内、CHANGELOG 章节就绪、版本超过全部已发布版本。"""
+    """本地打 tag 前的预检：tag 形态、与 version.txt 一致、tag 已提交且在 origin/main 历史内、CHANGELOG 章节就绪、版本超过全部已发布版本。"""
     version, _ = config()
     if tag != f'v{version}':
         raise ValueError('Tag does not match version.txt')

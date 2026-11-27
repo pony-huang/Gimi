@@ -9,14 +9,14 @@ Workflow files under `.github/workflows/` are the source of truth:
 - `ci.yml` delegates development branch verification to `verify.yml`, which runs release-tool tests,
   architecture checks, JVM tests, debug App assembly, plugin compilation, and `app:lintDebug` on
   Ubuntu with JDK 21. See Day-to-day development below for trigger exclusions.
-- `release.yml` runs only on manual dispatch with an existing tag (`workflow_dispatch`). It builds
-  and validates signed App/plugin APKs from the exact tagged commit, uploads complete artifacts to
-  a Draft, then publishes an immutable GitHub Release — prereleases automatically carry the
-  prerelease flag. It does not publish to Google Play.
-- `prepare_release.py` (run locally by the releaser) scaffolds the version PR: it writes
-  `version.txt`, appends the `CHANGELOG.md` section, and increments `releaseVersionCode` in one
-  commit on a `chore/release-*` branch. Version numbers are entered by a human; the script only
-  executes (ADR-0001).
+- `release.yml` follows the NewPipe model: a `v*` tag push starts the release, and manual dispatch
+  with an existing tag covers retries. It builds and validates signed App/plugin APKs from the
+  exact tagged commit, uploads complete artifacts to a Draft, then publishes an immutable GitHub
+  Release — prereleases automatically carry the prerelease flag. It does not publish to Google Play.
+- `prepare_release.py` (optional helper, run locally) writes `version.txt`, increments
+  `releaseVersionCode`, and appends the `CHANGELOG.md` section on the current branch, so the version
+  bump travels as an ordinary development commit. Version numbers are entered by a human; the
+  script only executes (ADR-0001).
 - App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through
   `gimi.android.application`.
 
@@ -27,8 +27,7 @@ The release baseline is calibrated to the latest stable GitHub release and recor
 The release script downloads the main App APK of the highest published semver Release
 to verify the increment that in-place upgrades require; it never relies on workflow run numbers.
 
-No PAT is needed: `prepare_release.py` uses the local `gh` credentials of whoever runs it, and
-`release.yml` uses the default `GITHUB_TOKEN`.
+No PAT is needed: release publication uses the default `GITHUB_TOKEN`.
 
 Configure four repository Actions secrets with the same production key as the distributed APKs:
 
@@ -38,9 +37,8 @@ Configure four repository Actions secrets with the same production key as the di
 - `RELEASE_KEY_PASSWORD`: private key password.
 
 The main branch rules require a pull request and forbid direct pushes. CI runs only on development
-branch pushes and pull requests, so `chore/release-*` version-PR pushes do not produce an extra
-push-run `Build & Test` check (the pull_request run covers it). Protect `v*` tags against updates
-and deletion; tags are created locally by the releaser. A repository admin configures these
+branch pushes and pull requests. Protect `v*` tags against updates and deletion; tags are created
+locally by the releaser. A repository admin configures these
 GitHub settings; editing the YAML does not enable them.
 
 ## Day-to-day development
@@ -53,35 +51,33 @@ GitHub settings; editing the YAML does not enable them.
    in AGENTS.md.
 3. Push a development branch to run release script tests, architecture checks, JVM unit tests,
    debug APK assembly, plugin compilation, and lint. Development branches are all branches except
-   `main`, `chore/release-**`, `backup/**`, and `dependabot/**`. Local commits alone do not run CI.
-4. Open the pull request with actual verification results. Main merges and tags do not trigger CI
-   on their own; a pull request targeting main runs the `Build & Test` check (including the
-   release-tooling `check` that validates the version PR).
+   `main`, `backup/**`, and `dependabot/**`. Local commits alone do not run CI.
+4. Open the pull request with actual verification results. A pull request targeting main runs the
+   `Build & Test` check.
 
-## Version PR and changelog
+## Version bump and changelog
 
 `version.txt` is the only version name file; the app and every plugin read the same version name and
 `releaseVersionCode` through the shared convention plugin. `version.txt` is the single version
 source of truth — no tool may infer or overwrite the version number; it is either read from the
 file or written exactly as the releaser typed it (ADR-0001).
 
-Run `python3 .github/scripts/prepare_release.py <version>` from an up-to-date main checkout. The
-script validates the version format and that it advances the current version, creates a
-`chore/release-<version>` branch, updates `version.txt`, increments `releaseVersionCode` (main's
-value + 1), and appends a `CHANGELOG.md` section generated from the Conventional Commits since the
-highest reachable version tag (`feat` → 新功能与体验, `fix` → 修复; chores stay out and user-visible
-details are edited by hand). It then pushes the branch and opens the version PR via `gh`.
+The version bump is an ordinary development commit on the release branch (NewPipe model — no
+version PR, no bot). Run `python3 .github/scripts/prepare_release.py <version>` on the branch:
+it validates that the version advances the current one and that the tag does not exist, updates
+`version.txt`, increments `releaseVersionCode` (current value + 1), and appends a `CHANGELOG.md`
+section generated from the Conventional Commits since the highest reachable version tag
+(`feat` → 新功能与体验, `fix` → 修复; chores stay out). Review the three files, rewrite the
+summaries into Chinese user-facing notes, add notes about permissions, plugins, protocols, and
+data resets, then commit them with the release branch.
 
-Before merging the version PR:
+Before merging the release branch:
 
 1. Confirm `releaseVersionCode` in `gradle.properties` was incremented. Publication checks
    the install version increment required for in-place upgrades.
-2. Rewrite the commit summaries into Chinese user-facing notes, merge duplicate entries, and add
-   notes about permissions, plugins, protocols, and data resets. Edit the current version's section
-   directly in CHANGELOG.md.
-3. Wait for the PR's `Build & Test` check and finish the required physical-device installation, core
-   feature, and plugin verification.
-4. Merge the version PR into main.
+2. Wait for the PR's `Build & Test` check and finish the required physical-device installation,
+   core feature, and plugin verification.
+3. Merge into main.
 
 The Release body is extracted from that version's CHANGELOG section at build time and replaces the
 automatic body. The GitHub Release and the in-app update dialog read the same notes.
@@ -143,28 +139,25 @@ features on a physical device; validate important versions through a prerelease 
 
 ## Tagging, prereleases, and retries
 
-After merging the version PR, tag the merge commit on main and dispatch the release. First run the
-local pre-tag gate, which checks the tag format, the agreement between tag and `version.txt`, that
-the tag exists and is part of main's history, the CHANGELOG section, and that the version exceeds
-every published release:
+After merging the release branch into main, tag the merge commit and push it — the tag push is the
+release trigger (NewPipe model). Optionally run the local pre-tag gate first, which checks the tag
+format, the agreement between tag and `version.txt`, that the tag exists and is part of main's
+history, the CHANGELOG section, and that the version exceeds every published release:
 
 ```sh
 python3 .github/scripts/release_tools.py pretag --tag v1.0.0-beta.6
 git tag v1.0.0-beta.6
-git push origin v1.0.0-beta.6
-gh workflow run release.yml -f tag=v1.0.0-beta.6
+git push origin v1.0.0-beta.6   # triggers release.yml
 ```
 
-Tags must be created locally after the version PR merge; the workflow's `push: tags` trigger was
-removed so a tag push can never start a release on the wrong baseline (ADR-0001). Prerelease
-numbering starts at 1; the stable release and every prerelease use their own incremented
+Prerelease numbering starts at 1; the stable release and every prerelease use their own incremented
 versionCode. Prerelease tiers are ordered `beta` before `rc` before the stable release,
 so `1.0.0-beta.1` precedes `1.0.0-rc.1`, which precedes `1.0.0`.
 
 A failed release keeps the unpublished Draft. After fixing the environment or the secrets, re-run
 Actions → Publish Android Release → Run workflow with the existing tag; the re-run does not build
 other sources from a manually chosen branch and does not create a new tag. Finish re-running a
-release before merging the next version PR, so that several unfinished releases never pile up.
+release before merging the next release branch, so that several unfinished releases never pile up.
 
 Publications of the same version run serially and the Draft may overwrite incomplete attachments. A
 published Release cannot have its attachments or body rewritten, and a re-run fails explicitly; a code

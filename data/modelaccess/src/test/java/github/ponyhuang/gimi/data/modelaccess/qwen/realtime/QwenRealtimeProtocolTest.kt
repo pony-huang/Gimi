@@ -22,6 +22,94 @@ class QwenRealtimeProtocolTest {
         assertEquals("新的角色正文", session.get("instructions").asString)
     }
 
+    @Test
+    fun createMessageItemCreatesUserMessageWithInputTextAndOptionalIds() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.USER,
+            parts = listOf(com.google.adk.kt.types.Part(text = "请帮我总结一下上次的对话")),
+        )
+        val payload = QwenRealtimeProtocol.createMessageItem(
+            content = content,
+            itemId = "item_123",
+            previousItemId = "item_abc",
+        )
+        assertEquals("conversation.item.create", payload.get("type").asString)
+        assertEquals("item_abc", payload.get("previous_item_id").asString)
+        val item = payload.getAsJsonObject("item")
+        assertEquals("item_123", item.get("id").asString)
+        assertEquals("message", item.get("type").asString)
+        assertEquals("user", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals(1, parts.size())
+        assertEquals("input_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("请帮我总结一下上次的对话", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun createMessageItemCreatesAssistantMessageWithOutputTextType() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.MODEL,
+            parts = listOf(com.google.adk.kt.types.Part(text = "好的，上次我们聊到了实时语音。")),
+        )
+        val payload = QwenRealtimeProtocol.createMessageItem(content)
+        assertEquals("conversation.item.create", payload.get("type").asString)
+        org.junit.Assert.assertNull(payload.get("previous_item_id"))
+        val item = payload.getAsJsonObject("item")
+        org.junit.Assert.assertNull(item.get("id"))
+        assertEquals("message", item.get("type").asString)
+        assertEquals("assistant", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals(1, parts.size())
+        assertEquals("output_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("好的，上次我们聊到了实时语音。", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun createMessageItemCreatesSystemMessageWithInputTextType() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.SYSTEM,
+            parts = listOf(com.google.adk.kt.types.Part(text = "你是一个中文助手。")),
+        )
+        val payload = QwenRealtimeProtocol.createMessageItem(content)
+        val item = payload.getAsJsonObject("item")
+        assertEquals("system", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals("input_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("你是一个中文助手。", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun historyMessagesFiltersThoughtAndEmptyMessages() {
+        val history = listOf(
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.USER,
+                parts = listOf(com.google.adk.kt.types.Part(text = "第一问")),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.MODEL,
+                parts = listOf(com.google.adk.kt.types.Part(text = "内部思考", thought = true)),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.MODEL,
+                parts = listOf(
+                    com.google.adk.kt.types.Part(text = "思考中", thought = true),
+                    com.google.adk.kt.types.Part(text = "第一答"),
+                ),
+            ),
+        )
+        val payloads = QwenRealtimeProtocol.historyMessages(history)
+        assertEquals(2, payloads.size)
+
+        val item0 = payloads[0].getAsJsonObject("item")
+        assertEquals("user", item0.get("role").asString)
+        assertEquals("第一问", item0.getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+
+        val item1 = payloads[1].getAsJsonObject("item")
+        assertEquals("assistant", item1.get("role").asString)
+        assertEquals("output_text", item1.getAsJsonArray("content")[0].asJsonObject.get("type").asString)
+        assertEquals("第一答", item1.getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+    }
+
 
     @Test
     fun `sessionUpdate carries dashscope session config`() {
@@ -39,10 +127,23 @@ class QwenRealtimeProtocolTest {
         assertEquals("pcm", session.get("input_audio_format").asString)
         assertEquals("pcm", session.get("output_audio_format").asString)
 
-        val vad = session.getAsJsonObject("turn_detection")
-        assertEquals("server_vad", vad.get("type").asString)
-        assertEquals(0.5, vad.get("threshold").asDouble, 0.0)
-        assertEquals(QwenRealtimeProtocol.DEFAULT_SILENCE_DURATION_MS, vad.get("silence_duration_ms").asLong)
+        // Manual 模式：本地 VAD 切句后由客户端提交，服务端不自动判轮。
+        assertTrue(session.get("turn_detection").isJsonNull)
+    }
+
+    @Test
+    fun `local VAD turn control commits audio before requesting a response`() {
+        val controls = QwenRealtimeProtocol.commitAudioTurn()
+
+        assertEquals(
+            listOf("input_audio_buffer.commit", "response.create"),
+            controls.map { it.get("type").asString },
+        )
+    }
+
+    @Test
+    fun `local barge in can cancel the active response`() {
+        assertEquals("response.cancel", QwenRealtimeProtocol.cancelResponse().get("type").asString)
     }
 
     @Test

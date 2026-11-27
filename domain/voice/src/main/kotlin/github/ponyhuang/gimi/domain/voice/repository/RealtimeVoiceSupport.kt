@@ -38,9 +38,6 @@ interface RealtimeVoiceSupport {
      */
     fun voicesFor(modelId: String): List<TtsVoice> = builtInVoices
 
-    /** 是否允许填写内置音色之外的 voice_id（声音复刻等厂商自定义音色）。 */
-    val customVoiceAllowed: Boolean
-
     /**
      * 某个 Realtime 模型的缺省会话音色。
      *

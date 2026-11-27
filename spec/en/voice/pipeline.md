@@ -57,7 +57,7 @@ Prefer hardware AEC when available, otherwise the software canceller. Never both
   ringing and AEC residue remain after the queue drains — keep the tail
   guarded or a sudden pickup lands on the frame where the guard disarms. The
   uplink playback check must use playing state *and* tail risk too, else the
-  tail goes up at full rate and server VAD opens a user turn: a second path.
+  tail reaches the provider at full confidence and can fake a local barge-in.
 - **Muting stops VAD input, not the mic.** It never stops the recording stream
   or echo processing; it stops feeding the detector, so speech onset cannot
   fire — **you cannot barge in while muted** (a second guard enforces this).
@@ -105,11 +105,13 @@ differ entirely in transport — keep this table current when adding a provider:
 - **Empty result means no generation.** Only finals become this turn's input;
 partials only refresh the UI. A blank result returns to listening with no
 answer and no context slot — why a cough buys nothing.
-- **Native realtime uplink is locally VAD-gated at all times.** Silence
-frames are not sent; the server sees the pre-roll plus locally confirmed
-speech only, so vendor server-VAD robustness differences cannot turn crowd
-noise into phantom turns. Server VAD still owns turn boundaries and barge-in
-semantics — over the filtered stream.
+- **Native realtime uplink and turn-taking are both local.** Silence frames
+are not sent; the provider sees pre-roll plus locally confirmed speech only.
+Session config disables automatic turn detection. At local utterance end,
+drain the single ordered uplink queue, then send `input_audio_buffer.commit`
+and `response.create`. Committing before the final queued speech frames can
+produce an empty or truncated first turn; omitting `response.create` leaves
+the committed turn unanswered. Local speech onset cancels an active response.
 - **Keep MiMo's protocol separate.** It shares chat-completions but its audio
   is a data-URI, its language option is vendor-specific, synthesis text sits
   in the assistant message and its voice table is its own — do not fold it
@@ -167,7 +169,7 @@ before the next recognition result, so nothing is spent on an answer about to
 be discarded); a backend interrupt event; and playback generation invalidation.
 There is no manual stop control — barge-in requires speaking.
 
-### Four typical branches
+### Typical branches
 Timelines build intuition faster than prose.
 **① Normal turn**
 
@@ -192,6 +194,11 @@ is dropped in Chatbot.
 routing and marks the session failed while keeping UI and session alive.
 Retry rebuilds the recording stream and the whole DSP chain, then re-runs
 start — it does not merely resume playback.
+**⑤ Native realtime turn**: local onset stops playback and cancels the active
+server response; locally confirmed speech plus pre-roll streams over the
+persistent connection; local end closes the uplink gate, drains queued frames,
+then commits and requests a response; server transcription/audio events drive
+Thinking/Speaking/Listening.
 
 ### Assistant voice presentation
 The call controller selects the chatbot backend for every pipeline; the

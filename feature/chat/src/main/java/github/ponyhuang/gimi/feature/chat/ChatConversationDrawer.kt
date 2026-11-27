@@ -379,14 +379,13 @@ private fun HistoryDrawerContent(
                     icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_linux),
                     label = stringResource(R.string.chat_drawer_local_environment),
                     isFirst = false,
-                    isLast = true,
+                    isLast = false,
                     onClick = onLocalEnvironmentClick,
                 )
-                Spacer(Modifier.height(12.dp))
                 DrawerFunctionEntry(
                     icon = Icons.Default.AutoAwesome,
                     label = stringResource(R.string.chat_drawer_personalize),
-                    isFirst = true,
+                    isFirst = false,
                     isLast = true,
                     onClick = onPersonalizeClick,
                 )
@@ -604,7 +603,7 @@ private fun DrawerFunctionEntry(
 // ── 自动播报开关 ────────────────────────────────────────────────
 
 /**
- * 自动语音播报卡片：开关 + 说明副标题，独立于跳转入口行成卡。
+ * 自动语音播报卡片：开关 + 说明文字，独立于跳转入口行成卡。
  * 从聊天顶栏下沉到抽屉：顶栏只留高频导航，低频持久开关归入抽屉设置区。
  *
  * @param enabled 自动播报全局开关当前值
@@ -635,18 +634,12 @@ private fun DrawerAutoSpeakCard(enabled: Boolean, onToggle: () -> Unit) {
                 tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(DrawerFunctionIconSize),
             )
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.chat_drawer_auto_speak_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             github.ponyhuang.gimi.ui.components.GimiSwitch(checked = enabled, onCheckedChange = null)
         }
     }

@@ -63,20 +63,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 聊天页 ViewModel — 维护消息列表并把 ADK `Event` 流合并到 UI 友好的 `Message` 模型。
+ * 管理聊天会话的界面状态，协调消息流、工具配置和失败轮次恢复。
  *
- * 核心算法（参考 `~/.claude/projects/E--workplace-adk-web/memory/chat-streaming-and-thought.md`）：
- * 事件归约算法（partial 合并 / 完整事件构造 / 工具确认捕获）已拆到 [AgentEventReducer]，
- * 本类负责会话编排；运行生命周期由 [ChatRunLifecycleCoordinator] 协调，工具配置由 [ChatToolConfigurationCoordinator]
- * 协调，失败轮恢复由 [ChatTurnRecoveryCoordinator] 协调。
- *
- * 持久化层：`buildMessageFromParts` 改走 `EventMapper.fromEvent(event)`，保证 streaming 与历史回放共用 `Event.id → Message.id` 映射。
- * 会话管理：通过 [ConversationRepository] 完成"新建 / 切换 / 删除 / 拉取会话列表"；导航和历史刷新由 [ChatSessionNavigationCoordinator] 协调。
- *
- * 取消语义：每个会话以 runToken 隔离事件，已接管的任务可在切换会话后继续。
- *
- * DI：通过 Hilt 注入 [PrepareChatSendUseCase] / [ConversationRepository]；UI 端用
- * `hiltViewModel()` 直接拿到实例，不再走原先的 `ChatViewModel.factory(context)`。
+ * [AgentEventReducer] 合并流式事件、构造完整消息并捕获工具确认。
+ * [ChatRunLifecycleCoordinator] 管理运行生命周期，按会话隔离事件；切换会话后，已启动的任务可继续运行。
+ * [ChatToolConfigurationCoordinator] 管理工具配置，[ChatTurnRecoveryCoordinator] 恢复失败轮次。
+ * [ChatSessionNavigationCoordinator] 协调会话导航与历史刷新，会话数据由 [ConversationRepository] 提供。
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -471,7 +463,8 @@ class ChatViewModel @Inject constructor(
             }
         }
         toolConfigurationCoordinator.expandPendingMarkers()
-        a2ui.sync(runtime.sessionId, runtime.messages)
+        a2ui.sync(runtime.sessionId, runtime.messages, progressive = runtime.job?.isActive == true &&
+            _uiState.value.sessionId == runtime.sessionId)
     }
 
 

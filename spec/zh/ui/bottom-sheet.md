@@ -128,7 +128,6 @@ inset 由组件负责：抽屉吃掉 `safeDrawing`，调用方不要再自己加
 | 权限模式 | `feature/chat` `ChatPermissionModeSheet` | 28% |
 | 聊天模型选择 | `feature/chat` `ChatModelPickerSheet` | 60%／90% |
 | Realtime 预设／详情 | `feature/chat` `RealtimeVoiceScreen` | 一级 50%，二/三级 90%（上限，短内容贴内容长） |
-| A2UI 详情抽屉 | `feature/chat` `ChatA2uiContainers` | 65%／90% |
 
 `feature/assistant` 的助手面板与折叠胶囊**没有**迁移：它们是 `Popup` 宿主而不是模态抽屉，
 自带拖拽把手，语义不同。

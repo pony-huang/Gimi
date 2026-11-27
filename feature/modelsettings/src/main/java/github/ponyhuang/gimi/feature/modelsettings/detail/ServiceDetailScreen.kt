@@ -56,9 +56,12 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.DeletionImpact
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelRole
+import github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.EndpointPolicy
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.modelcatalog.model.VisionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
@@ -411,8 +414,7 @@ private fun DetailPage(
             }
         }
     }
-    PreferenceSectionTitle(stringResource(R.string.modelsettings_section_access))
-    PreferenceGroupCard {
+    PreferenceGroupCard(modifier = Modifier.padding(top = 12.dp)) {
         PreferenceListItem(
             icon = Icons.Outlined.SettingsEthernet,
             title = stringResource(R.string.modelsettings_connection_settings),
@@ -806,6 +808,59 @@ private fun ServiceDetailPopulatedPreview() {
             ),
             onAction = {},
             onOpenUrl = {},
+        )
+    }
+}
+
+@Preview(name = "模型 · 浅色", showBackground = true, widthDp = 390, heightDp = 800, locale = "zh")
+@Preview(
+    name = "模型 · 深色", showBackground = true, widthDp = 390, heightDp = 800, locale = "zh",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ServiceDetailModelsSubpagePreview() {
+    val draft = PreviewDrafts.builtIn()
+    val connection = draft.connections.first()
+    val candidates = listOf(
+        // 带多模态输入能力：覆盖名称/ID 两行与视觉/文档/音频徽标形态。
+        Model(
+            "gpt-4.1",
+            "GPT-4.1",
+            multimodal = MultimodalCapabilities(
+                vision = VisionCapability(),
+                documentInput = DocumentInputCapability(),
+            ),
+        ),
+        Model("gpt-4.1-mini", "GPT-4.1 mini"),
+    ).map { ModelCandidateRow(connection.id, connection.capability, it) }
+    GimiTheme {
+        ModelsScreen(
+            state = ModelServiceDetailUiState(
+                draft = draft,
+                candidates = candidates,
+                pendingModelKeys = setOf(candidates.first().key),
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "模型 · 搜索无结果", showBackground = true, widthDp = 390, heightDp = 800, locale = "zh")
+@Composable
+private fun ServiceDetailModelsEmptyQueryPreview() {
+    val draft = PreviewDrafts.builtIn()
+    val connection = draft.connections.first()
+    val candidates = listOf(Model("gpt-4.1", "GPT-4.1"))
+        .map { ModelCandidateRow(connection.id, connection.capability, it) }
+    GimiTheme {
+        ModelsScreen(
+            state = ModelServiceDetailUiState(
+                draft = draft,
+                candidates = candidates,
+                modelQuery = "zzz",
+                pendingModelKeys = setOf(candidates.first().key),
+            ),
+            onAction = {},
         )
     }
 }

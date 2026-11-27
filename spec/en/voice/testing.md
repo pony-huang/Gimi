@@ -14,9 +14,10 @@ routing, call controller, notification). The fake-event helper
 `DashScopeTestEvents` travels with them. The Realtime native path spans
 `OpenAiRealtimeProtocolTest` / `OpenAiRealtimeModelTest` and
 `QwenRealtimeProtocolTest` / `QwenRealtimeModelTest` (MockWebServer WS:
-config-first framing, buffered uplink flush, event mapping, barge-in semantics
-(truncate / silent window), handshake classification, and the duplex-applicable
-subset of the single-receiver/close-unblocks contract), the vendor speech
+config-first framing with `turn_detection = null`, buffered uplink flush, ordered
+local commit + response trigger, event mapping, explicit barge-in cancellation
+(OpenAI truncate / Qwen silent window), handshake classification, and the
+duplex-applicable subset of the single-receiver/close-unblocks contract), the vendor speech
 adapter tests (DashScope / MiniMax / MiMo / OpenAI-compatible audio) in
 `:data:modelaccess`; the
 `Pcm16ResamplerTest` contract in `:core:audio`, and `SpeechModelProviderTest`

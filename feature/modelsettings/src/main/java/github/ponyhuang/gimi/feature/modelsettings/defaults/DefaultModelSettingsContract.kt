@@ -34,8 +34,6 @@ data class DefaultModelSettingsUiState(
     val ttsVoiceId: String = "",
     val ttsVoiceOptions: List<TtsVoice> = emptyList(),
     val isTtsVoiceLoading: Boolean = false,
-    /** TTS 服务是否允许填写内置音色表之外的音色 ID（声音复刻、基础音色）。 */
-    val ttsVoiceCustomInputAllowed: Boolean = false,
     /** 待呈现的一次性通知；Route 呈现后经 [DefaultModelSettingsAction.ConsumeNotice] 清除。 */
     val notice: DefaultModelSettingsNotice? = null,
     val chatModels: List<SelectableModelRow> = emptyList(),
@@ -45,6 +43,14 @@ data class DefaultModelSettingsUiState(
     val realtimeSelection: ModelSelection? = null,
     /** Realtime 候选模型；只包含已接入原生 Realtime 适配器的模板。 */
     val realtimeModels: List<SelectableModelRow> = emptyList(),
+    /** Realtime 自定义音色覆盖；null 表示跟随模型缺省音色。 */
+    val realtimeVoiceId: String? = null,
+    /** 当前生效的 Realtime 音色 ID（自定义覆盖或模型缺省音色）。 */
+    val realtimeActiveVoiceId: String = "",
+    val realtimeDefaultVoiceId: String = "",
+    val realtimeDefaultVoiceName: String = "",
+    val realtimeVoiceOptions: List<TtsVoice> = emptyList(),
+    val isRealtimeVoiceLoading: Boolean = false,
     val dialog: DefaultModelDialog? = null,
     val isMutationBlocked: Boolean = false,
 )
@@ -56,6 +62,7 @@ enum class DefaultModelDialog {
     Tts,
     TtsVoice,
     RealtimeModel,
+    RealtimeVoice,
 }
 
 sealed interface DefaultModelSettingsAction {
@@ -65,6 +72,8 @@ sealed interface DefaultModelSettingsAction {
         val selection: ModelSelection,
     ) : DefaultModelSettingsAction
     data class SelectVoice(val voiceId: String) : DefaultModelSettingsAction
+    /** 选择或恢复 Realtime 音色；null 或等于默认音色时重置为跟随模型缺省。 */
+    data class SelectRealtimeVoice(val voiceId: String?) : DefaultModelSettingsAction
     /**
      * 选择 Realtime 默认模型；null 表示未配置（Realtime 模式随之不可进入）。
      * 选择器只发非空选择，null 仅供配置归一化/清除路径使用。

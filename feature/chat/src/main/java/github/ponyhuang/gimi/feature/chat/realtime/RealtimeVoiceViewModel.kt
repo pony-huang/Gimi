@@ -173,11 +173,8 @@ data class VoiceSettingsUiState(
     /** 级联／半级联合成音色选项；随草稿合成模型变化。 */
     val synthesisVoiceOptions: List<TtsVoice> = emptyList(),
     val isSynthesisVoiceLoading: Boolean = false,
-    /** 合成服务是否允许填写内置音色表之外的音色 ID（声音复刻、基础音色）。 */
-    val synthesisVoiceCustomInputAllowed: Boolean = false,
     /** 所选实时模型在该厂商下的可选会话音色。 */
     val realtimeVoiceOptions: List<TtsVoice> = emptyList(),
-    val realtimeCustomVoiceAllowed: Boolean = false,
     /** 所选实时模型的厂商缺省会话音色 ID。 */
     val realtimeDefaultVoice: String = "",
 )
@@ -971,11 +968,9 @@ class RealtimeVoiceViewModel @Inject constructor(
                 voiceCatalog.builtInVoices(synthesisTemplateId)
             },
             isSynthesisVoiceLoading = snapshot.isSynthesisVoiceLoading,
-            synthesisVoiceCustomInputAllowed = voiceCatalog.allowsCustomVoice(synthesisTemplateId),
             realtimeVoiceOptions = snapshot.effective.realtimeModel
                 ?.let { selection -> realtimeSupport?.voicesFor(selection.modelId) }
                 .orEmpty(),
-            realtimeCustomVoiceAllowed = realtimeSupport?.customVoiceAllowed == true,
             realtimeDefaultVoice = snapshot.effective.realtimeModel
                 ?.let { selection -> realtimeSupport?.defaultVoiceFor(selection.modelId) }
                 .orEmpty(),

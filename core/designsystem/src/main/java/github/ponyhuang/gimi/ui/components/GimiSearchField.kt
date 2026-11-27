@@ -30,7 +30,7 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
 fun GimiSearchField(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
+    placeholder: String = "",
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     trailingIcon: (@Composable () -> Unit)? = null,
@@ -40,14 +40,16 @@ fun GimiSearchField(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = {
-            // 单行省略：长占位换行会撑高输入框，让同一抽屉里的搜索框高度不一致。
-            Text(
-                text = placeholder,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
+        placeholder = if (placeholder.isNotEmpty()) {
+            {
+                // 单行省略：长占位换行会撑高输入框，让同一抽屉里的搜索框高度不一致。
+                Text(
+                    text = placeholder,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else null,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         singleLine = true,

@@ -57,6 +57,18 @@ class ChatbotConversationWriterTest {
     }
 
     @Test
+    fun currentHistoryIncludesEventsWrittenWhileTheCallLeaseIsHeld() = runTest {
+        sessions.createSession(key)
+        val call = store().bind("conversation")
+        call.acquire()
+        call.enqueue(Content.fromText(Role.USER, "重连前的问题"))
+        call.flush()
+
+        assertEquals(listOf("重连前的问题"), call.currentHistory().map { it.parts.single().text })
+        call.release()
+    }
+
+    @Test
     fun resolveMemoizesTheCurrentConversationForWriteOnlyCallers() = runTest {
         coEvery { resolver.resolveCurrentOrCreate() } returns "conversation"
         sessions.createSession(key)

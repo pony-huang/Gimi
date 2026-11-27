@@ -37,6 +37,7 @@ import kotlinx.coroutines.cancelAndJoin
 import github.ponyhuang.gimi.data.agent.a2ui.A2uiCreateScope
 import github.ponyhuang.gimi.data.agent.a2ui.taskResult
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
+import github.ponyhuang.gimi.domain.a2ui.A2uiToolResult
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus
 
 /** 单轮执行句柄，恢复只使用创建时的 Runner 与元数据，不访问全局配置或 LRU。 */
@@ -306,14 +307,10 @@ class AgentChatExecution internal constructor(
 
     /** 正文与创建并行；结果在 Runner 结束后归档，整轮完成仍等待所有卡片。 */
     private fun Flow<Event>.withAsyncA2uiCreates(): Flow<Event> = channelFlow {
-        val creates = A2uiCreateScope(this)
         var stoppedBySdkError = false
-        suspend fun persist(result: Map<String, Any>): Event? {
+        fun snapshotEvent(result: Map<String, Any>): Event {
             val task = requireNotNull(A2uiGenerationTaskCodec.extract(result))
-            val session = runner.sessionService.getSession(
-                SessionKey(AgentChatRunner.APP_NAME, userId, sessionId),
-            ) ?: return null
-            val event = Event(
+            return Event(
                 author = A2uiGenerationTaskCodec.AUTHOR,
                 invocationId = task.invocationId,
                 content = Content(role = Role.SYSTEM, parts = listOf(Part(
@@ -321,14 +318,26 @@ class AgentChatExecution internal constructor(
                 ))),
                 customMetadata = mapOf(A2uiGenerationTaskCodec.RESULT_KEY to result),
             )
-            runner.sessionService.appendEvent(session, event)
-            return event
+        }
+        val creates = A2uiCreateScope(this) { send(snapshotEvent(it)) }
+        suspend fun persist(result: Map<String, Any>): Event? {
+            val session = runner.sessionService.getSession(
+                SessionKey(AgentChatRunner.APP_NAME, userId, sessionId),
+            ) ?: return null
+            return snapshotEvent(result).also { runner.sessionService.appendEvent(session, it) }
         }
         try {
             withContext(creates) {
                 try {
                     this@withAsyncA2uiCreates.collect { event ->
                         send(event)
+                        event.content?.parts.orEmpty().mapNotNull { it.functionResponse }
+                            .filter { it.name == A2uiToolResult.TOOL_NAME }.forEach { response ->
+                            val body = (response.response["result"] as? Map<*, *>) ?: response.response
+                            // ADK 的工具响应在不同执行路径上可能带 result 包装。
+                            val surfaceId = body["surfaceId"] as? String
+                            if (surfaceId != null && body["status"] == "pending") creates.markPendingSent(surfaceId)
+                        }
                         // SDK 错误事件也属于失败：投递后立即在 Runner 流的上游侧中止收集，
                         // 避免 Runner 正常收尾把该 invocation 记为已完成、重试不再调用模型。
                         // 失败异常仍由下游 transform 抛出，保证错误事件先被业务侧收到。
@@ -342,18 +351,26 @@ class AgentChatExecution internal constructor(
             }
             if (!stoppedBySdkError) {
                 for (entry in creates.snapshot()) {
-                    val result = entry.result.await()
-                    val event = persist(entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED))) ?: result)
+                    creates.markPendingSent(entry.task.surfaceId)
+                    val liveResult = entry.liveDelivery.await()
+                    val archived = entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED)))
+                        ?: liveResult
+                    val event = persist(archived)
                     entry.delivered = true
-                    if (event != null) send(event)
+                    if (event != null && archived != liveResult) send(event)
                 }
             }
         } finally {
             // 停止、模型错误或宿主销毁都结束尚未交付的占位；不能留下永久 loading。
             withContext(NonCancellable) {
                 for (entry in creates.snapshot().filterNot { it.delivered }) {
+                    entry.liveDelivery.cancelAndJoin()
                     entry.result.cancelAndJoin()
-                    persist(taskResult(entry.task.copy(status = A2uiGenerationStatus.CANCELLED)))
+                    // 已投递的终态保留到历史，避免用户随后停止正文时撤销已显示的卡片。
+                    val deliveredResult = if (!entry.liveDelivery.isCancelled) entry.liveDelivery.await() else null
+                    val archived = entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED)))
+                        ?: deliveredResult ?: taskResult(entry.task.copy(status = A2uiGenerationStatus.CANCELLED))
+                    persist(archived)
                 }
             }
         }

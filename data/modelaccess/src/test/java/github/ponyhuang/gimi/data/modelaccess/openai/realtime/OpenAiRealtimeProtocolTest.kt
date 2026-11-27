@@ -72,14 +72,26 @@ class OpenAiRealtimeProtocolTest {
         assertEquals(24_000, input.getAsJsonObject("format").get("rate").asInt)
         assertEquals("gpt-4o-transcribe", input.getAsJsonObject("transcription").get("model").asString)
 
-        val vad = input.getAsJsonObject("turn_detection")
-        assertEquals("server_vad", vad.get("type").asString)
-        assertEquals(OpenAiRealtimeProtocol.DEFAULT_SILENCE_DURATION_MS, vad.get("silence_duration_ms").asLong)
-        assertEquals(true, vad.get("create_response").asBoolean)
-        assertEquals(true, vad.get("interrupt_response").asBoolean)
+        // 判轮完全由客户端本地 VAD 负责，服务端不得再自动提交或触发响应。
+        assertTrue(input.get("turn_detection").isJsonNull)
 
         val output = session.getAsJsonObject("audio").getAsJsonObject("output")
         assertEquals(24_000, output.getAsJsonObject("format").get("rate").asInt)
+    }
+
+    @Test
+    fun `local VAD turn control commits audio before requesting a response`() {
+        val controls = OpenAiRealtimeProtocol.commitAudioTurn()
+
+        assertEquals(
+            listOf("input_audio_buffer.commit", "response.create"),
+            controls.map { it.get("type").asString },
+        )
+    }
+
+    @Test
+    fun `local barge in can cancel the active response`() {
+        assertEquals("response.cancel", OpenAiRealtimeProtocol.cancelResponse().get("type").asString)
     }
 
     @Test
@@ -137,6 +149,117 @@ class OpenAiRealtimeProtocolTest {
     }
 
     @Test
+    fun createMessageItemCreatesUserMessageWithoutId() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.USER,
+            parts = listOf(com.google.adk.kt.types.Part(text = "hi")),
+        )
+        val payload = OpenAiRealtimeProtocol.createMessageItem(content)
+        assertEquals("conversation.item.create", payload.get("type").asString)
+        val item = payload.getAsJsonObject("item")
+        assertNull(item.get("id"))
+        assertEquals("message", item.get("type").asString)
+        assertEquals("user", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals(1, parts.size())
+        assertEquals("input_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("hi", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun createMessageItemCreatesAssistantMessageWithOutputTextType() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.MODEL,
+            parts = listOf(com.google.adk.kt.types.Part(text = "Hello! How can I help you today?")),
+        )
+        val payload = OpenAiRealtimeProtocol.createMessageItem(content, "msg-assistant-1")
+        assertEquals("conversation.item.create", payload.get("type").asString)
+        val item = payload.getAsJsonObject("item")
+        assertEquals("msg-assistant-1", item.get("id").asString)
+        assertEquals("message", item.get("type").asString)
+        assertEquals("assistant", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals(1, parts.size())
+        assertEquals("output_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("Hello! How can I help you today?", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun createMessageItemCreatesSystemMessageWithInputTextType() {
+        val content = com.google.adk.kt.types.Content(
+            role = com.google.adk.kt.types.Role.SYSTEM,
+            parts = listOf(com.google.adk.kt.types.Part(text = "system context")),
+        )
+        val payload = OpenAiRealtimeProtocol.createMessageItem(content)
+        val item = payload.getAsJsonObject("item")
+        assertEquals("system", item.get("role").asString)
+        val parts = item.getAsJsonArray("content")
+        assertEquals("input_text", parts[0].asJsonObject.get("type").asString)
+        assertEquals("system context", parts[0].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun historyMessagesFiltersThoughtAndNonImageAttachments() {
+        val history = listOf(
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.USER,
+                parts = listOf(com.google.adk.kt.types.Part(text = "第一问")),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.MODEL,
+                parts = listOf(com.google.adk.kt.types.Part(text = "内部思考", thought = true)),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.MODEL,
+                parts = listOf(
+                    com.google.adk.kt.types.Part(text = "中间思考", thought = true),
+                    com.google.adk.kt.types.Part(text = "第一答"),
+                ),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.USER,
+                parts = listOf(
+                    com.google.adk.kt.types.Part(inlineData = com.google.adk.kt.types.Blob(
+                        mimeType = "application/pdf", data = byteArrayOf(1),
+                    )),
+                ),
+            ),
+            com.google.adk.kt.types.Content(
+                role = com.google.adk.kt.types.Role.USER,
+                parts = listOf(
+                    com.google.adk.kt.types.Part(text = "配图问题"),
+                    com.google.adk.kt.types.Part(inlineData = com.google.adk.kt.types.Blob(
+                        mimeType = "image/png", data = byteArrayOf(9, 8, 7),
+                    )),
+                ),
+            ),
+        )
+        val payloads = OpenAiRealtimeProtocol.historyMessages(history)
+        assertEquals(3, payloads.size)
+
+        // 1. 用户第一问
+        val item0 = payloads[0].getAsJsonObject("item")
+        assertEquals("user", item0.get("role").asString)
+        assertEquals("第一问", item0.getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+
+        // 2. 助手第一答（思考过滤后保留文本）
+        val item1 = payloads[1].getAsJsonObject("item")
+        assertEquals("assistant", item1.get("role").asString)
+        assertEquals("output_text", item1.getAsJsonArray("content")[0].asJsonObject.get("type").asString)
+        assertEquals("第一答", item1.getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+
+        // 3. 用户配图问（PDF 过滤、PNG 保留）
+        val item2 = payloads[2].getAsJsonObject("item")
+        assertEquals("user", item2.get("role").asString)
+        val parts2 = item2.getAsJsonArray("content")
+        assertEquals(2, parts2.size())
+        assertEquals("input_text", parts2[0].asJsonObject.get("type").asString)
+        assertEquals("配图问题", parts2[0].asJsonObject.get("text").asString)
+        assertEquals("input_image", parts2[1].asJsonObject.get("type").asString)
+        assertEquals("data:image/png;base64,CQgH", parts2[1].asJsonObject.get("image_url").asString)
+    }
+
+    @Test
     fun `connectRequest maps wss to https and appends model query`() {
         val request: Request = OpenAiRealtimeProtocol.connectRequest(
             "wss://api.openai.com/v1/realtime", "gpt-realtime-2.1", apiKey = "sk-test",
@@ -144,6 +267,18 @@ class OpenAiRealtimeProtocolTest {
         assertEquals("https://api.openai.com/v1/realtime?model=gpt-realtime-2.1", request.url.toString())
         assertEquals("Bearer sk-test", request.headers.get("Authorization"))
         assertNull(request.headers.get("OpenAI-Beta"))
+    }
+
+    @Test
+    fun `connectRequest supports callId and intent parameters`() {
+        val request: Request = OpenAiRealtimeProtocol.connectRequest(
+            baseUrl = "wss://api.openai.com/v1/realtime",
+            model = "",
+            apiKey = "sk-test",
+            callId = "call_abc123",
+            intent = "transcription",
+        )
+        assertEquals("https://api.openai.com/v1/realtime?call_id=call_abc123&intent=transcription", request.url.toString())
     }
 
     @Test

@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.modelaccess.openai.realtime
 
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.gson.JsonArray
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import github.ponyhuang.gimi.core.audio.Pcm16Resampler
 import github.ponyhuang.gimi.data.modelaccess.shared.openAiFunctionToolArray
@@ -37,38 +38,76 @@ internal object OpenAiRealtimeProtocol {
     }
 
 
-    /** 一次手动消息的文字和图片必须属于同一个用户事件。 */
-    fun userMessage(content: com.google.adk.kt.types.Content, itemId: String): JsonObject {
-        require(content.role == com.google.adk.kt.types.Role.USER && content.parts.isNotEmpty())
+    /**
+     * 构建消息类型的 [CLIENT_ITEM_CREATE] 事件。
+     * 用户消息文本使用 input_text、图片使用 input_image；助手消息使用 output_text；系统消息使用 input_text。
+     */
+    fun createMessageItem(content: com.google.adk.kt.types.Content, itemId: String? = null): JsonObject {
+        val roleStr = when (content.role) {
+            com.google.adk.kt.types.Role.USER -> "user"
+            com.google.adk.kt.types.Role.MODEL -> "assistant"
+            com.google.adk.kt.types.Role.SYSTEM -> "system"
+            else -> throw IllegalArgumentException("Unsupported role for realtime conversation item: ${content.role}")
+        }
         val parts = JsonArray()
         content.parts.forEach { part ->
-            parts.add(JsonObject().apply {
-                if (part.text != null) {
-                    addProperty("type", "input_text")
+            if (part.thought == true) return@forEach
+            if (part.text != null) {
+                parts.add(JsonObject().apply {
+                    addProperty("type", if (roleStr == "assistant") "output_text" else "input_text")
                     addProperty("text", part.text)
-                } else {
-                    val blob = requireNotNull(part.inlineData)
-                    require(blob.mimeType in setOf("image/jpeg", "image/png", "image/webp", "image/gif"))
+                })
+            } else if (part.inlineData != null && roleStr == "user") {
+                val blob = requireNotNull(part.inlineData)
+                require(blob.mimeType in setOf("image/jpeg", "image/png", "image/webp", "image/gif")) {
+                    "Unsupported image mimeType: ${blob.mimeType}"
+                }
+                parts.add(JsonObject().apply {
                     addProperty("type", "input_image")
                     addProperty("image_url", "data:${blob.mimeType};base64,${requireNotNull(blob.data).toByteString().base64()}")
-                }
-            })
+                })
+            }
         }
+        require(parts.size() > 0) { "Message item content parts must not be empty" }
         return JsonObject().apply {
-            addProperty("type", "conversation.item.create")
+            addProperty("type", CLIENT_ITEM_CREATE)
             add("item", JsonObject().apply {
-                addProperty("id", itemId)
+                if (itemId != null) {
+                    addProperty("id", itemId)
+                }
                 addProperty("type", "message")
-                addProperty("role", "user")
+                addProperty("role", roleStr)
                 add("content", parts)
             })
         }
+    }
+
+    /** 一次手动消息的文字和图片必须属于同一个用户事件。 */
+    fun userMessage(content: com.google.adk.kt.types.Content, itemId: String): JsonObject {
+        require(content.role == com.google.adk.kt.types.Role.USER)
+        return createMessageItem(content, itemId)
+    }
+
+    /**
+     * 将会话历史转为 [CLIENT_ITEM_CREATE] 客户端事件列表，用于在新全双工会话初始化时注入历史上下文。
+     * 过滤思考过程、不支持的非图片附件及空轮次。
+     */
+    fun historyMessages(history: List<com.google.adk.kt.types.Content>): List<JsonObject> = history.mapNotNull { content ->
+        val filteredParts = content.parts.filter { part ->
+            part.thought != true && (
+                part.text != null ||
+                (content.role == com.google.adk.kt.types.Role.USER && part.inlineData?.mimeType in setOf("image/jpeg", "image/png", "image/webp", "image/gif"))
+            )
+        }
+        if (filteredParts.isEmpty()) null
+        else runCatching { createMessageItem(content.copy(parts = filteredParts)) }.getOrNull()
     }
 
     // —— 客户端事件类型 ——
 
     private const val CLIENT_SESSION_UPDATE = "session.update"
     private const val CLIENT_APPEND_AUDIO = "input_audio_buffer.append"
+    private const val CLIENT_COMMIT_AUDIO = "input_audio_buffer.commit"
     private const val CLIENT_TRUNCATE = "conversation.item.truncate"
     private const val CLIENT_CANCEL_RESPONSE = "response.cancel"
     private const val CLIENT_ITEM_CREATE = "conversation.item.create"
@@ -91,20 +130,14 @@ internal object OpenAiRealtimeProtocol {
     /** 会话输入转写模型：用户侧字幕的服务端来源；不指定语言，交给服务端自动检测。 */
     private const val INPUT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe"
 
-    /** server_vad 的静音判轮时长（毫秒）；GA 默认值，中文对话实测后再调。 */
-    const val DEFAULT_SILENCE_DURATION_MS = 500L
-
-    /** server_vad 的其余参数取 GA 默认（threshold 0.5 / prefix_padding 300ms）。 */
-    private const val DEFAULT_PREFIX_PADDING_MS = 300L
-
     /**
      * 构建会话配置；连接握手成功后发送一次，`session.updated` 确认前不允许上行音频。
-     * [tools] 非空时按 GA 扁平结构携带 function 工具声明（实时助手模式）。
+     * 判轮完全由客户端本地 VAD 负责，因此关闭服务端自动判轮；[tools] 非空时按 GA
+     * 扁平结构携带 function 工具声明（实时助手模式）。
      */
     fun sessionUpdate(
         instructions: String,
         voice: String,
-        silenceDurationMs: Long = DEFAULT_SILENCE_DURATION_MS,
         tools: List<FunctionDeclaration> = emptyList(),
     ): JsonObject {
         val inputFormat = JsonObject().apply {
@@ -114,18 +147,10 @@ internal object OpenAiRealtimeProtocol {
         val transcription = JsonObject().apply {
             addProperty("model", INPUT_TRANSCRIPTION_MODEL)
         }
-        val turnDetection = JsonObject().apply {
-            addProperty("type", "server_vad")
-            addProperty("threshold", 0.5)
-            addProperty("prefix_padding_ms", DEFAULT_PREFIX_PADDING_MS)
-            addProperty("silence_duration_ms", silenceDurationMs)
-            addProperty("create_response", true)
-            addProperty("interrupt_response", true)
-        }
         val audioInput = JsonObject().apply {
             add("format", inputFormat)
             add("transcription", transcription)
-            add("turn_detection", turnDetection)
+            add("turn_detection", JsonNull.INSTANCE)
         }
         val audioOutput = JsonObject().apply {
             add("format", JsonObject().apply {
@@ -191,20 +216,39 @@ internal object OpenAiRealtimeProtocol {
         addProperty("type", CLIENT_CREATE_RESPONSE)
     }
 
-    /** 构建 wss 连接请求：模型走查询参数，密钥走 Bearer 头；GA 不需要 Beta 头。 */
-    fun connectRequest(baseUrl: String, model: String, apiKey: String): Request {
+    /** 本地 VAD 判轮结束：先提交音频，再显式请求模型响应。 */
+    fun commitAudioTurn(): List<JsonObject> = listOf(
+        JsonObject().apply { addProperty("type", CLIENT_COMMIT_AUDIO) },
+        createResponse(),
+    )
+
+    /** 构建 wss 连接请求：模型/通话 ID/意图走查询参数，密钥走 Bearer 头；GA 不需要 Beta 头。 */
+    fun connectRequest(
+        baseUrl: String,
+        model: String,
+        apiKey: String,
+        callId: String? = null,
+        intent: String? = null,
+    ): Request {
         // 目录允许的地址协议是 wss；OkHttp 只接受 http/https，wss/ws 映射为 https/http。
         val normalized = when {
             baseUrl.startsWith("wss://", ignoreCase = true) -> "https://" + baseUrl.substring(5)
             baseUrl.startsWith("ws://", ignoreCase = true) -> "http://" + baseUrl.substring(5)
             else -> baseUrl
         }
-        val url = normalized.toHttpUrlOrNull()?.newBuilder()
-            ?.addQueryParameter("model", model)
-            ?.build()
+        val builder = normalized.toHttpUrlOrNull()?.newBuilder()
             ?: throw IllegalArgumentException("非法的 Realtime 接入地址：$baseUrl")
+        if (model.isNotBlank()) {
+            builder.addQueryParameter("model", model)
+        }
+        if (!callId.isNullOrBlank()) {
+            builder.addQueryParameter("call_id", callId)
+        }
+        if (!intent.isNullOrBlank()) {
+            builder.addQueryParameter("intent", intent)
+        }
         return Request.Builder()
-            .url(url)
+            .url(builder.build())
             .header("Authorization", "Bearer $apiKey")
             .build()
     }

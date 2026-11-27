@@ -997,13 +997,6 @@ private fun ChatbotModeIntro(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.chatbot_intro_hint, stringResource(R.string.chat_mode_assistant)),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 

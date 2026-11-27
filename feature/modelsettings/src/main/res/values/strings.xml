@@ -66,6 +66,7 @@
     <string name="modelsettings_defaults_voice_title">播放音色</string>
     <string name="modelsettings_defaults_section_realtime">Realtime</string>
     <string name="modelsettings_defaults_realtime_model_title">Realtime 模型</string>
+    <string name="modelsettings_realtime_default_voice_format">%1$s（默认音色）</string>
 
     <string name="modelsettings_dialog_pick_assistant">选择默认模型</string>
     <string name="modelsettings_dialog_pick_quick">选择快速模型</string>
@@ -201,10 +202,10 @@
     <string name="modelsettings_shared_credential_hint">对话与语音使用此密钥</string>
     <string name="modelsettings_toggle_key_visibility">显示或隐藏密钥</string>
     <string name="modelsettings_get_api_key">获取密钥</string>
-    <string name="modelsettings_section_available_models">可用模型</string>
+    <string name="modelsettings_section_available_models">模型</string>
     <string name="modelsettings_no_capabilities">尚未选择模型</string>
     <string name="modelsettings_selected_count">已选 %1$d 个</string>
-    <string name="modelsettings_section_access">接入设置</string>
+    <string name="modelsettings_section_access">服务配置</string>
     <string name="modelsettings_connection_settings">接口设置</string>
     <string name="modelsettings_connection_settings_subtitle">连接地址、密钥来源与连接测试</string>
     <string name="modelsettings_official_tools">厂商工具</string>
@@ -216,7 +217,6 @@
     <string name="modelsettings_save_new_service">保存服务</string>
     <string name="modelsettings_save_with_defaults">保存服务与默认选择</string>
     <string name="modelsettings_confirm_models">确认选择（%1$d）</string>
-    <string name="modelsettings_models_confirm_hint">确认后返回服务详情，保存服务后生效。</string>
     <string name="modelsettings_delete_service">删除服务</string>
     <string name="modelsettings_delete_dialog_title">删除“%1$s”？</string>
     <string name="modelsettings_delete_dialog_body">将删除这套服务的连接配置、密钥和模型选择。</string>
@@ -235,9 +235,14 @@
     <string name="modelsettings_add_model_kind_label">模型类别</string>
     <string name="modelsettings_add_model_kind_hint">类别决定该模型承担的用途（对话、识别、合成或实时语音）。</string>
     <string name="modelsettings_add">添加</string>
-    <string name="modelsettings_models_empty_hint">没有可选择的模型；可以从对话连接获取候选或手动添加。</string>
     <string name="modelsettings_search_models">搜索模型名称或 ID</string>
     <string name="modelsettings_category_all">全部</string>
+    <string name="modelsettings_models_summary">已选 %1$d · 候选 %2$d</string>
+    <string name="modelsettings_model_badge_vision">视觉</string>
+    <string name="modelsettings_model_badge_documents">文档</string>
+    <string name="modelsettings_model_badge_audio">音频</string>
+    <string name="modelsettings_empty_query_title">没有匹配「%1$s」的模型</string>
+    <string name="modelsettings_empty_query_hint">换个关键词，或切换类别筛选</string>
     <!-- 接口设置 -->
     <string name="modelsettings_field_protocol">接口协议</string>
     <string name="modelsettings_protocol_locked_hint">该服务固定使用此接口协议，不可更换。</string>

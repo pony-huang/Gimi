@@ -140,10 +140,9 @@
     <string name="chat_stt_configure_default_first">请先在设置中配置语音识别模型</string>
 
     <!-- ChatConversationDrawer -->
-    <string name="chat_drawer_auto_speak">自动播放</string>
+    <string name="chat_drawer_auto_speak">回复生成后自动朗读</string>
     <string name="chat_drawer_plugins">插件</string>
     <string name="chat_drawer_local_environment">本地环境</string>
-    <string name="chat_drawer_auto_speak_subtitle">回复生成后自动朗读</string>
     <string name="chat_drawer_personalize">个性化选项</string>
     <string name="chat_drawer_empty_history">暂无最近会话</string>
     <string name="chat_drawer_current_session_protected">当前会话不可删除</string>
@@ -251,67 +250,55 @@
     <string name="chat_official_tool_deepseek_web_fetch">网页抓取</string>
     <string name="chat_official_tool_deepseek_web_search_description">搜索网页，返回链接、摘要和可选正文。</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">抓取指定网页，返回标题和 Markdown 正文。</string>
+    <string name="chat_a2ui_table_empty">没有匹配的行</string>
+    <string name="chat_a2ui_sort_asc">升序</string>
+    <string name="chat_a2ui_sort_desc">降序</string>
+    <string name="chat_a2ui_subtotal">小计</string>
+    <string name="chat_a2ui_tax">税费</string>
+    <string name="chat_a2ui_shipping">运费</string>
+    <string name="chat_a2ui_shipping_free">免运费</string>
+    <string name="chat_a2ui_discount">折扣</string>
+    <string name="chat_a2ui_total">合计</string>
+    <string name="chat_a2ui_feels">体感</string>
+    <string name="chat_a2ui_humidity">湿度</string>
+    <string name="chat_a2ui_wind">风速</string>
+    <string name="chat_a2ui_weather_high">最高 %1$s</string>
+    <string name="chat_a2ui_weather_low">最低 %1$s</string>
+    <string name="chat_a2ui_chart_empty">暂无图表数据</string>
+    <string name="chat_a2ui_over_period">区间涨跌</string>
+    <string name="chat_a2ui_ohlc_open">开</string>
+    <string name="chat_a2ui_ohlc_high">高</string>
+    <string name="chat_a2ui_ohlc_low">低</string>
+    <string name="chat_a2ui_ohlc_close">收</string>
+    <string name="chat_a2ui_agenda_empty">暂无日程</string>
+    <string name="chat_a2ui_agenda_all_day">全天</string>
+    <string name="chat_a2ui_table_rows">%1$d 行</string>
+    <string name="chat_a2ui_table_range">%1$d–%2$d / %3$d</string>
+    <string name="chat_a2ui_prev_page">上一页</string>
+    <string name="chat_a2ui_next_page">下一页</string>
+    <string name="chat_a2ui_selected_count">已选 %1$d 项</string>
+    <string name="chat_a2ui_sample">示例数据</string>
+    <string name="chat_a2ui_stock_trend">趋势从 %1$s 到 %2$s</string>
     <string name="chat_a2ui_failed">界面暂时无法显示，请让助手重试。</string>
     <string name="chat_a2ui_link_failed">无法打开链接</string>
     <string name="chat_a2ui_audio">音频</string>
+    <string name="chat_a2ui_music_open_netease">在音乐客户端中打开</string>
+    <string name="chat_a2ui_music_like">红心收藏</string>
+    <string name="chat_a2ui_music_unlike">取消红心收藏</string>
+    <string name="chat_a2ui_music_play">播放</string>
+    <string name="chat_a2ui_music_pause">暂停</string>
+    <string name="chat_a2ui_music_previous">上一首</string>
+    <string name="chat_a2ui_music_next">下一首</string>
+    <string name="chat_a2ui_music_open_queue">展开播放队列</string>
+    <string name="chat_a2ui_music_queue_title">当前播放队列</string>
+    <string name="chat_a2ui_music_queue_count">（%1$d 首）</string>
+    <string name="chat_a2ui_music_trial_badge">试听 · VIP</string>
+    <string name="chat_a2ui_music_vip_badge">VIP</string>
 
-    <!-- A2UI 天气卡片 -->
-    <string name="chat_weather_today">今天</string>
-    <string name="chat_weather_updated_at">更新于 %1$s</string>
-    <string name="chat_weather_temperature_value">%1$d°</string>
-    <string name="chat_weather_percent_value">%1$d%%</string>
-    <string name="chat_weather_not_available">—</string>
-    <string name="chat_weather_metric_humidity">湿度</string>
-    <string name="chat_weather_metric_wind">风</string>
-    <string name="chat_weather_metric_precipitation">降水</string>
-    <string name="chat_weather_wind_speed">%1$d km/h</string>
-    <string name="chat_weather_condition_clear">晴</string>
-    <string name="chat_weather_condition_partly_cloudy">晴间多云</string>
-    <string name="chat_weather_condition_cloudy">多云</string>
-    <string name="chat_weather_condition_rain">阵雨</string>
-    <string name="chat_weather_condition_thunderstorm">雷阵雨</string>
-    <string name="chat_weather_condition_snow">小雪</string>
-    <string name="chat_weather_condition_fog">雾</string>
-    <string name="chat_weather_condition_wind">大风</string>
-    <string name="chat_weather_condition_unknown">未知天气</string>
 
-    <!-- A2UI 通用音乐播放器 -->
-    <string name="chat_player_open">打开播放器</string>
-    <string name="chat_player_open_named">在%1$s中打开</string>
-    <string name="chat_player_next">下一首</string>
-    <string name="chat_player_play">播放</string>
-    <string name="chat_player_pause">暂停</string>
-    <string name="chat_player_artwork">专辑封面</string>
-    <string name="chat_player_generic_name">音乐</string>
 
-    <!-- A2UI 新闻列表 -->
-    <!-- A2UI 只读数据表格 -->
-    <string name="chat_table_default_heading">表格</string>
-    <string name="chat_table_empty">暂无数据</string>
-    <string name="chat_table_copy">复制表格</string>
-    <string name="chat_table_export_image">保存为图片</string>
-    <string name="chat_table_expand">全屏查看</string>
-    <string name="chat_table_share">分享表格</string>
-    <string name="chat_table_close">关闭</string>
-    <string name="chat_table_export_failed">表格导出失败</string>
     <string name="chat_timeline_steps">%1$d 个步骤</string>
     <string name="chat_timeline_elapsed">共 %1$.1f 秒</string>
-    <string name="chat_player_playing">正在播放</string>
-    <string name="chat_player_paused">已暂停</string>
-    <string name="chat_player_saved">已收藏</string>
-    <string name="chat_player_save">收藏</string>
-    <string name="chat_player_previous">上一首</string>
-    <string name="chat_player_shuffle">随机播放</string>
-    <string name="chat_player_repeat">切换循环模式</string>
-    <string name="chat_weather_location_today">%1$s · 今天</string>
-    <string name="chat_weather_high_low">最高 %1$d° / 最低 %2$d°</string>
-    <string name="chat_a2ui_collection_empty">暂无内容</string>
-    <string name="chat_a2ui_position_vertical">%1$d / %2$d · 上下滚动</string>
-    <string name="chat_a2ui_position_horizontal">%1$d / %2$d · 左右滑动</string>
-    <string name="chat_a2ui_expanded">已展开</string>
-    <string name="chat_a2ui_collapsed">已收起</string>
-    <string name="chat_a2ui_expand">展开内容</string>
-    <string name="chat_a2ui_collapse">收起内容</string>
     <string name="session_export_single">导出会话</string>
     <string name="session_export_actions">会话操作</string>
     <string name="session_delete_single">删除会话</string>
@@ -397,6 +384,7 @@
     <string name="voice_settings_missing_models">请在下方补齐必需模型</string>
     <string name="voice_settings_saving">正在保存语音设置</string>
     <string name="voice_settings_after_hangup">挂断后可修改</string>
+    <string name="voice_current_role">当前角色</string>
     <string name="voice_settings_unsaved">未保存</string>
     <string name="voice_settings_scope_hint">修改仅作用于当前聊天，配置完整后自动保存</string>
     <string name="voice_semi_settings_note">半级联暂未开放：链路暂不可选，模型与音色可预先配置</string>
@@ -475,7 +463,6 @@
     <string name="chat_mode_chatbot">Chatbot</string>
     <string name="chatbot_intro_title">Chatbot 模式</string>
     <string name="chatbot_intro_body">支持官方网络搜索与文件上传，不启用工具、MCP、权限、本地工具等。</string>
-    <string name="chatbot_intro_hint">要执行任务、编排工具？切到 %1$s 模式。</string>
     <string name="chatbot_model_services">模型服务</string>
     <string name="chatbot_failure">生成未完成，请重试</string>
     <string name="chatbot_send_busy">当前会话正在处理或任务较多，请稍后再试</string>

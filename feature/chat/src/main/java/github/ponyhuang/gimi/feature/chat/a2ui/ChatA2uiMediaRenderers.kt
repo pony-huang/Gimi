@@ -34,6 +34,7 @@ import androidx.media3.ui.compose.material3.MiniController
 import androidx.media3.ui.compose.material3.Player as Media3Player
 import github.ponyhuang.gimi.feature.chat.R
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 将 A2UI 视频接入 Media3 官方播放器，播放控件由官方组件提供。 */
 internal object ChatA2uiVideoRenderer : androidx.compose.material3.a2ui.catalog.A2uiVideoRenderer {
@@ -60,7 +61,7 @@ internal object ChatA2uiVideoRenderer : androidx.compose.material3.a2ui.catalog.
                 controlsVisible = true
             } else if (controlsVisible) {
                 // 只在播放时自动隐藏，暂停、结束或缓冲时保留继续播放的入口。
-                delay(3_000)
+                delay(3_000.milliseconds)
                 controlsVisible = false
             }
         }
@@ -96,7 +97,7 @@ internal object ChatA2uiAudioPlayerRenderer : androidx.compose.material3.a2ui.ca
 }
 
 @Composable
-private fun rememberA2uiPlayer(
+internal fun rememberA2uiPlayer(
     url: String,
     contentType: Int,
     onError: (Throwable?) -> Unit,

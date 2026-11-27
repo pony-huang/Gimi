@@ -364,7 +364,6 @@ class InMemoryRealtimeVoiceCallControllerTest {
             if (serviceId == this.serviceId) object : RealtimeVoiceSupport {
                 override val serviceId: String = this@RealtimeCapable.serviceId
                 override val builtInVoices = emptyList<TtsVoice>()
-                override val customVoiceAllowed: Boolean = true
                 override val uplink = RealtimeUplink(16_000, false)
                 override fun defaultVoiceFor(modelId: String): String = "longanqian_v3.1"
             } else null

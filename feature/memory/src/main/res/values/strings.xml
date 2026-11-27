@@ -15,9 +15,9 @@
     <string name="memory_saving">正在保存</string>
     <string name="memory_saved">记忆设置已保存</string>
     <string name="memory_save_failed">记忆设置保存失败</string>
-    <string name="memory_history_title">云端记忆历史</string>
+    <string name="memory_history_title">Mem0</string>
     <string name="memory_history_subtitle">查看、删除和反馈当前 Mem0 记忆</string>
-    <string name="memory_history_screen_title">云端记忆历史</string>
+    <string name="memory_history_screen_title">Mem0</string>
     <string name="memory_history_empty">暂无云端记忆</string>
     <string name="memory_history_updated_at">更新时间：%1$s</string>
     <string name="memory_history_positive_feedback">有帮助</string>

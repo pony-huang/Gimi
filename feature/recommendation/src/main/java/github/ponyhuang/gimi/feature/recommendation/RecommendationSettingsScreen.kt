@@ -2,12 +2,13 @@ package github.ponyhuang.gimi.feature.recommendation
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Rule
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -21,7 +22,6 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
-import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
@@ -61,9 +61,8 @@ fun RecommendationSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_tools_section)) }
-            item { PreferenceSectionNote(stringResource(R.string.recommendation_tool_loading_note)) }
             item {
+                Spacer(Modifier.height(12.dp))
                 PreferenceGroupCard {
                     ToolLoadingSegmentedGroup(
                         toolAccessMode = state.toolAccessMode,
@@ -73,9 +72,8 @@ fun RecommendationSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_conversation_section)) }
-            item { PreferenceSectionNote(stringResource(R.string.recommendation_a2ui_note)) }
             item {
+                Spacer(Modifier.height(12.dp))
                 PreferenceGroupCard {
                     PreferenceSwitchRow(
                         icon = a2uiLogo,
@@ -85,6 +83,7 @@ fun RecommendationSettingsScreen(
                         onCheckedChange = { checked ->
                             onAction(RecommendationSettingsAction.SetA2uiEnabled(checked))
                         },
+                        descriptionMaxLines = Int.MAX_VALUE,
                     )
                 }
             }
@@ -100,8 +99,8 @@ fun RecommendationSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_theme_section)) }
             item {
+                Spacer(Modifier.height(12.dp))
                 PreferenceGroupCard {
                     ThemeModeSegmentedGroup(
                         themeMode = state.themeMode,

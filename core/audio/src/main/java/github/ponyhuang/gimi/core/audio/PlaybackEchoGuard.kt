@@ -40,8 +40,8 @@ class PlaybackEchoGuard(
     }
 
     /**
-     * 上行门控复用同一风险窗：播放刚结束时服务端 server_vad 一样会收到混响尾音，
-     * 若此刻恢复全量上行，判轮与本地切句器一样会误触发新一轮回答。
+     * 上行门控复用同一风险窗：播放刚结束时的混响尾音若被放行，会像本地切句器
+     * 一样误触发用户开口与打断。
      */
     fun tailRisk(): Boolean = playbackEndedAtNanos > 0L &&
         clock() - playbackEndedAtNanos < PLAYBACK_TAIL_NANOS

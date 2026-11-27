@@ -10,10 +10,9 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import javax.inject.Inject
 
 /**
- * 厂商级联 TTS 内置音色目录与自定义音色策略的统一解析。
+ * 厂商级联 TTS 内置音色目录的统一解析。
  *
- * 音色表跟随各厂商适配器住在 `<vendor>/…`，按模板标识解析；千问基础音色没有列表接口，
- * 因此是唯一开放自由填写音色 ID 的服务。
+ * 音色表跟随各厂商适配器住在 `<vendor>/…`，按模板标识解析。
  */
 class VoiceCatalog @Inject constructor() : VoiceCatalogResolver {
     override fun builtInVoices(serviceId: String?): List<TtsVoice> = when (serviceId) {
@@ -29,15 +28,5 @@ class VoiceCatalog @Inject constructor() : VoiceCatalogResolver {
         // 默认音色必须按当前模型收窄取第一个。
         "qwen" -> modelId?.let { QwenAudioTtsVoices.forModel(it) }.orEmpty().firstOrNull()
         else -> builtInVoices(serviceId).firstOrNull()
-    }
-
-    override fun allowsCustomVoice(serviceId: String?): Boolean = serviceId == QWEN_TEMPLATE_ID
-
-    private companion object {
-        /**
-         * 千问音频：内置表只是系统音色的一部分，3.0 还有五百余个基础音色没有列表接口，
-         * 因此除了选择还需要允许直接填写音色 ID。
-         */
-        private const val QWEN_TEMPLATE_ID = "qwen"
     }
 }

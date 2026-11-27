@@ -10,8 +10,7 @@
 厂商适配器测试随适配器/模型一并迁入 `:data:modelaccess`；`data:voice/src/test` 保留业务层（仓库、偏好、路由、通话控制器、通知）。假事件辅助
 `DashScopeTestEvents` 一并随迁。Realtime 原生路径：`:data:modelaccess` 的 `OpenAiRealtimeProtocolTest` /
 `OpenAiRealtimeModelTest` 与 `QwenRealtimeProtocolTest` / `QwenRealtimeModelTest`
-（MockWebServer WS:配置先行帧、缓冲上行冲出、事件映射、打断语义（截断 / 静默窗口）、
-握手分类、单接收者与 close 解锁契约子集）、厂商语音适配器测试（DashScope / MiniMax / MiMo / OpenAI 兼容音频，下表）同在 `:data:modelaccess`；`:core:audio` 的 `Pcm16ResamplerTest` 契约、
+（MockWebServer WS:配置先行且 `turn_detection = null`、缓冲上行冲出、本地提交与响应触发顺序、事件映射、显式打断取消（OpenAI 截断 / Qwen 静默窗口）、握手分类、单接收者与 close 解锁契约子集）、厂商语音适配器测试（DashScope / MiniMax / MiMo / OpenAI 兼容音频，下表）同在 `:data:modelaccess`；`:core:audio` 的 `Pcm16ResamplerTest` 契约、
 `data:modelcatalog` 的 `SpeechModelProviderTest`（覆盖两个 Realtime 模板）：
 
 | 文件 | 验证的契约 |

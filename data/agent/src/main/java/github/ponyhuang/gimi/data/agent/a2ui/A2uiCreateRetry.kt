@@ -52,7 +52,6 @@ class A2uiCreateRetry @Inject constructor(
         val result = try {
             val generation = A2uiGeneration(models.createModel(models.selectModelConfig(selection)), protocol)
             val document = generation.generate(task.surfaceId, capabilities, "Requested UI: ${task.changes}",
-                requireWeatherComponent = requestedWeatherComponent(task.changes, task.componentNames),
                 requestedComponents = task.componentNames)
             taskResult(task.copy(status = A2uiGenerationStatus.COMPLETED)) +
                 (A2uiToolResult.DOCUMENT_KEY to A2uiToolResult.encode(document))

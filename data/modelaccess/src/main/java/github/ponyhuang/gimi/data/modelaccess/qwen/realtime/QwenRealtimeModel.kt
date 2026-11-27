@@ -16,13 +16,17 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.core.network.VoiceWsKernel
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeInstructionSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
@@ -33,9 +37,9 @@ import github.ponyhuang.gimi.data.modelaccess.shared.parseFunctionArguments
  * 百炼 Qwen-Audio Realtime 原生语音模型。
  *
  * 与 [OpenAiRealtimeModel] 同为常驻全双工会话，协议差异见 [QwenRealtimeProtocol]：
- * 上行原生 16 kHz PCM16 直喂（不经重采样）、下行 24 kHz；打断由服务端自动完成，
- * 模型侧只维护**静默窗口**——`speech_started` 后丢弃残余音频增量直到下一个
- * `response.created`，不发送任何截断/取消事件。
+ * 上行原生 16 kHz PCM16 直喂（不经重采样）、下行 24 kHz；服务端自动判轮关闭，
+ * 本地 VAD 切句后提交音频并请求响应，开口时经 [RealtimeTurnControlSink] 取消活动
+ * 响应。残余音频增量在下一个 `response.created` 前维持静默窗口。
  *
  * 契约要点（与 OpenAI 路径一致的部分）：
  * - 文本通过 [LlmResponse.inputTranscription] 承载用户侧转写（增量替换 + 终稿）、
@@ -53,7 +57,6 @@ internal class QwenRealtimeModel(
     private val apiKey: String,
     /** 会话音色；会话首个 session.update 下发，测试据此断言音色解析结果。 */
     internal val voice: String,
-    private val silenceDurationMs: Long,
     /** 百炼业务空间 ID；非空时请求额外携带 `X-DashScope-WorkSpace` 头兜底。 */
     private val workspaceId: String?,
     private val webSocketClient: OkHttpClient,
@@ -79,12 +82,29 @@ internal class QwenRealtimeModel(
         private val kernel: VoiceWsKernel,
         private val instructions: String,
         private val toolDeclarations: List<FunctionDeclaration>,
-    ) : LiveConnection, RealtimeInstructionSink, RealtimeFunctionCallSink {
+    ) : LiveConnection, RealtimeInstructionSink, RealtimeFunctionCallSink, RealtimeTurnControlSink {
         private val collecting = Mutex()
+
+        /** 串行化音频、提交、取消与响应创建，避免协程间发送顺序交叉。 */
+        private val sendMutex = Mutex()
+
+        /** 仅在同一次 WebSocket 会话的 `session.updated` 后完成。 */
+        private val sessionReady = CompletableDeferred<Unit>()
+
+        @Volatile private var responseActive = false
+
+        /** 已发出 response.create、但尚未收到 response.created。 */
+        @Volatile private var responseRequested = false
+
+        /** 请求确认前发生打断；created 到达时必须补发取消。 */
+        @Volatile private var cancelPending = false
 
         /** `session.updated` 确认前的上行缓冲；满则丢最旧，确认后一次冲出。 */
         private val pendingAudio = ArrayDeque<ByteArray>()
         private var pendingAudioBytes = 0
+
+        /** `session.updated` 确认前的历史消息缓冲；确认后在音频前一次冲出。 */
+        private val pendingHistory = mutableListOf<com.google.gson.JsonObject>()
 
         @Volatile private var sessionConfigured = false
 
@@ -99,11 +119,49 @@ internal class QwenRealtimeModel(
 
         override suspend fun updateInstructions(instructions: String) {
             check(sessionConfigured)
-            kernel.sendControl(QwenRealtimeProtocol.instructionsUpdate(instructions))
+            sendMutex.withLock { kernel.sendControl(QwenRealtimeProtocol.instructionsUpdate(instructions)) }
+        }
+
+        override suspend fun commitAudioTurn() {
+            sessionReady.await()
+            sendMutex.withLock {
+                for (event in QwenRealtimeProtocol.commitAudioTurn()) kernel.sendControl(event)
+                responseRequested = true
+            }
+        }
+
+        override suspend fun cancelResponse() {
+            sendMutex.withLock {
+                when {
+                    responseActive -> {
+                        responseActive = false
+                        responseRequested = false
+                        suppressAudio = true
+                        // 工具累积器仅由接收循环维护；取消后的 response.done 会在该线程丢弃未定稿调用。
+                        cancellationAwareRunCatching { kernel.sendControl(QwenRealtimeProtocol.cancelResponse()) }
+                            .onFailure { Log.w(TAG, "取消本地打断响应失败（连接可能已断开）", it) }
+                    }
+                    responseRequested -> {
+                        responseRequested = false
+                        cancelPending = true
+                        suppressAudio = true
+                    }
+                }
+            }
         }
 
         override suspend fun sendHistory(history: List<Content>) {
-            // 全双工会话的上下文由服务端会话自身持有；历史注入留阶段二（Chat 原生化）。
+            val events = QwenRealtimeProtocol.historyMessages(history)
+            if (events.isEmpty()) return
+            sendMutex.withLock {
+                if (!sessionConfigured) {
+                    pendingHistory.addAll(events)
+                } else {
+                    for (event in events) {
+                        kernel.sendControl(event)
+                    }
+                }
+            }
         }
 
         override suspend fun sendContent(content: Content, partial: Boolean) {
@@ -115,13 +173,15 @@ internal class QwenRealtimeModel(
                 is RealtimeInput.Audio -> {
                     require(input.blob.mimeType == "audio/pcm;rate=16000") { "Expected mono PCM16 at 16 kHz" }
                     val bytes = input.blob.data ?: return
-                    if (!sessionConfigured) {
-                        bufferAudio(bytes)
-                    } else {
-                        sendAudio(bytes)
+                    sendMutex.withLock {
+                        if (!sessionConfigured) {
+                            bufferAudio(bytes)
+                        } else {
+                            sendAudio(bytes)
+                        }
                     }
                 }
-                // 判轮归服务端 server_vad；本地 VAD 边界只驱动仓储侧的门控与即时停播。
+                // 手动判轮由 RealtimeTurnControlSink 显式提交；ADK 活动边界不映射协议事件。
                 RealtimeInput.ActivityStart, RealtimeInput.ActivityEnd, RealtimeInput.AudioStreamEnd -> Unit
                 is RealtimeInput.Video -> throw UnsupportedOperationException("Realtime 会话不接受视频输入")
             }
@@ -139,21 +199,30 @@ internal class QwenRealtimeModel(
                             // 的第一现场；重连即新会话，每次都要重新下发并留痕。
                             Log.i(TAG, "Qwen session.update 下发 ${toolDeclarations.size} 个工具声明")
                             kernel.sendControl(
-                                QwenRealtimeProtocol.sessionUpdate(instructions, voice, silenceDurationMs, toolDeclarations),
+                                QwenRealtimeProtocol.sessionUpdate(instructions, voice, toolDeclarations),
                             )
                         }
                         is VoiceWsKernel.WsFrame.Control ->
                             when (val event = QwenRealtimeProtocol.parse(frame.payload)) {
-                                is QwenRealtimeEvent.SessionUpdated -> {
+                                is QwenRealtimeEvent.SessionUpdated -> sendMutex.withLock {
                                     sessionConfigured = true
+                                    flushPendingHistory()
                                     flushPendingAudio()
+                                    sessionReady.complete(Unit)
                                 }
-                                is QwenRealtimeEvent.ResponseCreated -> {
-                                    suppressAudio = false
+                                is QwenRealtimeEvent.ResponseCreated -> sendMutex.withLock {
+                                    responseRequested = false
+                                    responseActive = !cancelPending
+                                    suppressAudio = cancelPending
                                     sawTranscriptDelta = false
+                                    if (cancelPending) {
+                                        cancelPending = false
+                                        cancellationAwareRunCatching { kernel.sendControl(QwenRealtimeProtocol.cancelResponse()) }
+                                            .onFailure { Log.w(TAG, "取消延迟确认的响应失败", it) }
+                                    }
                                 }
                                 is QwenRealtimeEvent.SpeechStarted -> {
-                                    // 服务端自动打断生成；本地进入静默窗口并通知编排层立即停播。
+                                    // 兼容服务端 speech_started 事件；本地 VAD 仍独占判轮与打断。
                                     // 未定稿的工具调用随打断丢弃，防止残留泄入后续响应的兜底冲出。
                                     suppressAudio = true
                                     toolCalls.discardUnfinished()
@@ -180,17 +249,19 @@ internal class QwenRealtimeModel(
                                     }
                                 }
                                 is QwenRealtimeEvent.AssistantTranscriptDelta -> {
-                                    sawTranscriptDelta = true
-                                    emit(
-                                        LlmResponse(
-                                            outputTranscription = Transcription(text = event.text, finished = false),
-                                            partial = true,
-                                        ),
-                                    )
+                                    if (!suppressAudio) {
+                                        sawTranscriptDelta = true
+                                        emit(
+                                            LlmResponse(
+                                                outputTranscription = Transcription(text = event.text, finished = false),
+                                                partial = true,
+                                            ),
+                                        )
+                                    }
                                 }
                                 is QwenRealtimeEvent.AssistantTranscriptDone ->
                                     // 追加语义下终稿与增量重复；仅在整条响应无增量时补发。
-                                    if (!sawTranscriptDelta && event.transcript.isNotEmpty()) {
+                                    if (!suppressAudio && !sawTranscriptDelta && event.transcript.isNotEmpty()) {
                                         emit(
                                             LlmResponse(
                                                 outputTranscription = Transcription(text = event.transcript, finished = false),
@@ -215,18 +286,31 @@ internal class QwenRealtimeModel(
                                 is QwenRealtimeEvent.ToolCallStarted -> toolCalls.onStarted(event.callId, event.name)
                                 is QwenRealtimeEvent.ToolCallArgumentsDelta -> toolCalls.onDelta(event.callId, event.delta)
                                 is QwenRealtimeEvent.ToolCallArgumentsDone ->
-                                    toolCalls.onDone(event.callId, event.arguments)?.let { emit(functionCallResponse(it)) }
+                                    toolCalls.onDone(event.callId, event.arguments)
+                                        ?.takeUnless { suppressAudio }
+                                        ?.let { emit(functionCallResponse(it)) }
                                 is QwenRealtimeEvent.ResponseDone -> {
-                                    // 仅明确取消/失败/截断的响应丢弃未定稿调用；status 缺失
-                                    // 与未知终态按完成兜底冲出（后者记日志），避免静默漏执行。
-                                    when (realtimeResponseDisposition(event.status)) {
-                                        RealtimeResponseDisposition.DISCARD -> toolCalls.discardUnfinished()
-                                        RealtimeResponseDisposition.UNKNOWN -> {
-                                            Log.w(TAG, "未知的 response.done 状态，按完成处理: ${event.status}")
-                                            for (call in toolCalls.flushUnfinished()) emit(functionCallResponse(call))
+                                    val disposition = realtimeResponseDisposition(event.status)
+                                    sendMutex.withLock {
+                                        responseActive = false
+                                        responseRequested = false
+                                        cancelPending = false
+                                        suppressAudio = suppressAudio || disposition == RealtimeResponseDisposition.DISCARD
+                                    }
+                                    if (suppressAudio) {
+                                        toolCalls.discardUnfinished()
+                                    } else {
+                                        // 仅明确取消/失败/截断的响应丢弃未定稿调用；status 缺失
+                                        // 与未知终态按完成兜底冲出（后者记日志），避免静默漏执行。
+                                        when (disposition) {
+                                            RealtimeResponseDisposition.DISCARD -> toolCalls.discardUnfinished()
+                                            RealtimeResponseDisposition.UNKNOWN -> {
+                                                Log.w(TAG, "未知的 response.done 状态，按完成处理: ${event.status}")
+                                                for (call in toolCalls.flushUnfinished()) emit(functionCallResponse(call))
+                                            }
+                                            RealtimeResponseDisposition.FLUSH ->
+                                                for (call in toolCalls.flushUnfinished()) emit(functionCallResponse(call))
                                         }
-                                        RealtimeResponseDisposition.FLUSH ->
-                                            for (call in toolCalls.flushUnfinished()) emit(functionCallResponse(call))
                                     }
                                     emit(LlmResponse(turnComplete = true))
                                 }
@@ -239,20 +323,27 @@ internal class QwenRealtimeModel(
                                     )
                                 QwenRealtimeEvent.Ignored -> Unit
                             }
-                        is VoiceWsKernel.WsFrame.Failure ->
+                        is VoiceWsKernel.WsFrame.Failure -> {
                             // 传输失败以异常终止事件流：编排层据此按异常类型分类
                             // （握手鉴权失败不重试，网络失败按退避重连）。
+                            sessionReady.completeExceptionally(frame.error)
                             throw frame.error
+                        }
                         is VoiceWsKernel.WsFrame.Audio -> Unit
-                        VoiceWsKernel.WsFrame.Closed -> break
+                        VoiceWsKernel.WsFrame.Closed -> {
+                            sessionReady.completeExceptionally(IllegalStateException("Realtime 会话在配置确认前关闭"))
+                            break
+                        }
                     }
                 }
             } finally {
+                sessionReady.completeExceptionally(IllegalStateException("Realtime 接收循环在配置确认前结束"))
                 collecting.unlock()
             }
         }
 
         override suspend fun closeSession() {
+            sessionReady.completeExceptionally(IllegalStateException("Realtime 会话已关闭"))
             kernel.close()
         }
 
@@ -261,6 +352,14 @@ internal class QwenRealtimeModel(
             pendingAudioBytes += bytes.size
             while (pendingAudioBytes > MAX_PENDING_AUDIO_BYTES) {
                 pendingAudio.removeFirstOrNull()?.let { pendingAudioBytes -= it.size }
+            }
+        }
+
+        private suspend fun flushPendingHistory() {
+            val buffered = pendingHistory.toList()
+            pendingHistory.clear()
+            for (event in buffered) {
+                kernel.sendControl(event)
             }
         }
 
@@ -292,13 +391,18 @@ internal class QwenRealtimeModel(
         )
 
         override suspend fun sendFunctionResult(callId: String, outputJson: String) {
-            runCatching { kernel.sendControl(QwenRealtimeProtocol.functionCallOutput(callId, outputJson)) }
-                .onFailure { Log.w(TAG, "写回工具结果失败（连接可能已断开）", it) }
+            sendMutex.withLock {
+                cancellationAwareRunCatching { kernel.sendControl(QwenRealtimeProtocol.functionCallOutput(callId, outputJson)) }
+                    .onFailure { Log.w(TAG, "写回工具结果失败（连接可能已断开）", it) }
+            }
         }
 
         override suspend fun sendResponseTrigger() {
-            runCatching { kernel.sendControl(QwenRealtimeProtocol.createResponse()) }
-                .onFailure { Log.w(TAG, "触发工具二轮响应失败（连接可能已断开）", it) }
+            sendMutex.withLock {
+                cancellationAwareRunCatching { kernel.sendControl(QwenRealtimeProtocol.createResponse()) }
+                    .onFailure { Log.w(TAG, "触发工具二轮响应失败（连接可能已断开）", it) }
+                    .onSuccess { responseRequested = true }
+            }
         }
     }
 

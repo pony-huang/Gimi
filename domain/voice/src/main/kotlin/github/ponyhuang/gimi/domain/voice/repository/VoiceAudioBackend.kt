@@ -70,6 +70,12 @@ interface RealtimeVoiceDuplexSession {
     /** 上行一帧 16 kHz 单声道 PCM16 采集音频；实现内部重采样为 24 kHz。 */
     suspend fun sendAudio(pcm16: ByteArray)
 
+    /** 本地 VAD 判轮结束：提交已上行音频并显式请求服务端响应。 */
+    suspend fun commitTurn()
+
+    /** 本地 VAD 检测到用户开口：取消服务端正在生成的响应。 */
+    suspend fun interrupt()
+
     /** 提交前准备在此完成，不得打断正在播报的回答。 */
     suspend fun prepareInput(input: VoiceManualInput): VoiceManualInput
     suspend fun submit(input: VoiceManualInput)

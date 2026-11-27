@@ -160,7 +160,6 @@ pages inside, not a stack of separate sheets.
 | Permission mode | `feature/chat` `ChatPermissionModeSheet` | 28 % |
 | Chat model picker | `feature/chat` `ChatModelPickerSheet` | 60 % / 90 % |
 | Realtime preset / details | `feature/chat` `RealtimeVoiceScreen` | 50 % for entry, 90 % for sub-pages (caps; short content hugs its height) |
-| A2UI detail sheet | `feature/chat` `ChatA2uiContainers` | 65 % / 90 % |
 
 The assistant panel and the collapsed capsule in `feature/assistant` are **not**
 migrated: they are `Popup`-hosted rather than modal sheets and carry their own

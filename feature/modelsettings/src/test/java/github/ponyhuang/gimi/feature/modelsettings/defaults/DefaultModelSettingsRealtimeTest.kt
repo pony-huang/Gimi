@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -22,7 +23,6 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityNotSupported
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
-import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
 import io.mockk.coEvery
 import io.mockk.every
@@ -75,6 +75,70 @@ class DefaultModelSettingsRealtimeTest {
         verify { repository.selectRealtimeModel(null) }
     }
 
+    @Test
+    fun realtimeVoiceResolvesDefaultVoiceAndOptions() = runTest {
+        val repository = repository(realtimeSelection = realtimeSelection)
+        val viewModel = viewModel(repository)
+
+        viewModel.uiState.test {
+            awaitItem()
+            var state = awaitItem()
+            while (state.realtimeModels.isEmpty()) state = awaitItem()
+
+            assertEquals("longanqian_v3.1", state.realtimeDefaultVoiceId)
+            assertEquals("龙安千", state.realtimeDefaultVoiceName)
+            assertEquals("longanqian_v3.1", state.realtimeActiveVoiceId)
+            assertEquals(null, state.realtimeVoiceId)
+            assertEquals(listOf("longanqian_v3.1"), state.realtimeVoiceOptions.map { it.id })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun selectingRealtimeVoiceWritesOverrideOrClears() = runTest {
+        val repository = repository(realtimeSelection = realtimeSelection)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeVoice("custom-voice"))
+        advanceUntilIdle()
+        verify { repository.selectRealtimeVoice(RealtimeVoiceOverride(realtimeSelection, "custom-voice")) }
+
+        viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeVoice(null))
+        advanceUntilIdle()
+        verify { repository.selectRealtimeVoice(null) }
+    }
+
+    @Test
+    fun reselectingCurrentRealtimeModelKeepsRealtimeVoice() = runTest {
+        val repository = repository(
+            realtimeSelection = realtimeSelection,
+            realtimeVoice = RealtimeVoiceOverride(realtimeSelection, "custom-voice"),
+        )
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeModel(realtimeSelection))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { repository.selectRealtimeModel(any()) }
+        verify(exactly = 0) { repository.selectRealtimeVoice(any()) }
+    }
+
+    @Test
+    fun switchingRealtimeModelResetsRealtimeVoice() = runTest {
+        val repository = repository(realtimeSelection = realtimeSelection)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+
+        val newSelection = ModelSelection("instance-qwen", "instance-qwen-realtime", "qwen-audio-3.0-realtime-plus")
+        viewModel.onAction(DefaultModelSettingsAction.SelectRealtimeModel(newSelection))
+        advanceUntilIdle()
+
+        verify { repository.selectRealtimeModel(newSelection) }
+        verify { repository.selectRealtimeVoice(null) }
+    }
+
     private fun viewModel(
         repository: ModelCatalogRepository,
     ) = DefaultModelSettingsViewModel(
@@ -100,13 +164,12 @@ class DefaultModelSettingsRealtimeTest {
             if (templateId == "qwen") QwenLikeSupport else null
     }
 
-    /** 千问式适配器：音色集按模型代际给、允许自由输入、缺省音色同样按代际给。 */
+    /** 千问式适配器：系统音色和缺省音色按模型代际提供。 */
     private object QwenLikeSupport : RealtimeVoiceSupport {
         override val serviceId: String = "qwen"
 
         /** 音色集随模型变化，服务级没有统一表。 */
         override val builtInVoices: List<TtsVoice> = emptyList()
-        override val customVoiceAllowed: Boolean = true
         override val uplink: RealtimeUplink = RealtimeUplink(sampleRateHz = 16_000, resampled = false)
 
         override fun voicesFor(modelId: String): List<TtsVoice> =
@@ -125,6 +188,7 @@ class DefaultModelSettingsRealtimeTest {
 
     private fun repository(
         realtimeSelection: ModelSelection? = null,
+        realtimeVoice: RealtimeVoiceOverride? = null,
     ): ModelCatalogRepository = mockk(relaxed = true) {
         every { observeInstances() } returns MutableStateFlow(listOf(qwenInstance(), plainInstance()))
         every { observeAssistantSelection() } returns MutableStateFlow(null)
@@ -133,7 +197,7 @@ class DefaultModelSettingsRealtimeTest {
         every { observeTtsSelection() } returns MutableStateFlow(null)
         every { observeTtsVoice() } returns MutableStateFlow("")
         every { observeRealtimeSelection() } returns MutableStateFlow(realtimeSelection)
-        every { observeRealtimeVoice() } returns MutableStateFlow(null)
+        every { observeRealtimeVoice() } returns MutableStateFlow(realtimeVoice)
     }
 
     /** 声明了原生 Realtime 适配器的语音服务实例。 */

@@ -78,3 +78,17 @@ interface RealtimeFunctionCallSink {
     /** 触发服务端基于已写回的工具结果继续生成（二轮推理）。 */
     suspend fun sendResponseTrigger()
 }
+
+/**
+ * 本地 VAD 驱动的 Realtime 判轮与打断通道。
+ *
+ * 会话配置关闭服务端自动判轮；客户端在音频发送完毕后依次提交缓冲并请求响应，
+ * 用户开口时取消仍在生成的服务端响应。厂商协议差异由连接实现封装。
+ */
+interface RealtimeTurnControlSink {
+    /** 提交当前音频缓冲，并按协议顺序触发一次响应。 */
+    suspend fun commitAudioTurn()
+
+    /** 取消当前活动或已请求但未确认的响应；两者都不存在时不发送协议事件。 */
+    suspend fun cancelResponse()
+}

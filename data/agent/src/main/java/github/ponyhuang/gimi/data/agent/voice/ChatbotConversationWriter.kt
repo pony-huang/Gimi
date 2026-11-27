@@ -25,8 +25,8 @@ import kotlinx.coroutines.CancellationException
  * Chatbot 三入口共享的会话写入组件：把一轮的用户/模型文字事件写入 Chatbot 分区
  * （[AgentSessionIdentity.CHATBOT_USER_ID]）的「当前 Chatbot 会话」。
  *
- * - 级联 Chatbot 经 [acquire][Call.acquire] 恢复最近 64 条历史作为上下文；原生实时复用
- *   同一组件只写不读（上下文不重放）。工具调用不写入：Chatbot 上下文只承载对话文字。
+ * - 级联与原生实时均经 [acquire][Call.acquire] 恢复最近 64 条历史；原生实时重连时经
+ *   [currentHistory][Call.currentHistory] 刷新本次通话新增的轮次。工具调用不写入：Chatbot 上下文只承载对话文字。
  * - 未显式绑定会话时经 [ChatbotConversationResolver] 解析当前 Chatbot 会话，
  *   与文本 chatbot 共享同一段对话。
  */
@@ -43,8 +43,8 @@ class ChatbotConversationWriter @Inject constructor(
         private val pending = ArrayDeque<Event>()
 
         /**
-         * 解析并记住目标会话 ID；[acquire] 之外也需要它的入口（原生实时只写不读，
-         * 不会调用 acquire）必须先解析，否则 [flush] 会在空 ID 上失败并静默丢转写。
+         * 解析并记住目标会话 ID；[currentHistory] 等不申请租约的入口也必须先解析，
+         * 否则后续 [flush] 会在空 ID 上失败并静默丢转写。
          */
         suspend fun resolve(): String {
             if (conversationId.isNullOrBlank()) {
@@ -60,12 +60,7 @@ class ChatbotConversationWriter @Inject constructor(
                 val id = resolve()
                 lease = gate.acquire(AgentTaskSource.REALTIME_VOICE, id, AgentTaskPhase.WAITING_FOR_INPUT)
                 val session = requireNotNull(sessions.getSession(key())) { "Conversation no longer exists" }
-                return session.events.mapNotNull { event ->
-                    val content = event.content ?: return@mapNotNull null
-                    if (content.role != Role.USER && content.role != Role.MODEL) return@mapNotNull null
-                    val parts = content.parts.filter { it.thought != true && (it.text != null || it.fileData != null || it.inlineData != null) }
-                    if (parts.isEmpty()) null else Content(role = content.role, parts = parts)
-                }.takeLast(64)
+                return historyFrom(session)
             } catch (failure: Exception) {
                 release()
                 when (failure) {
@@ -74,6 +69,13 @@ class ChatbotConversationWriter @Inject constructor(
                     else -> throw VoiceAudioBackendException(RealtimeVoiceFailure.Persistence, cause = failure)
                 }
             }
+        }
+
+        /** 取当前 Chatbot 会话的最新历史；原生实时重连时刷新上下文，不重复申请租约。 */
+        suspend fun currentHistory(): List<Content> {
+            resolve()
+            val session = requireNotNull(sessions.getSession(key())) { "Conversation no longer exists" }
+            return historyFrom(session)
         }
 
         fun enqueue(content: Content, isNativeRealtimeTranscript: Boolean = false) {
@@ -111,6 +113,13 @@ class ChatbotConversationWriter @Inject constructor(
             lease?.release()
             lease = null
         }
+
+        private fun historyFrom(session: com.google.adk.kt.sessions.Session) = session.events.mapNotNull { event ->
+            val content = event.content ?: return@mapNotNull null
+            if (content.role != Role.USER && content.role != Role.MODEL) return@mapNotNull null
+            val parts = content.parts.filter { it.thought != true && (it.text != null || it.fileData != null || it.inlineData != null) }
+            if (parts.isEmpty()) null else Content(role = content.role, parts = parts)
+        }.takeLast(64)
 
         private fun key() = SessionKey(AgentChatRunner.APP_NAME, AgentSessionIdentity.CHATBOT_USER_ID, requireNotNull(conversationId))
     }

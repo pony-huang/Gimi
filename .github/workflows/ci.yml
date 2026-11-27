@@ -5,7 +5,7 @@ on:
     branches:
       - '**'
       - '!main'
-      - '!release-please--**'
+      - '!chore/release-**'
       - '!backup/**'
       - '!dependabot/**'
   pull_request:

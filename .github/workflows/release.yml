@@ -1,28 +1,13 @@
 name: Publish Android Release
 
+# 只允许 workflow_dispatch 显式发版；push tag 不再触发（ADR-0001）。
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
         description: '已存在的版本 tag，例如 v0.6.4、v0.7.0-rc.1、v1.0.0-beta.1 或热修 v1.0.0-beta.4.0.1'
         required: true
         type: string
-  workflow_call:
-    inputs:
-      tag:
-        required: true
-        type: string
-    secrets:
-      RELEASE_KEYSTORE_BASE64:
-        required: true
-      RELEASE_KEYSTORE_PASSWORD:
-        required: true
-      RELEASE_KEY_ALIAS:
-        required: true
-      RELEASE_KEY_PASSWORD:
-        required: true
 
 permissions:
   contents: read

@@ -120,6 +120,11 @@ class ModelServiceDetailViewModel @Inject constructor(
                     })
                 }
             }
+            ModelServiceDetailAction.SelectAllVisibleModels -> if (state.canEdit && state.page == ServiceEditorPage.Models) {
+                _uiState.update { current ->
+                    current.copy(pendingModelKeys = current.pendingModelKeys + current.visibleCandidates.map { it.key })
+                }
+            }
             ModelServiceDetailAction.ConfirmModels -> confirmModels()
             ModelServiceDetailAction.ShowAddDialog -> if (state.canEdit) {
                 _uiState.update { it.copy(isAddDialogVisible = true, newModelId = "") }

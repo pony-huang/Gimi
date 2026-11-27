@@ -10,7 +10,7 @@
     <string name="gimi_sheet_search_exit">Exit search</string>
     <string name="voice_picker_search_hint">Type keywords to search voices</string>
     <!-- Voice picker sheet: migrated from :feature:modelsettings, shared by the chat voice page and default model settings (see AGENTS.md exception). -->
-    <string name="voice_picker_search">Search name, voice ID, trait or scene</string>
+    <string name="voice_picker_search">Search voices</string>
     <string name="voice_picker_current">Current: %1$s</string>
     <string name="voice_picker_current_none">Current: default voice</string>
     <string name="voice_picker_current_custom">Current: %1$s (custom value, not in the system voice list)</string>

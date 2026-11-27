@@ -3,6 +3,7 @@ import json
 import copy
 import hashlib
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -71,22 +72,44 @@ class ReleaseToolsTest(unittest.TestCase):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 release.version_key(version)
 
-    def test_requires_consistent_manifest_and_valid_install_code(self):
-        """version.txt/manifest/versionCode 三方必须一致，versionCode 越界拒绝。"""
+    def test_requires_valid_version_and_install_code(self):
+        """version.txt/versionCode 必须合法：versionCode 恰好一个声明且越界拒绝。"""
         with tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
             root = Path(folder)
             (root / 'version.txt').write_text('0.6.4\n')
-            (root / '.release-please-manifest.json').write_text(json.dumps({'.': '0.6.4'}))
             (root / 'gradle.properties').write_text('releaseVersionCode=1001\n')
             self.assertEqual(release.config(root), ('0.6.4', 1001))
-            (root / '.release-please-manifest.json').write_text(json.dumps({'.': '0.6.3'}))
-            with self.assertRaises(ValueError):
-                release.config(root)
-            (root / '.release-please-manifest.json').write_text(json.dumps({'.': '0.6.4'}))
-            for code in ('0', '2100000001', 'oops'):
+            for code in ('0', '2100000001', 'oops', '1001\nreleaseVersionCode=1002\n'):
                 (root / 'gradle.properties').write_text(f'releaseVersionCode={code}\n')
                 with self.assertRaises(ValueError):
                     release.config(root)
+
+    def test_pretag_rejects_mismatched_missing_and_unmerged_tags(self):
+        """预检：tag 与 version.txt 不一致、tag 不存在、tag 不在 origin/main 内、CHANGELOG 缺章节都拒绝。"""
+        with patch.object(release, 'config', return_value=('0.7.0-beta.1', 1001)), patch.object(
+            release, 'notes', return_value='notes'
+        ), patch.object(release, 'releases', return_value=[]), patch.object(
+            release, 'run', return_value='commit'
+        ), patch.object(release.subprocess, 'run') as execute:
+            def result(command, **kwargs):
+                # rev-parse 用 returncode 表达 tag 是否存在；merge-base 用非零表达不在 main 内。
+                return subprocess.CompletedProcess(command, 0)
+            execute.side_effect = result
+            release.pretag('v0.7.0-beta.1')
+            with self.assertRaises(ValueError):
+                release.pretag('v0.7.0-beta.2')
+            execute.side_effect = lambda command, **kwargs: subprocess.CompletedProcess(
+                command, 1 if command[:2] == ['git', 'rev-parse'] else 0)
+            with self.assertRaises(ValueError):
+                release.pretag('v0.7.0-beta.1')
+            # mock 替换了 subprocess.run，check=True 的抛错逻辑不复存在；merge-base 失败须由 side_effect 自行抛出。
+            def unmerged(command, **kwargs):
+                if command[:2] == ['git', 'merge-base']:
+                    raise subprocess.CalledProcessError(1, command)
+                return subprocess.CompletedProcess(command, 0)
+            execute.side_effect = unmerged
+            with self.assertRaises(subprocess.CalledProcessError):
+                release.pretag('v0.7.0-beta.1')
 
     def test_published_release_cannot_be_modified(self):
         """已发布（非草稿）Release 不可再动：发布不可变，重试只针对草稿。"""

@@ -10,7 +10,7 @@ import kotlinx.coroutines.CancellationException
  * 原生实时 Chatbot 的终稿收集器：把一通的转写流聚合成轮终稿，经
  * [ChatbotConversationWriter.Call] 落盘到 Chatbot 分区当前会话。
  *
- * 写入策略（只写终稿，不喂上下文——原生实时起呼不重放历史）：
+ * 写入策略（只写终稿；起呼与重连历史由会话门面读取并注入）：
  * - 输入转写（用户侧）按最新累计文本替换；输出转写按增量累计。
  * - 正常收尾写入用户 + 模型两侧；打断只写用户侧已定稿话语，被截断的半句
  *   回答不落盘（cancelled 的 response.done 仍会发 turnComplete，此时状态

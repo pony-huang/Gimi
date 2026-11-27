@@ -34,22 +34,24 @@ internal fun ChatA2uiContent(
     retryEnabled: Boolean = false,
     onRetry: (String) -> Unit = {},
 ) {
-    ChatA2uiTheme {
-        Column(Modifier.fillMaxWidth()) {
-            surfaces.forEach { surface ->
-                key(surface.id) {
-                    A2uiSurface(
-                        surfaceModel = surface,
-                        modifier = Modifier.fillMaxWidth(),
-                        errorContent = { A2uiError() },
-                    )
-                }
+    // 整张 surface 随聊天列表滚动。独立滚动的组件在目录中限制各自的视口。
+    Column(Modifier.fillMaxWidth()) {
+        surfaces.forEach { surface ->
+            key(surface.id) {
+                A2uiSurface(
+                    surfaceModel = surface,
+                    modifier = Modifier.fillMaxWidth(),
+                    errorContent = { A2uiError() },
+                )
             }
-            tasks.filter { it.status != A2uiGenerationStatus.COMPLETED }.forEach { task ->
-                key(task.callId) { A2uiTaskStatus(task, retryEnabled, onRetry) }
-            }
-            if (failed && tasks.isEmpty()) A2uiError()
         }
+        tasks.filter { task ->
+            task.status != A2uiGenerationStatus.COMPLETED &&
+                (task.status != A2uiGenerationStatus.PENDING || surfaces.none { it.id == task.surfaceId })
+        }.forEach { task ->
+            key(task.callId) { A2uiTaskStatus(task, retryEnabled, onRetry) }
+        }
+        if (failed && tasks.isEmpty()) A2uiError()
     }
 }
 

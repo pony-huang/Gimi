@@ -1,6 +1,11 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.a2ui.A2uiDocument
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTask
+import github.ponyhuang.gimi.domain.a2ui.A2uiToolResult
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -109,6 +114,23 @@ class AdoptLoadedHistoryTest {
 
         // argsSummary 只是展示口径差异：身份保留，展示随内存对象（与落盘内容一致）。
         assertEquals("run-1:assistant", adopted.single().id)
+    }
+
+    @Test
+    fun `persisted A2UI result replaces stale placeholder while keeping message identity`() {
+        val task = A2uiGenerationTask("call", "surface", "invocation", "fixture", setOf("Text"))
+        val pending = FunctionResponseView(task.callId, A2uiToolResult.TOOL_NAME, a2uiTask = task)
+        val completed = pending.copy(
+            a2uiTask = task.copy(status = A2uiGenerationStatus.COMPLETED),
+            a2uiDocument = A2uiDocument(task.surfaceId, listOf("fixture")),
+        )
+        val live = assistantMessage("live", "").copy(functionResponses = listOf(pending))
+        val persisted = assistantMessage("persisted", "").copy(functionResponses = listOf(completed))
+
+        val adopted = adoptLoadedHistory(listOf(live), listOf(persisted)).single()
+
+        assertEquals(live.id, adopted.id)
+        assertEquals(listOf(completed), adopted.functionResponses)
     }
 
     @Test

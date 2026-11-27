@@ -62,7 +62,6 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
  *
  * @param currentVoiceId 当前生效的音色 ID；为空表示使用厂商缺省音色。
  * @param options 当前模型可用的系统音色；列表已按模型过滤，组件不再做跨模型判断。
- * @param allowCustomInput 是否允许填写内置表之外的音色 ID（声音复刻、基础音色）。
  * @param isLoading 音色表是否仍在加载；加载中不把空列表当成「没有内置音色」。
  * @param defaultVoiceId 厂商缺省音色，仅在输入引导里作为提示展示。
  * @param initialQuery 搜索框初值；生产调用保持空串，仅供预览构造「搜索中」状态。
@@ -72,7 +71,6 @@ fun VoicePickerDialog(
     title: String,
     currentVoiceId: String,
     options: List<TtsVoice>,
-    allowCustomInput: Boolean,
     isLoading: Boolean,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -82,7 +80,7 @@ fun VoicePickerDialog(
     var customMode by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf(initialQuery) }
     // 没有内置音色表时直接落到输入态，避免出现一个永远空着的列表。
-    val showInput = customMode || (!isLoading && options.isEmpty() && allowCustomInput)
+    val showInput = customMode || (!isLoading && options.isEmpty())
     val canReturnToList = options.isNotEmpty()
 
     if (showInput) {
@@ -104,7 +102,6 @@ fun VoicePickerDialog(
             currentVoiceId = currentVoiceId,
             options = options,
             isLoading = isLoading,
-            allowCustomInput = allowCustomInput,
             query = query,
             onQueryChange = { query = it },
             onPick = { voiceId ->
@@ -124,7 +121,6 @@ private fun VoiceListDialog(
     currentVoiceId: String,
     options: List<TtsVoice>,
     isLoading: Boolean,
-    allowCustomInput: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
     onPick: (String) -> Unit,
@@ -166,11 +162,9 @@ private fun VoiceListDialog(
                                 Icon(Icons.Default.Close, stringResource(R.string.picker_clear_search))
                             }
                         }
-                        if (allowCustomInput) {
-                            // 自定义音色入口常驻搜索框尾部：框内尾部留给「清除搜索」，两者并存。
-                            IconButton(onClick = onOpenCustomInput) {
-                                Icon(Icons.Default.Add, stringResource(R.string.voice_picker_manual_entry))
-                            }
+                        // 自定义音色入口常驻搜索框尾部：框内尾部留给「清除搜索」，两者并存。
+                        IconButton(onClick = onOpenCustomInput) {
+                            Icon(Icons.Default.Add, stringResource(R.string.voice_picker_manual_entry))
                         }
                     }
                 },
@@ -180,16 +174,15 @@ private fun VoiceListDialog(
             CurrentVoiceLabel(currentVoiceId, options)
         },
         groupTitle = { categoryLabels[it.category] },
-        emptyContent = { VoiceEmptyState(isLoading, normalizedQuery, allowCustomInput, onPick) },
+        emptyContent = { VoiceEmptyState(isLoading, normalizedQuery, onPick) },
     )
 }
 
-/** 搜索/加载的空态：加载中显示进度；无命中且允许自定义时把输入变成可选项。 */
+/** 搜索/加载的空态：加载中显示进度；无命中时把输入变成可选项。 */
 @Composable
 private fun VoiceEmptyState(
     isLoading: Boolean,
     query: String,
-    allowCustomInput: Boolean,
     onPick: (String) -> Unit,
 ) {
     Box(
@@ -212,13 +205,11 @@ private fun VoiceEmptyState(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (allowCustomInput) {
-                    Button(
-                        onClick = { onPick(query) },
-                        modifier = Modifier.padding(top = 16.dp),
-                    ) {
-                        Text(stringResource(R.string.voice_picker_use_query, query))
-                    }
+                Button(
+                    onClick = { onPick(query) },
+                    modifier = Modifier.padding(top = 16.dp),
+                ) {
+                    Text(stringResource(R.string.voice_picker_use_query, query))
                 }
             }
         }
@@ -246,7 +237,7 @@ private fun CurrentVoiceLabel(currentVoiceId: String, options: List<TtsVoice>) {
 /**
  * 音色 ID 输入态对话框。
  *
- * 只在厂商允许自定义音色或没有内置音色表时出现；留空表示回到该模型的缺省音色，
+ * 从新增入口打开，或在没有内置音色表时直接显示；留空表示回到该模型的缺省音色，
  * 因此确定按钮始终可用，不需要额外的「清除」入口。
  */
 @Composable
@@ -400,7 +391,6 @@ private fun VoicePickerDialogPreview() {
             title = "播放音色",
             currentVoiceId = "longanlingxin_v3.1",
             options = voicePickerPreviewVoices(),
-            allowCustomInput = true,
             isLoading = false,
             onPick = {},
             onDismiss = {},
@@ -416,23 +406,6 @@ private fun VoicePickerDialogCustomValuePreview() {
             title = "播放音色",
             currentVoiceId = "qwen-audio-3.0-tts-flash-abc123",
             options = voicePickerPreviewVoices(),
-            allowCustomInput = true,
-            isLoading = false,
-            onPick = {},
-            onDismiss = {},
-        )
-    }
-}
-
-@Preview(name = "不允许自定义输入 · 无加号", showBackground = true, widthDp = 720, heightDp = 900)
-@Composable
-private fun VoicePickerDialogNoCustomInputPreview() {
-    GimiTheme {
-        VoicePickerDialog(
-            title = "播放音色",
-            currentVoiceId = "longanlingxin_v3.1",
-            options = voicePickerPreviewVoices(),
-            allowCustomInput = false,
             isLoading = false,
             onPick = {},
             onDismiss = {},
@@ -455,7 +428,6 @@ private fun VoicePickerDialogSearchPreview() {
             title = "播放音色",
             currentVoiceId = "longanlingxin_v3.1",
             options = voicePickerPreviewVoices(),
-            allowCustomInput = true,
             isLoading = false,
             onPick = {},
             onDismiss = {},
@@ -479,7 +451,6 @@ private fun VoicePickerDialogInputPreview() {
             title = "会话音色",
             currentVoiceId = "",
             options = emptyList(),
-            allowCustomInput = true,
             isLoading = false,
             onPick = {},
             onDismiss = {},

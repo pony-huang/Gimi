@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.a2ui.A2uiToolResult
 import github.ponyhuang.gimi.domain.conversation.model.Message
 
 /**
@@ -10,7 +11,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
  * `message.id` 全部变化，LazyColumn 整轮 item key 随之重建，已完成的回答被迫从流式状态切到静态
  * 路径整段重 parse —— 气泡「刷新式」闪一下。
  *
- * 因此：渲染内容等价的消息保留内存对象身份，只同步收尾标志位与落盘时间戳；从首个分歧点起以落盘
+ * 因此：渲染内容等价的消息保留内存对象身份，同步收尾标志位、落盘时间戳与 A2UI 终态；从首个分歧点起以落盘
  * 历史为准，保证 SDK 重试替换 partial、外部写入新轮次等真实变化仍然被采用。
  *
  * @param current 当前内存消息（含流式/乐观身份）。
@@ -36,6 +37,10 @@ internal fun adoptLoadedHistory(
                 partial = authoritative.partial,
                 turnComplete = authoritative.turnComplete,
                 timestamp = authoritative.timestamp,
+                // 工具调用身份相同仍可能从占位变成终态，跟随已归档的卡片响应。
+                functionResponses = kept.functionResponses.zip(authoritative.functionResponses) { live, persisted ->
+                    if (live.name == A2uiToolResult.TOOL_NAME) persisted else live
+                },
             )
             paired++
         }

@@ -7,23 +7,26 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,18 +38,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemory
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemoryFeedback
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import java.time.Instant
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -87,44 +90,44 @@ fun MemoryHistoryScreen(
             onRefresh = { onAction(MemoryHistoryAction.Refresh) },
             modifier = Modifier.fillMaxSize(),
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 16.dp),
-            ) {
-                if (!state.refreshing && state.memories.isEmpty()) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.memory_history_empty),
-                            modifier = Modifier.padding(horizontal = 32.dp),
-                        )
-                    }
-                }
-                itemsIndexed(state.memories, key = { _, memory -> memory.id }) { index, memory ->
-                    MemoryHistoryItem(
-                        memory = memory,
-                        expanded = memory.id in state.expandedMemoryIds,
-                        operating = state.operatingMemoryId == memory.id,
-                        isFirst = index == 0,
-                        isLast = index == state.memories.lastIndex,
-                        onClick = { onAction(MemoryHistoryAction.ToggleExpanded(memory.id)) },
-                        onPositiveFeedback = {
-                            onAction(MemoryHistoryAction.SubmitFeedback(memory, ManagedMemoryFeedback.POSITIVE, null))
-                        },
-                        onNegativeFeedback = { negativeFeedbackMemory = memory },
-                        onDelete = { onAction(MemoryHistoryAction.RequestDelete(memory)) },
-                    )
-                }
-                if (state.loadingNextPage) {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            contentAlignment = androidx.compose.ui.Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
+            if (state.memories.isNotEmpty()) {
+                PreferenceGroupCard(modifier = Modifier.padding(top = 8.dp)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        itemsIndexed(state.memories, key = { _, memory -> memory.id }) { index, memory ->
+                            MemoryHistoryItem(
+                                memory = memory,
+                                expanded = memory.id in state.expandedMemoryIds,
+                                operating = state.operatingMemoryId == memory.id,
+                                showDivider = index != state.memories.lastIndex,
+                                onClick = { onAction(MemoryHistoryAction.ToggleExpanded(memory.id)) },
+                                onPositiveFeedback = {
+                                    onAction(MemoryHistoryAction.SubmitFeedback(memory, ManagedMemoryFeedback.POSITIVE, null))
+                                },
+                                onNegativeFeedback = { negativeFeedbackMemory = memory },
+                                onDelete = { onAction(MemoryHistoryAction.RequestDelete(memory)) },
+                            )
+                        }
+                        if (state.loadingNextPage) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
                         }
                     }
                 }
+            } else if (!state.refreshing) {
+                Text(
+                    text = stringResource(R.string.memory_history_empty),
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 24.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -161,66 +164,87 @@ private fun MemoryHistoryItem(
     memory: ManagedMemory,
     expanded: Boolean,
     operating: Boolean,
-    isFirst: Boolean,
-    isLast: Boolean,
+    showDivider: Boolean,
     onClick: () -> Unit,
     onPositiveFeedback: () -> Unit,
     onNegativeFeedback: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(
-                RoundedCornerShape(
-                    topStart = if (isFirst) HISTORY_GROUP_CORNER_RADIUS else 0.dp,
-                    topEnd = if (isFirst) HISTORY_GROUP_CORNER_RADIUS else 0.dp,
-                    bottomStart = if (isLast) HISTORY_GROUP_CORNER_RADIUS else 0.dp,
-                    bottomEnd = if (isLast) HISTORY_GROUP_CORNER_RADIUS else 0.dp,
-                ),
-            )
-            .background(preferenceGroupCardColor())
             .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
     ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Lightbulb,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // 收起态保持单行，展开后才展示完整记忆与操作。
             Text(
                 text = memory.text,
-                maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_TEXT_LINES,
+                style = if (expanded) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = stringResource(R.string.memory_history_updated_at, memory.updatedAt?.toString().orEmpty()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.memory_history_updated_at, memory.updatedAt?.toString().orEmpty()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             AnimatedVisibility(visible = expanded) {
-                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()) {
-                    IconButton(onClick = onPositiveFeedback, enabled = !operating) {
+                Row(
+                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilledTonalIconButton(onClick = onPositiveFeedback, enabled = !operating) {
                         Icon(Icons.Default.ThumbUp, stringResource(R.string.memory_history_positive_feedback))
                     }
-                    IconButton(onClick = onNegativeFeedback, enabled = !operating) {
+                    FilledTonalIconButton(onClick = onNegativeFeedback, enabled = !operating) {
                         Icon(Icons.Default.ThumbDown, stringResource(R.string.memory_history_negative_feedback))
                     }
-                    IconButton(onClick = onDelete, enabled = !operating) {
+                    FilledTonalIconButton(onClick = onDelete, enabled = !operating) {
                         Icon(Icons.Default.Delete, stringResource(R.string.memory_history_delete))
                     }
                 }
             }
         }
-    if (!isLast) {
+    }
+    if (showDivider) {
         HorizontalDivider(
-            modifier = Modifier.padding(start = HISTORY_TEXT_START, end = 32.dp),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = HISTORY_DIVIDER_ALPHA),
+            modifier = Modifier.padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }
-
-private const val COLLAPSED_TEXT_LINES = 3
-private val HISTORY_GROUP_CORNER_RADIUS = 24.dp
-private val HISTORY_TEXT_START = 32.dp
-private const val HISTORY_DIVIDER_ALPHA = 0.5f
 
 /** 当用户已滚动到末尾附近且仍有下一页时，触发续载。 */
 internal fun shouldLoadNextMemoryPage(

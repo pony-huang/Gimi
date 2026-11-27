@@ -1,13 +1,19 @@
 package github.ponyhuang.gimi.feature.chat.a2ui
 
+import androidx.a2ui.compose.ui.A2uiCatalog
 import androidx.a2ui.compose.ui.toJsonSchemaString
 import github.ponyhuang.gimi.data.a2ui.AndroidxA2uiProtocol
 import github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities
 import github.ponyhuang.gimi.domain.a2ui.A2uiDocument
+import github.ponyhuang.gimi.feature.chat.a2ui.components.NeteaseRedAmbientPalette
+import github.ponyhuang.gimi.feature.chat.a2ui.components.fallbackPaletteFor
+import github.ponyhuang.gimi.feature.chat.a2ui.components.resolveMusicClientJumpUrl
+import github.ponyhuang.gimi.feature.chat.a2ui.components.resolveNeteaseJumpUrl
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
@@ -16,36 +22,66 @@ import org.junit.Test
  */
 class ChatA2uiCatalogValidationTest {
     @Test
-    fun exportedContainersValidateComposedTemplatesInputsTabsAndDetailReferences() = runTest {
-        val catalog = chatA2uiCatalog {}
-        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        for (empty in listOf(false, true)) {
-            for (revision in containerPreviewMessages(catalog.id, !empty, false, empty).chunked(3)) {
-                val surfaceId = Json.parseToJsonElement(revision.first()).jsonObject
-                    .getValue("createSurface").jsonObject.getValue("surfaceId").jsonPrimitive.content
-                AndroidxA2uiProtocol().validate(A2uiDocument(surfaceId, revision), capabilities)
-            }
-        }
+    fun extendedCatalogExportsCustomComponentsAlongsideTheBasicCatalog() {
+        val basic = chatA2uiCatalog {}
+        val extended = extendedChatA2uiCatalog(basic)
+        fun componentNames(catalog: A2uiCatalog) =
+            Json.parseToJsonElement(catalog.toJsonSchemaString()).jsonObject
+                .getValue("components").jsonObject.keys
+
+        assertEquals(
+            setOf("BarChart", "PieChart", "CandlestickChart", "WeatherCard", "ReceiptCard", "StockTicker",
+                "DataTable", "KeyValueList", "Timeline", "Agenda", "MusicPlayerCard", "Switch", "ChipSelect", "EntityCard"),
+            componentNames(extended) - componentNames(basic),
+        )
+        assertNotEquals(basic.id, extended.id)
     }
 
     @Test
-    fun exportedCatalogValidatesInlineAndBoundDataTablesIncludingEmptyRows() = runTest {
-        val catalog = chatA2uiCatalog(openUrl = {})
+    fun extendedCatalogValidatesCustomCardsAndWritableSwitchWithBasicContainer() = runTest {
+        val catalog = extendedChatA2uiCatalog(chatA2uiCatalog {})
         val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        val table = """{"heading":"用量","columns":[{"label":"模型"},{"label":"费用","align":"end"}],"rows":[["A","¥ 1.20"]]}"""
-        for (property in listOf(table, """{"path":"/table"}""", table.replace("[[\"A\",\"¥ 1.20\"]]", "[]"))) {
-            AndroidxA2uiProtocol().validate(
-                A2uiDocument(
-                    surfaceId = "table-surface",
-                    messages = listOf(
-                        """{"version":"v0.9.1","createSurface":{"surfaceId":"table-surface","catalogId":"${catalog.id}"}}""",
-                        """{"version":"v0.9.1","updateDataModel":{"surfaceId":"table-surface","path":"/","value":{"table":$table}}}""",
-                        """{"version":"v0.9.1","updateComponents":{"surfaceId":"table-surface","components":[{"id":"root","component":"DataTable","table":$property}]}}""",
-                    ),
-                ),
-                capabilities,
-            )
-        }
+        val document = A2uiDocument(
+            surfaceId = "extended",
+            messages = listOf(
+                """{"version":"v0.9.1","createSurface":{"surfaceId":"extended","catalogId":"${catalog.id}","sendDataModel":true}}""",
+                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"extended","path":"/","value":{"reminder":true,"liked":true,"topics":["deploys"],"slices":[{"label":"Food","value":20}]}}}""",
+                """{"version":"v0.9.1","updateComponents":{"surfaceId":"extended","components":[
+                  {"id":"root","component":"Column","children":["bar","pie","candlestick","weather","receipt","stock","table","pairs","timeline","agenda","music","switch","chips","entity"]},
+                  {"id":"bar","component":"BarChart","format":"currency","data":[{"x":"Food","y":20,"series":"Budget"}]},
+                  {"id":"pie","component":"PieChart","format":"compact","data":{"path":"/slices"},"donut":true,"centerLabel":"Total"},
+                  {"id":"candlestick","component":"CandlestickChart","title":"HLVR","format":"currency","data":[{"date":"Sep 1","open":182.4,"high":182.48,"low":178.71,"close":179.46}]},
+                  {"id":"weather","component":"WeatherCard","location":"Hangzhou","temp":23,"condition":"Cloudy"},
+                  {"id":"receipt","component":"ReceiptCard","merchant":"Cafe","items":[{"name":"Coffee","price":12}]},
+                  {"id":"stock","component":"StockTicker","symbol":"0700.HK","price":420.8,"sample":true,"series":[410,420.8]},
+                  {"id":"table","component":"DataTable","title":"Accounts","pageSize":5,"columns":[{"key":"price","label":"Price","format":"currency"}],"rows":[{"price":12}]},
+                  {"id":"pairs","component":"KeyValueList","title":"Order","columns":2,"items":[{"label":"Store","value":"West Lake"},{"label":"Items","value":3,"hint":"Express"}]},
+                  {"id":"timeline","component":"Timeline","items":[{"title":"Packed","status":"done"},{"title":"In transit","status":"current","icon":"truck"}]},
+                  {"id":"agenda","component":"Agenda","title":"This week","days":[{"date":"2026-11-28","events":[{"title":"Walk","time":"9:30 AM","tone":"accent"}]}]},
+                  {"id":"music","component":"MusicPlayerCard","title":"Goon Gumpas","artist":"Aphex Twin","durationSeconds":153,"progressSeconds":51,"isPlaying":true,"provider":"spotify","deviceId":"speaker-1","externalUrl":"https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC","songId":"8f3c9a12b4e567890123456789abcdef","originalId":"139774","liked":{"path":"/liked"},"tracks":[{"title":"Goon Gumpas","artist":"Aphex Twin","durationSeconds":153},{"title":"Avril 14th","artist":"Aphex Twin","externalUrl":"spotify:track:1a2b3c","isVip":true}]},
+                  {"id":"switch","component":"Switch","label":"Reminder","value":{"path":"/reminder"}},
+                  {"id":"chips","component":"ChipSelect","label":"Topics","value":{"path":"/topics"},"options":[{"value":"deploys","label":"Deploys"},{"value":"security","label":"Security"}]},
+                  {"id":"entity","component":"EntityCard","title":"Café Central","subtitle":"Coffee house","meta":"Open until 22:00","badge":{"label":"Popular","color":"success"},"rating":4.5,"ratingCount":12840,"actions":[{"label":"Directions","href":"https://maps.google.com"},{"label":"Pick","variant":"solid"}]}
+                ]}}""",
+            ),
+        )
+
+        AndroidxA2uiProtocol().validate(document, capabilities)
+    }
+
+    @Test
+    fun exportedCatalogContainsOnlyBasicCatalogComponents() {
+        val catalog = chatA2uiCatalog {}
+        val names = Json.parseToJsonElement(catalog.toJsonSchemaString()).jsonObject
+            .getValue("components").jsonObject.keys
+        assertEquals(
+            setOf(
+                "Text", "Image", "Icon", "Video", "AudioPlayer", "Row", "Column", "List",
+                "Card", "Tabs", "Divider", "Modal", "Button", "TextField", "CheckBox",
+                "ChoicePicker", "Slider", "DateTimeInput",
+            ),
+            names,
+        )
     }
 
     @Test
@@ -79,61 +115,37 @@ class ChatA2uiCatalogValidationTest {
     }
 
     @Test
-    fun exportedCatalogValidatesTodayOnlyWeatherPayload() = runTest {
-        val catalog = chatA2uiCatalog(openUrl = {})
-        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        org.junit.Assert.assertFalse(capabilities.schemaJson.contains("WeatherForecast"))
-        val document = A2uiDocument(
-            surfaceId = "weather-surface",
-            messages = listOf(
-                """{"version":"v0.9.1","createSurface":{"surfaceId":"weather-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
-                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"weather-surface","path":"/","value":{
-                  "weather":{
-                    "location":"上海",
-                    "updatedAt":"14:20",
-                    "current":{"conditionCode":"clear","temperatureC":28,"humidityPercent":68},
-                    "daily":[{"date":"2026-10-25","highC":31,"lowC":24}]
-                  }
-                }}}""",
-                """{"version":"v0.9.1","updateComponents":{"surfaceId":"weather-surface","components":[
-                  {"id":"root","component":"WeatherToday","weather":{"path":"/weather"}}
-                ]}}""",
-            ),
-        )
-
-        AndroidxA2uiProtocol().validate(document, capabilities)
+    fun neteaseJumpUrlPrefersNumericOriginalIdsAndNeverEmbedsEncryptedHexIds() {
+        assertEquals("orpheus://song/139774", resolveNeteaseJumpUrl("139774", "999888"))
+        assertEquals("orpheus://playlist/999888", resolveNeteaseJumpUrl("", "999888"))
+        // 32 位十六进制加密 songId 不能拼进客户端路由，必须回退到 orpheus:// 首页
+        assertEquals("orpheus://", resolveNeteaseJumpUrl("8f3c9a12b4e567890123456789abcdef", ""))
     }
 
     @Test
-    fun exportedCatalogValidatesMusicPlayerPayload() = runTest {
-        val catalog = chatA2uiCatalog(openUrl = {})
-        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        val document = A2uiDocument(
-            surfaceId = "player-surface",
-            messages = listOf(
-                """{"version":"v0.9.1","createSurface":{"surfaceId":"player-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
-                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"player-surface","path":"/","value":{
-                  "player":{
-                    "provider":"网易云音乐",
-                    "trackUri":"netease:track:one",
-                    "title":"Night Flight",
-                    "artist":"Artist",
-                    "album":"Album",
-                    "durationMs":258000,
-                    "progressMs":72000,
-                    "isPlaying":true,
-                    "fetchedAtEpochMs":1760000000000,
-                    "deviceId":"device",
-                    "deviceName":"Living room",
-                    "playbackContext":"now_playing"
-                  }
-                }}}""",
-                """{"version":"v0.9.1","updateComponents":{"surfaceId":"player-surface","components":[
-                  {"id":"root","component":"MusicPlayer","player":{"path":"/player"}}
-                ]}}""",
+    fun musicClientJumpSupportsSpotifyUrisAndNetEaseRedBaseTheme() {
+        assertEquals(
+            "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+            resolveMusicClientJumpUrl(
+                originalSongId = "",
+                songId = "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
             ),
         )
-
-        AndroidxA2uiProtocol().validate(document, capabilities)
+        assertEquals(
+            "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+            resolveMusicClientJumpUrl(
+                originalSongId = "",
+                externalUrl = "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=123",
+            ),
+        )
+        assertEquals(
+            "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+            resolveMusicClientJumpUrl(
+                originalSongId = "",
+                songId = "4uLU6hMCjMI75M1A2tKUQC",
+                provider = "spotify",
+            ),
+        )
+        assertEquals(NeteaseRedAmbientPalette, fallbackPaletteFor("Goon Gumpas", 0))
     }
 }

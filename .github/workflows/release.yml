@@ -1,34 +1,22 @@
 name: Publish Android Release
 
+# NewPipe 式发版：开发分支携带版本提升，合并 main 后手动打 tag 推送触发发布；
+# workflow_dispatch 保留给失败补跑（填已有 tag）。tag 形态与基线由 prepare 步校验。
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: '已存在的版本 tag，例如 v0.6.4、v0.7.0-rc.1、v1.0.0-beta.1 或热修 v1.0.0-beta.4.0.1'
+        description: '已存在的版本 tag，例如 v1.0.0-beta.5 或热修 v1.0.0-beta.4.0.1（补跑用）'
         required: true
         type: string
-  workflow_call:
-    inputs:
-      tag:
-        required: true
-        type: string
-    secrets:
-      RELEASE_KEYSTORE_BASE64:
-        required: true
-      RELEASE_KEYSTORE_PASSWORD:
-        required: true
-      RELEASE_KEY_ALIAS:
-        required: true
-      RELEASE_KEY_PASSWORD:
-        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-release-${{ inputs.tag || github.ref_name }}
+  group: android-release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:

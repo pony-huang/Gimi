@@ -115,16 +115,29 @@ def version_key(version):
 
 
 def config(root=ROOT):
-    """读取并交叉校验 version.txt、release-please manifest 与 gradle.properties 的 versionCode 三方一致；返回 (版本名, versionCode)。"""
+    """读取并校验 version.txt 与 gradle.properties 的 versionCode；返回 (版本名, versionCode)。"""
     version = (root / 'version.txt').read_text(encoding='utf-8').strip()
     version_key(version)
     codes = re.findall(r'^releaseVersionCode=(\d+)\s*$', (root / 'gradle.properties').read_text(encoding='utf-8'), re.M)
     if len(codes) != 1 or not 0 < int(codes[0]) <= 2100000000:
         raise ValueError('Exactly one valid releaseVersionCode is required')
-    manifest = json.loads((root / '.release-please-manifest.json').read_text(encoding='utf-8'))
-    if manifest['.'] != version:
-        raise ValueError('version.txt and release-please manifest differ')
     return version, int(codes[0])
+
+
+def pretag(tag):
+    """本地打 tag 前的预检：tag 形态、与 version.txt 一致、tag 已提交且在 origin/main 历史内、CHANGELOG 章节就绪、版本超过全部已发布版本。"""
+    version, _ = config()
+    if tag != f'v{version}':
+        raise ValueError('Tag does not match version.txt')
+    if subprocess.run(['git', 'rev-parse', '--verify', '--quiet', f'{tag}^{{commit}}'],
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+        raise ValueError(f'Tag {tag} does not exist; tag the version PR merge commit on main first')
+    subprocess.run(['git', 'merge-base', '--is-ancestor', f'{tag}^{{commit}}', 'origin/main'], check=True)
+    notes((ROOT / 'CHANGELOG.md').read_text(encoding='utf-8'), version)
+    previous = latest_release(releases())
+    if previous and version_key(version) <= version_key(previous['tag_name'].removeprefix('v')):
+        raise ValueError('Release version must exceed all published versions, including prereleases')
+    print(f'Pretag check passed for {tag}')
 
 
 def notes(text, version):
@@ -268,7 +281,7 @@ def publish(tag):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=('check', 'validate', 'package', 'publish'))
+    parser.add_argument('command', choices=('check', 'pretag', 'validate', 'package', 'publish'))
     parser.add_argument('--tag')
     parser.add_argument('--base-ref')
     parser.add_argument('--aapt')
@@ -288,6 +301,10 @@ if __name__ == '__main__':
                 base_code = int(re.search(r'^releaseVersionCode=(\d+)\s*$', base_properties, re.M)[1])
                 if version_key(version) <= version_key(base_version) or code <= base_code:
                     raise ValueError('Version PR must increment both versionName and releaseVersionCode')
+    elif args.command == 'pretag':
+        if not args.tag:
+            raise ValueError('pretag requires --tag')
+        pretag(args.tag)
     elif args.command == 'validate':
         validate(args.tag)
     elif args.command == 'package':

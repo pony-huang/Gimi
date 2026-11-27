@@ -164,7 +164,6 @@ class DefaultSpeechRepositoriesTest {
         } else {
             TtsVoice("v-first", "第一音色", "中文", "女声")
         }
-        every { allowsCustomVoice(any()) } returns false
     }
 
     private fun catalog(

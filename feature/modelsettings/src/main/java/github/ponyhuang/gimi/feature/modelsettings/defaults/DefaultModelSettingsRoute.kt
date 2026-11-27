@@ -5,6 +5,9 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -30,14 +33,17 @@ fun DefaultModelSettingsRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    var consumedRole by rememberSaveable { mutableStateOf<DefaultModelRole?>(null) }
     LaunchedEffect(openRole) {
-        when (openRole) {
-            DefaultModelRole.Realtime -> viewModel.showDialog(DefaultModelDialog.RealtimeModel)
-            DefaultModelRole.Assistant -> viewModel.showDialog(DefaultModelDialog.Assistant)
-            DefaultModelRole.Fast -> viewModel.showDialog(DefaultModelDialog.Fast)
-            DefaultModelRole.SpeechRecognition -> viewModel.showDialog(DefaultModelDialog.Speech)
-            DefaultModelRole.SpeechSynthesis -> viewModel.showDialog(DefaultModelDialog.Tts)
-            null -> Unit
+        if (openRole != null && consumedRole != openRole) {
+            consumedRole = openRole
+            when (openRole) {
+                DefaultModelRole.Realtime -> viewModel.showDialog(DefaultModelDialog.RealtimeModel)
+                DefaultModelRole.Assistant -> viewModel.showDialog(DefaultModelDialog.Assistant)
+                DefaultModelRole.Fast -> viewModel.showDialog(DefaultModelDialog.Fast)
+                DefaultModelRole.SpeechRecognition -> viewModel.showDialog(DefaultModelDialog.Speech)
+                DefaultModelRole.SpeechSynthesis -> viewModel.showDialog(DefaultModelDialog.Tts)
+            }
         }
     }
 
@@ -61,6 +67,7 @@ fun DefaultModelSettingsRoute(
             state = state,
             onAction = viewModel::onAction,
             onAddService = { dialog ->
+                viewModel.onAction(DefaultModelSettingsAction.DismissDialog)
                 dialog.toRole()?.let(onAddService)
             },
             modifier = scaffoldModifier,
@@ -75,5 +82,6 @@ private fun DefaultModelDialog.toRole(): DefaultModelRole? = when (this) {
     DefaultModelDialog.Speech -> DefaultModelRole.SpeechRecognition
     DefaultModelDialog.Tts -> DefaultModelRole.SpeechSynthesis
     DefaultModelDialog.RealtimeModel -> DefaultModelRole.Realtime
-    DefaultModelDialog.TtsVoice -> null
+    DefaultModelDialog.TtsVoice,
+    DefaultModelDialog.RealtimeVoice -> null
 }

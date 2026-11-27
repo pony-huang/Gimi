@@ -3,8 +3,8 @@ package github.ponyhuang.gimi.feature.chat.realtime
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -31,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -47,6 +50,7 @@ internal val RoleChipsRestingHeight = 48.dp
 internal fun ChatbotRoleChipsRoute(
     conversationId: String,
     edgePadding: Dp = 18.dp,
+    showCenteredLockedRole: Boolean = false,
     viewModel: ChatbotPromptViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(conversationId) { viewModel.bind(conversationId) }
@@ -58,6 +62,7 @@ internal fun ChatbotRoleChipsRoute(
         state = state,
         expanded = expanded && !call.configurationLocked,
         locked = call.configurationLocked,
+        showCenteredLockedRole = showCenteredLockedRole,
         edgePadding = edgePadding,
         onToggleExpanded = { expanded = !expanded },
         onSelect = { viewModel.onAction(ChatbotPromptAction.Select(it)) },
@@ -73,12 +78,18 @@ private fun ChatbotRoleChips(
     onSelect: (String?) -> Unit,
     edgePadding: Dp = 18.dp,
     locked: Boolean = false,
+    showCenteredLockedRole: Boolean = false,
 ) {
+    val lockedRoleName = if (locked) {
+        (state.builtInPresets + state.presets).firstOrNull { it.id == state.selectedPresetId }?.name
+            ?: stringResource(R.string.voice_prompt_preset_none)
+    } else {
+        null
+    }
     val chips: @Composable () -> Unit = {
-        if (locked) {
-            val current = (state.builtInPresets + state.presets).firstOrNull { it.id == state.selectedPresetId }
+        if (lockedRoleName != null) {
             RoleChip(
-                label = current?.name ?: stringResource(R.string.voice_prompt_preset_none),
+                label = lockedRoleName,
                 selected = true,
                 enabled = false,
                 onClick = {},
@@ -118,7 +129,9 @@ private fun ChatbotRoleChips(
             .fillMaxWidth()
             .animateContentSize(alignment = Alignment.BottomStart),
     ) {
-        if (expanded) {
+        if (lockedRoleName != null && showCenteredLockedRole) {
+            LockedRoleStatus(lockedRoleName, edgePadding)
+        } else if (expanded) {
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,6 +147,41 @@ private fun ChatbotRoleChips(
                 verticalAlignment = Alignment.CenterVertically,
             ) { chips() }
         }
+    }
+}
+
+@Composable
+private fun LockedRoleStatus(name: String, edgePadding: Dp) {
+    val lockedDescription = stringResource(R.string.voice_settings_after_hangup)
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = RoleChipsRestingHeight)
+            .padding(horizontal = edgePadding)
+            .semantics(mergeDescendants = true) { stateDescription = lockedDescription },
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.voice_current_role),
+            style = MaterialTheme.typography.labelSmall,
+            color = secondaryColor,
+        )
+        Text(
+            text = name,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            imageVector = Icons.Default.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(13.dp),
+            tint = secondaryColor,
+        )
     }
 }
 
@@ -173,6 +221,7 @@ private fun ChatbotRoleChipsExpandedPreview() {
 }
 
 @Preview(widthDp = 350)
+@Preview(widthDp = 350, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatbotRoleChipsLockedPreview() {
     GimiTheme { RoleChipsPreview(expanded = false, locked = true) }
@@ -189,6 +238,7 @@ private fun RoleChipsPreview(expanded: Boolean, locked: Boolean = false) {
         ),
         expanded = expanded,
         locked = locked,
+        showCenteredLockedRole = true,
         onToggleExpanded = {},
         onSelect = {},
     )

@@ -99,9 +99,8 @@ class AdkVoiceAudioBackend @Inject constructor(
         // 「我没有工具」；即便后续工具恢复，该指令仍压着模型。空声明时改用中性约束，
         // 只禁止虚构「已执行外部动作」，不替模型断言自己有没有工具。
         val hasDeclarations = !tools?.declarations.isNullOrEmpty()
-        // 原生实时 Chatbot 不调用 acquire()（不重放历史），所以必须在这里提前把可空的
-        // conversationId 解析为真实会话：否则轮终稿 flush() 会在空 ID 上失败，
-        // 被 RealtimeChatbotTranscript 吞掉后静默丢失整通转写。
+        // 原生实时 Chatbot 起呼时经 acquire() 注入历史上下文，并提前把可空的
+        // conversationId 解析为真实会话，避免轮终稿 flush() 在空 ID 上失败。
         val chatbotWriter = if (assistantMode) null else simpleVoice.get().bind(configuration.conversationId)
         // 助手模式没有 Chatbot 写入，会话 ID 仍可空（预设解析接受 null）；只有 Chatbot 必须解析出真实 ID。
         val conversationId = if (assistantMode) configuration.conversationId else chatbotWriter!!.resolve()
@@ -119,7 +118,7 @@ class AdkVoiceAudioBackend @Inject constructor(
             // 会话音色的自定义覆盖；null 表示用所选模型在该厂商下的缺省音色。
             voice = configuration.realtimeVoice,
             tools = tools,
-            // Chatbot 写入 Chatbot 分区当前会话（轮终稿落盘、上下文不重放）；实时助手行为不变不落库。
+            // Chatbot 写入 Chatbot 分区当前会话，并在起呼与重连时读取最近历史；实时助手行为不变不落库。
             persistence = chatbotWriter,
             // 门面构造非挂起，上行契约在首个事件/首帧上行时惰性解析；未知 Realtime
             // 服务无原生适配器，此处显式失败而不是静默走错协议。

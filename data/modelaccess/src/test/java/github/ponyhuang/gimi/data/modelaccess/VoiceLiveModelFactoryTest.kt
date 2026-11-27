@@ -221,5 +221,11 @@ class VoiceLiveModelFactoryTest {
             voice = "cloned_voice_id",
         )
         assertEquals("cloned_voice_id", (qwen as QwenRealtimeModel).voice)
+
+        val openAi = factory().create(
+            selection("instance-openai", "instance-openai-realtime", "gpt-realtime-2.1"),
+            voice = "voice_00123",
+        )
+        assertEquals("voice_00123", (openAi as OpenAiRealtimeModel).voice)
     }
 }

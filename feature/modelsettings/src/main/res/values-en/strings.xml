@@ -59,6 +59,7 @@
     <string name="modelsettings_defaults_voice_title">Speaking voice</string>
     <string name="modelsettings_defaults_section_realtime">Realtime</string>
     <string name="modelsettings_defaults_realtime_model_title">Realtime model</string>
+    <string name="modelsettings_realtime_default_voice_format">%1$s (Default voice)</string>
 
     <string name="modelsettings_dialog_pick_assistant">Select assistant model</string>
     <string name="modelsettings_dialog_pick_quick">Select quick response model</string>
@@ -190,10 +191,10 @@
     <string name="modelsettings_shared_credential_hint">Chat and speech share this key</string>
     <string name="modelsettings_toggle_key_visibility">Show or hide the key</string>
     <string name="modelsettings_get_api_key">Get a key</string>
-    <string name="modelsettings_section_available_models">Available models</string>
+    <string name="modelsettings_section_available_models">Models</string>
     <string name="modelsettings_no_capabilities">No models selected</string>
     <string name="modelsettings_selected_count">%1$d selected</string>
-    <string name="modelsettings_section_access">Access</string>
+    <string name="modelsettings_section_access">Service configuration</string>
     <string name="modelsettings_connection_settings">Connection settings</string>
     <string name="modelsettings_connection_settings_subtitle">Endpoint and connection test</string>
     <string name="modelsettings_official_tools">Provider tools</string>
@@ -205,7 +206,6 @@
     <string name="modelsettings_save_new_service">Save service</string>
     <string name="modelsettings_save_with_defaults">Save service &amp; defaults</string>
     <string name="modelsettings_confirm_models">Confirm selection (%1$d)</string>
-    <string name="modelsettings_models_confirm_hint">Confirm to return to the service details; saving applies the change.</string>
     <string name="modelsettings_delete_service">Delete service</string>
     <string name="modelsettings_delete_dialog_title">Delete “%1$s”?</string>
     <string name="modelsettings_delete_dialog_body">This removes the service connections, keys and model selections.</string>
@@ -224,9 +224,14 @@
     <string name="modelsettings_add_model_kind_label">Model kind</string>
     <string name="modelsettings_add_model_kind_hint">The kind decides what the model is used for (chat, recognition, synthesis or realtime).</string>
     <string name="modelsettings_add">Add</string>
-    <string name="modelsettings_models_empty_hint">No selectable models; fetch candidates from the chat connection or add one manually.</string>
     <string name="modelsettings_search_models">Search model name or ID</string>
     <string name="modelsettings_category_all">All</string>
+    <string name="modelsettings_models_summary">%1$d selected · %2$d candidates</string>
+    <string name="modelsettings_model_badge_vision">Vision</string>
+    <string name="modelsettings_model_badge_documents">Documents</string>
+    <string name="modelsettings_model_badge_audio">Audio</string>
+    <string name="modelsettings_empty_query_title">No models match &quot;%1$s&quot;</string>
+    <string name="modelsettings_empty_query_hint">Try a different keyword or category filter</string>
     <string name="modelsettings_field_protocol">Protocol</string>
     <string name="modelsettings_protocol_locked_hint">This service uses a fixed API protocol and cannot be changed.</string>
     <string name="modelsettings_field_endpoint">Endpoint</string>

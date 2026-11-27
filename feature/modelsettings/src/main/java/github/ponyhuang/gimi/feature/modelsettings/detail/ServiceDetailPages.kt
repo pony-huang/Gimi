@@ -1,9 +1,12 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -12,7 +15,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -39,9 +45,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -62,21 +77,15 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 模型管理页：搜索、类别筛选、候选勾选与手动添加。 */
 @Composable
 internal fun ModelsPage(state: ModelServiceDetailUiState, onAction: (ModelServiceDetailAction) -> Unit) {
-    val normalizedQuery = state.modelQuery.trim()
     val capabilities = state.candidates.map { it.capability }.distinct()
     val selectedCategory = state.selectedCategory?.takeIf { it in capabilities }
-    val visibleCandidates = state.candidates
-        .filter { candidate -> selectedCategory == null || candidate.capability == selectedCategory }
-        .filter { candidate ->
-            normalizedQuery.isEmpty() ||
-                candidate.model.id.contains(normalizedQuery, ignoreCase = true) ||
-                candidate.model.name.contains(normalizedQuery, ignoreCase = true)
-        }
+    val visibleCandidates = state.visibleCandidates
     Column(Modifier.fillMaxWidth()) {
         GimiSearchField(
             state.modelQuery,
@@ -103,76 +112,270 @@ internal fun ModelsPage(state: ModelServiceDetailUiState, onAction: (ModelServic
                 }
             }
         }
+        if (state.candidates.isNotEmpty()) {
+            // 摘要行取代原"全选"独占行：左侧汇总已选与候选规模，右侧承载全选入口。
+            SelectionSummaryRow(
+                selectedCount = visibleCandidates.count { it.key in state.pendingModelKeys },
+                visibleCount = visibleCandidates.size,
+                selectAllEnabled = state.canEdit && visibleCandidates.any { it.key !in state.pendingModelKeys },
+                onSelectAll = { onAction(ModelServiceDetailAction.SelectAllVisibleModels) },
+            )
+        }
+        if (visibleCandidates.isEmpty() && state.modelQuery.isNotBlank()) {
+            EmptyQueryHint(state.modelQuery.trim())
+        }
         val grouped = visibleCandidates.groupBy { it.capability }
         grouped.forEach { (capability, rows) ->
-            PreferenceSectionTitle(stringResource(capabilityLabelRes(capability)))
-            PreferenceGroupCard {
-                rows.forEachIndexed { index, row ->
-                    ModelChoiceRow(
+            ModelSectionHeader(stringResource(capabilityLabelRes(capability)), rows.size)
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rows.forEach { row ->
+                    ModelChoiceCard(
                         row = row,
                         selected = row.key in state.pendingModelKeys,
-                        showDivider = index < rows.lastIndex,
                         onToggle = { onAction(ModelServiceDetailAction.ToggleModel(row.key)) },
                     )
                 }
             }
         }
-        // 手动添加是独立操作入口：与候选卡片之间留出间距，避免两张卡片贴成一团。
-        Spacer(Modifier.height(12.dp))
-        PreferenceGroupCard {
-            PreferenceListItem(
-                icon = Icons.Outlined.Add,
-                title = stringResource(R.string.modelsettings_add_model_manually),
-                onClick = { onAction(ModelServiceDetailAction.ShowAddDialog) },
-            )
-        }
-        if (visibleCandidates.isEmpty()) {
-            PreferenceSectionNote(stringResource(R.string.modelsettings_models_empty_hint))
-        }
-        Spacer(Modifier.height(8.dp))
-        PreferenceSectionNote(stringResource(R.string.modelsettings_models_confirm_hint))
+        // 手动添加是独立操作入口：虚线卡片在视觉上与候选卡片区分操作与选项。
+        Spacer(Modifier.height(10.dp))
+        ManualAddCard(onClick = { onAction(ModelServiceDetailAction.ShowAddDialog) })
     }
 }
 
+/** 候选列表顶部的选择摘要行：左汇总、右全选；无可见候选时全选自然禁用。 */
 @Composable
-private fun ModelChoiceRow(
+private fun SelectionSummaryRow(
+    selectedCount: Int,
+    visibleCount: Int,
+    selectAllEnabled: Boolean,
+    onSelectAll: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.modelsettings_models_summary, selectedCount, visibleCount),
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onSelectAll, enabled = selectAllEnabled) {
+            Text(stringResource(R.string.modelsettings_select_all))
+        }
+    }
+}
+
+/** 候选分组标题：能力名 + 当前可见数量，缩进与选择卡片的内边距对齐。 */
+@Composable
+private fun ModelSectionHeader(label: String, count: Int) {
+    Row(
+        Modifier.padding(start = 28.dp, end = 32.dp, top = 18.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+        )
+    }
+}
+
+/** 候选模型的选择卡片：能力图标圆底 + 名称/ID/多模态徽标 + 尾部勾选标记。 */
+@Composable
+private fun ModelChoiceCard(
     row: ModelCandidateRow,
     selected: Boolean,
-    showDivider: Boolean,
     onToggle: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val multimodal = row.model.multimodal
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer else preferenceGroupCardColor(),
+            )
+            .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onToggle() })
+            .padding(start = 12.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // 能力图标圆底：行首视觉锚点，与设置页图标徽章同一容器语言。
+        Box(
+            Modifier.size(38.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            Checkbox(checked = selected, onCheckedChange = { onToggle() })
-            Column(Modifier.weight(1f)) {
-                Text(row.model.name.ifBlank { row.model.id }, style = MaterialTheme.typography.bodyLarge)
-                if (row.model.id != row.model.name) {
-                    Text(
-                        row.model.id,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Icon(
+                capabilityIcon(row.capability),
+                contentDescription = null,
+                Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                row.model.name.ifBlank { row.model.id },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (row.model.id != row.model.name) {
+                Text(
+                    row.model.id,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            if (multimodal.isMultimodal) {
+                Row(
+                    Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (multimodal.supportsImages) {
+                        ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_vision))
+                    }
+                    if (multimodal.supportsDocuments) {
+                        ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_documents))
+                    }
+                    if (multimodal.supportsAudio) {
+                        ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_audio))
+                    }
                 }
             }
         }
-        if (showDivider) {
-            HorizontalRowDivider(start = 68)
+        SelectionMark(selected)
+    }
+}
+
+/** 多模态输入能力的小徽标：辅助标签用 tertiary 容器语言。 */
+@Composable
+private fun ModelCapabilityBadge(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+/** 尾部多选标记：选中为墨色圆底白勾，未选中为描边空圆。 */
+@Composable
+private fun SelectionMark(selected: Boolean) {
+    Box(
+        Modifier
+            .size(22.dp)
+            .then(
+                if (selected) {
+                    Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
+                } else {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                Modifier.size(13.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
         }
     }
 }
 
+/** 搜索无结果的空态：给出换词与换类别的引导。 */
 @Composable
-internal fun HorizontalRowDivider(start: Int) {
-    androidx.compose.material3.HorizontalDivider(
-        Modifier.padding(start = start.dp, end = 16.dp),
-        color = MaterialTheme.colorScheme.outlineVariant,
-    )
+private fun EmptyQueryHint(query: String) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 44.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            stringResource(R.string.modelsettings_empty_query_title, query),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+        )
+        Text(
+            stringResource(R.string.modelsettings_empty_query_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+/** 手动添加入口：虚线描边卡片，与候选卡片区分操作与选项。 */
+@Composable
+private fun ManualAddCard(onClick: () -> Unit) {
+    // drawBehind 在绘制期执行，不能读 composition-local；颜色与形状在组合期捕获。
+    val shape = MaterialTheme.shapes.large
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(shape)
+            .drawBehind {
+                // Compose 的 border 修饰符不支持虚线，这里手绘圆角虚线描边。
+                val dash = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
+                val stroke = Stroke(width = 1.5.dp.toPx(), pathEffect = dash)
+                when (val outline = shape.createOutline(size, layoutDirection, this)) {
+                    is Outline.Rounded -> {
+                        drawPath(Path().apply { addRoundRect(outline.roundRect) }, outlineColor, style = stroke)
+                    }
+                    is Outline.Rectangle -> drawRect(outlineColor, style = stroke)
+                    else -> Unit
+                }
+            }
+            .clickable(onClick = onClick)
+            .padding(vertical = 15.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(26.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = null,
+                Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+        Text(
+            stringResource(R.string.modelsettings_add_model_manually),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 10.dp),
+        )
+    }
 }
 
 /** 接口设置页：每条连接的协议、端点、凭据来源与连接测试。 */

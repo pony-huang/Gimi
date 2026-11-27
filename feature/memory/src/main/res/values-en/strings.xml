@@ -15,9 +15,9 @@
     <string name="memory_saving">Saving</string>
     <string name="memory_saved">Memory settings saved</string>
     <string name="memory_save_failed">Could not save memory settings</string>
-    <string name="memory_history_title">Cloud memory history</string>
+    <string name="memory_history_title">Mem0</string>
     <string name="memory_history_subtitle">View, delete, and rate current Mem0 memories</string>
-    <string name="memory_history_screen_title">Cloud memory history</string>
+    <string name="memory_history_screen_title">Mem0</string>
     <string name="memory_history_empty">No cloud memories yet</string>
     <string name="memory_history_updated_at">Updated: %1$s</string>
     <string name="memory_history_positive_feedback">Helpful</string>

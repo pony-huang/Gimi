@@ -187,6 +187,27 @@ class ModelServiceDetailViewModelTest {
     }
 
     @Test
+    fun selectAllAddsMatchingModelsAndKeepsSelectionsOutsideTheSearch() = runTest {
+        val viewModel = createViewModel(repository(instances = listOf(openAiInstance())))
+        viewModel.onAction(ModelServiceDetailAction.Load("instance-openai", null, null))
+        advanceUntilIdle()
+        viewModel.onAction(ModelServiceDetailAction.OpenPage(ServiceEditorPage.Models))
+
+        val candidates = viewModel.uiState.value.candidates
+        val conversationKey = candidates.single { it.model.id == "gpt-4.1" }.key
+        val recognitionKey = candidates.single { it.model.id == "whisper-1" }.key
+        viewModel.onAction(ModelServiceDetailAction.ToggleModel(recognitionKey))
+        viewModel.onAction(ModelServiceDetailAction.ModelQueryChanged(" GPT "))
+        viewModel.onAction(ModelServiceDetailAction.SelectCategory(ServiceCapability.Recognition))
+        viewModel.onAction(ModelServiceDetailAction.SelectAllVisibleModels)
+        assertEquals(setOf(conversationKey), viewModel.uiState.value.pendingModelKeys)
+
+        viewModel.onAction(ModelServiceDetailAction.ModelQueryChanged(" WHISPER "))
+        viewModel.onAction(ModelServiceDetailAction.SelectAllVisibleModels)
+        assertEquals(setOf(conversationKey, recognitionKey), viewModel.uiState.value.pendingModelKeys)
+    }
+
+    @Test
     fun backFromSubPageReturnsToDetailInsteadOfClosingEditor() = runTest {
         val repository = repository(instances = listOf(openAiInstance()))
         val viewModel = createViewModel(repository)

@@ -10,23 +10,6 @@ internal fun catalogHas(capabilities: A2uiCapabilities, vararg names: String): B
     return names.any { components?.containsKey(it) == true }
 }
 
-/** 容器只描述布局，业务内容仍由普通组件与标准 children 模板表达。 */
-internal fun containerRoutingInstructions(capabilities: A2uiCapabilities): String = buildString {
-    if (catalogHas(capabilities, "Disclosure")) appendLine(
-        "Disclosure: summary is a component ID; children uses the standard child list/template. " +
-            "initiallyExpanded is optional. Use for details/sources; expand/collapse is local.",
-    )
-    if (catalogHas(capabilities, "Tabs")) appendLine(
-        "Tabs: tabs:[{\"title\":\"Label\",\"child\":\"component-id\"}]. Each child is an existing subtree. " +
-            "Switching is local; preserve bound input values.",
-    )
-    if (catalogHas(capabilities, "DetailSheet")) appendLine(
-        "DetailSheet: trigger and content are component IDs. The trigger Button must emit open_detail; " +
-            "a close Button inside content emits close_detail. These scoped events are local only. " +
-            "Business buttons inside content keep their normal event names and authorization.",
-    )
-}.trimEnd()
-
 internal fun inputRoutingInstructions(capabilities: A2uiCapabilities): String {
     if (!catalogHas(capabilities, "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput")) return ""
     return """
@@ -62,25 +45,5 @@ internal fun inputRoutingInstructions(capabilities: A2uiCapabilities): String {
         On update, replace existing date/time TextFields with DateTimeInput while preserving the known selected value.
         FINAL CHECK: inspect every date/time field before render_a2ui. Replace forbidden TextFields with DateTimeInput,
         verify enableDate/enableTime, and verify each value binding has an initialized data entry.
-    """.trimIndent()
-}
-
-internal fun tableRoutingInstructions(capabilities: A2uiCapabilities): String {
-    if (!catalogHas(capabilities, "DataTable")) return ""
-    return """
-        When the catalog provides DataTable and the request is a comparison, metrics table, or structured
-        query result, prefer DataTable over manually aligning Text/Row/List components. Keep specialized
-        weather and music requests on their matching native components. DataTable is read-only:
-        do not use it for editable forms or controls. Use exactly one native DataTable component as the
-        root; do not wrap it in a generic Card. Do NOT add a separate Text title above the table or a
-        summary/footer/count Text below it: the component already renders its own heading, and the
-        client adds card-level actions. If a total is needed, append it as the last row of the table.
-        Use one required table property, preferably
-        {"id":"root","component":"DataTable","table":{"path":"/table"}}.
-        Example data: {"table":{"heading":"用量","columns":[{"label":"模型"},
-        {"label":"请求数","align":"end"}],"rows":[["Model A","128"],["Model B","64"]]}}.
-        Supply exactly one formatted string per column in every row. Localize labels, numbers, units,
-        dates and missing-value labels. Use rows:[] for empty results. Do not invent values or truncate
-        silently: at most 8 columns and 100 rows; narrow the query explicitly for larger results.
     """.trimIndent()
 }

@@ -22,8 +22,8 @@ class UplinkFrameQueueTest {
         queue.enqueue(reused)
         reused[0] = 3
 
-        assertArrayEquals(byteArrayOf(1, 0, 0, 0), queue.poll())
-        assertArrayEquals(byteArrayOf(2, 0, 0, 0), queue.poll())
+        assertArrayEquals(byteArrayOf(1, 0, 0, 0), queue.pollAudio())
+        assertArrayEquals(byteArrayOf(2, 0, 0, 0), queue.pollAudio())
         assertNull(queue.poll())
     }
 
@@ -32,9 +32,9 @@ class UplinkFrameQueueTest {
         val queue = UplinkFrameQueue(3)
         repeat(5) { index -> queue.enqueue(byteArrayOf(index.toByte())) }
 
-        assertEquals(2, queue.poll()!![0].toInt())
-        assertEquals(3, queue.poll()!![0].toInt())
-        assertEquals(4, queue.poll()!![0].toInt())
+        assertEquals(2, queue.pollAudio()[0].toInt())
+        assertEquals(3, queue.pollAudio()[0].toInt())
+        assertEquals(4, queue.pollAudio()[0].toInt())
         assertNull(queue.poll())
     }
 
@@ -43,6 +43,8 @@ class UplinkFrameQueueTest {
         val queue = UplinkFrameQueue(8)
         queue.enqueue(byteArrayOf(1))
         queue.enqueue(byteArrayOf(2))
+        queue.enqueueCommit()
+        queue.enqueueInterrupt()
         queue.clear()
         assertNull(queue.poll())
     }
@@ -52,11 +54,44 @@ class UplinkFrameQueueTest {
         val queue = UplinkFrameQueue(2)
         val source = byteArrayOf(7)
         queue.enqueue(source)
-        val polled = queue.poll()!!
+        val polled = queue.pollAudio()
         assertNotSame(source, polled)
         polled[0] = 9
         assertEquals(7, source[0].toInt())
     }
+
+    @Test
+    fun `turn controls stay ordered between audio from adjacent utterances`() {
+        val queue = UplinkFrameQueue(8)
+        queue.enqueue(byteArrayOf(1))
+        queue.enqueueCommit()
+        queue.enqueueInterrupt()
+        queue.enqueue(byteArrayOf(2))
+        queue.enqueueCommit()
+
+        assertArrayEquals(byteArrayOf(1), queue.pollAudio())
+        assertEquals(UplinkFrameQueue.Item.CommitTurn, queue.poll())
+        assertEquals(UplinkFrameQueue.Item.Interrupt, queue.poll())
+        assertArrayEquals(byteArrayOf(2), queue.pollAudio())
+        assertEquals(UplinkFrameQueue.Item.CommitTurn, queue.poll())
+        assertNull(queue.poll())
+    }
+
+    @Test
+    fun `dropping oldest audio never drops queued turn controls`() {
+        val queue = UplinkFrameQueue(1)
+        queue.enqueue(byteArrayOf(1))
+        queue.enqueueCommit()
+        queue.enqueue(byteArrayOf(2))
+        queue.enqueueInterrupt()
+
+        assertEquals(UplinkFrameQueue.Item.CommitTurn, queue.poll())
+        assertArrayEquals(byteArrayOf(2), queue.pollAudio())
+        assertEquals(UplinkFrameQueue.Item.Interrupt, queue.poll())
+    }
+
+    private fun UplinkFrameQueue.pollAudio(): ByteArray =
+        (poll() as UplinkFrameQueue.Item.Audio).pcm16
 
     @Test(expected = IllegalArgumentException::class)
     fun `non positive capacity is rejected`() {

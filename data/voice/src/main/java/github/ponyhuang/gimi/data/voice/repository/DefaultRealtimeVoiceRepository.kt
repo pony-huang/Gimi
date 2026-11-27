@@ -109,12 +109,28 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             mutableState.update { it.copy(audioRouting = routing) }
         })
         private val segmenter = VoiceActivitySegmenter(
-            onSpeechStarted = { scope.launch { speechStarted() } },
+            onSpeechStarted = {
+                // 检测回调与上行帧同处录音线程：在派发主线程任务前同步推进 revision，
+                // 并排入打断控制，避免旧 commit 与新一轮音频的顺序窗口。
+                synchronized(inputLock) {
+                    if (!closed && started && !state.value.muted && !state.value.inputPaused) {
+                        inputRevision++
+                        uplinkQueue.enqueueInterrupt()
+                        ensureUplinkDrain()
+                    }
+                }
+                scope.launch { speechStarted() }
+            },
             onUtterance = { segment ->
                 if (duplexMode) {
-                    // 本地语音段结束:关闸回到门控待命,静默帧重新进预滚环;整轮判轮归服务端 server_vad。
-                    uplinkGateOpen = false
-                    uplinkPreRoll.clear()
+                    synchronized(inputLock) {
+                        if (closed || !started || state.value.muted || state.value.inputPaused) return@synchronized
+                        // 本地 VAD 独占判轮：提交控制与音频同队列，后面的新语音无法插到本轮前面。
+                        uplinkGateOpen = false
+                        uplinkPreRoll.clear()
+                        uplinkQueue.enqueueCommit()
+                        ensureUplinkDrain()
+                    }
                 } else {
                     if (configuration.pipeline == VoicePipeline.SEMI_CASCADED) {
                         scope.launch { handleSemiCascadedUtterance(segment) }
@@ -137,7 +153,9 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             if (started) return@withContext
             var startupFailure = RealtimeVoiceFailure.Configuration
             cancellationAwareRunCatching {
-                check(session.isAvailable()) { "Speech configuration unavailable" }
+                if (!duplexMode) {
+                    check(session.isAvailable()) { "Speech configuration unavailable" }
+                }
                 startupFailure = RealtimeVoiceFailure.AudioProcessing
                 withContext(NonCancellable + Dispatchers.IO) {
                     val created = SileroVoiceActivityDetector(context.assets)
@@ -198,13 +216,18 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             val session = backend.openDuplex(configuration)
             // 就绪即接管上行：解析窗口内暂存的帧已在同一个有界队列里，按入队顺序由单一
             // 协程发送；session.updated 确认前由连接层的 pendingAudio 继续小缓冲。
-            synchronized(inputLock) {
-                duplex = session
-                ensureUplinkDrain()
+            // 首事件可能同步报错，先登记 Job，失败处理才能取消并等待这个收集者。
+            duplexJob = scope.launch(start = CoroutineStart.LAZY) {
+                cancellationAwareRunCatching {
+                    session.events().collect { event -> handleDuplexEvent(event) }
+                }.onFailure { error ->
+                    android.util.Log.w(TAG, "Duplex event stream failed", error)
+                    fail((error as? VoiceAudioBackendException)?.failure ?: RealtimeVoiceFailure.Generation)
+                }
             }
-            duplexJob = scope.launch {
-                session.events().collect { event -> handleDuplexEvent(event) }
-            }
+            synchronized(inputLock) { duplex = session }
+            duplexJob?.start()
+            synchronized(inputLock) { ensureUplinkDrain() }
         }
 
         private fun acceptCleanAudio(bytes: ByteArray) {
@@ -265,11 +288,10 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         }
 
         /**
-         * Realtime 模式的本地上行门控（设计 D4 演进——全程门控）：
-         * 嘈杂环境的人群声在服务端 VAD 看来同样是语音，部分厂商判轮鲁棒性不足；
+         * Realtime 模式的本地上行门控：嘈杂环境的人群声对模型同样是语音，
          * 统一由本地 VAD 把关，静默帧不上行，服务端只收到判定为语音的帧（含预滚
-         * 前导音）。判轮与打断仍归服务端；播放期与播完尾音期回声主导的帧已被
-         * [PlaybackEchoGuard] 压到 0，天然进不了上行。
+         * 前导音）。服务端自动判轮关闭，轮次边界由同一上行队列中的提交控制显式触发；播放期
+         * 与播完尾音期回声主导的帧已被 [PlaybackEchoGuard] 压到 0，天然进不了上行。
          */
         private fun uplinkFrame(frame: ByteArray, probability: Float) {
             if (!uplinkGateOpen) {
@@ -302,31 +324,46 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
         private fun ensureUplinkDrain() {
             if (uplinkDrainJob?.isActive == true) return
             val session = duplex ?: return
-            uplinkDrainJob = scope.launch {
+            // 即使从主线程入队也先登记 Job，避免同步失败时清理遗漏当前消费者。
+            uplinkDrainJob = scope.launch(Dispatchers.Main) {
                 while (isActive) {
-                    val frame = synchronized(inputLock) {
-                        val next = uplinkQueue.poll()
-                        // 队列排空后释放 job；此后入队会重新拉起消费协程。
-                        if (next == null) uplinkDrainJob = null
-                        next
+                    val item = synchronized(inputLock) {
+                        uplinkQueue.poll() ?: run {
+                            // 队列排空后释放 job；此后入队会重新拉起消费协程。
+                            uplinkDrainJob = null
+                            null
+                        }
                     } ?: break
-                    cancellationAwareRunCatching { session.sendAudio(frame) }
+                    cancellationAwareRunCatching {
+                        when (item) {
+                            is UplinkFrameQueue.Item.Audio -> session.sendAudio(item.pcm16)
+                            UplinkFrameQueue.Item.CommitTurn -> session.commitTurn()
+                            UplinkFrameQueue.Item.Interrupt -> session.interrupt()
+                        }
+                    }.onFailure { error ->
+                        if (!closed) {
+                            android.util.Log.w(TAG, "Realtime 上行命令处理失败", error)
+                            fail(RealtimeVoiceFailure.Generation)
+                        }
+                    }
                 }
             }
         }
 
-        private fun speechStarted() {
+        private suspend fun speechStarted() {
             if (closed || !started || state.value.muted || state.value.inputPaused) return
-            inputRevision++
             recognitionJob?.cancel()
             replyActive = false
             player.stop()
             // 人声开始即取消整条生成/合成链路，不能等待下一次识别才停止付费请求。
             replyJob?.cancel()
             if (duplexMode) {
-                // 本地即时停播;服务端协议级取消由 duplex 会话的 Interrupted/TurnCompleted 事件收尾。
+                // 本地即时停播，并显式取消服务端活动响应；后续 response.done 负责会话收尾。
                 duplexPlayback?.cancel()
                 duplexPlayback = null
+                cancellationAwareRunCatching { duplex?.interrupt() }.onFailure {
+                    android.util.Log.w(TAG, "Realtime 本地打断失败", it)
+                }
             }
             mutableState.update { it.copy(phase = RealtimeVoicePhase.Listening, speakingText = "", outputLevel = 0f) }
         }
@@ -393,7 +430,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 is RealtimeVoiceEvent.AssistantAudio -> onAssistantAudio(event.pcm24k)
                 RealtimeVoiceEvent.Interrupted -> stopDuplexPlayback()
                 RealtimeVoiceEvent.TurnCompleted -> finishDuplexPlayback()
-                is RealtimeVoiceEvent.Failed -> onDuplexFailed(event.failure)
+                is RealtimeVoiceEvent.Failed -> fail(event.failure)
             }
         }
 
@@ -450,18 +487,6 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             }
             if (state.value.phase == RealtimeVoicePhase.Thinking) armResponseWatchdog()
             else responseWatchdog?.cancel()
-        }
-
-        private suspend fun onDuplexFailed(failure: RealtimeVoiceFailure) {
-            duplexJob?.cancel()
-            duplexJob = null
-            duplexPlayback?.cancel()
-            duplexPlayback = null
-            player.stop()
-            val session = duplex
-            duplex = null
-            withContext(Dispatchers.IO) { runCatching { session?.close() } }
-            fail(failure)
         }
 
         private fun handleSemiCascadedUtterance(segment: UtteranceSegment) {
@@ -744,6 +769,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
 
         private fun fail(failure: RealtimeVoiceFailure) {
             if (closed) return
+            started = false
             inputRevision++
             replyActive = false
             player.stop()
@@ -751,22 +777,20 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             if (duplexMode) {
                 duplexPlayback?.cancel()
                 duplexPlayback = null
-                duplexJob?.cancel()
+                val eventJob = duplexJob
                 duplexJob = null
                 // 失败即停掉上行消费并弃置暂存帧：跨入下一次通话的陈旧音频不应随重试冲入新会话。
-                uplinkDrainJob?.cancel()
-                uplinkDrainJob = null
                 // 置空 duplex 与清空队列同锁完成，避免录音线程在两者之间把帧重新攒进队列。
-                val duplexSession = synchronized(inputLock) {
-                    val current = duplex
+                val (duplexSession, uplinkJob) = synchronized(inputLock) {
+                    val active = duplex to uplinkDrainJob
                     duplex = null
+                    uplinkDrainJob = null
                     uplinkQueue.clear()
-                    current
+                    active
                 }
-                scope.launch(Dispatchers.IO) { runCatching { duplexSession?.close() } }
+                lifecycle.closeFailedDuplex(scope, duplexSession, eventJob, uplinkJob)
             }
             recorder.stop()
-            started = false
             restoreAudioRouting()
             mutableState.update { it.copy(phase = RealtimeVoicePhase.Failed, listening = false, failure = failure,
                 speakingText = "", inputLevel = 0f, outputLevel = 0f) }
@@ -774,13 +798,14 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
 
         override suspend fun retry() {
             if (closed || state.value.phase != RealtimeVoicePhase.Failed) return
-            if (state.value.failure == RealtimeVoiceFailure.Persistence) {
+            if (!duplexMode && state.value.failure == RealtimeVoiceFailure.Persistence) {
                 val saved = cancellationAwareRunCatching { session.retryPersistence() }.isSuccess
                 if (!saved) return
             }
             replyJob?.join()
             recorder.stopAndJoin()
             if (duplexMode) {
+                lifecycle.awaitFailedDuplexCleanup()
                 duplexPlayback?.cancel()
                 duplexPlayback = null
                 duplexPlaybackJob = null
@@ -857,10 +882,14 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     }
                 }
                 try {
-                    // 退出仍尝试提交；存储失败不能阻止麦克风、路由及会话租约的释放。
-                    withContext(Dispatchers.IO) { session.close() }
-                } catch (_: VoiceAudioBackendException) {
-                    mutableState.update { it.copy(failure = RealtimeVoiceFailure.Persistence) }
+                    if (!duplexMode) {
+                        try {
+                            // 退出仍尝试提交；存储失败不能阻止麦克风、路由及会话租约的释放。
+                            withContext(Dispatchers.IO) { session.close() }
+                        } catch (_: VoiceAudioBackendException) {
+                            mutableState.update { it.copy(failure = RealtimeVoiceFailure.Persistence) }
+                        }
+                    }
                 } finally {
                     restoreAudioRouting()
                     mutableState.update { it.copy(phase = RealtimeVoicePhase.Closed, listening = false, inputLevel = 0f, outputLevel = 0f) }

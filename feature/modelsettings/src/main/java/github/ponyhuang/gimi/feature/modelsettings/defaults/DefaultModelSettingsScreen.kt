@@ -139,9 +139,39 @@ fun DefaultModelSettingsScreen(
                         title = stringResource(R.string.modelsettings_defaults_realtime_model_title),
                         selection = state.realtimeSelection,
                         rows = state.realtimeModels,
-                        showDivider = false,
+                        showDivider = true,
                         onClick = if (state.isMutationBlocked) null else {
                             { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.RealtimeModel)) }
+                        },
+                    )
+
+                    val realtimeEnabled = state.realtimeModels.any { it.selection() == state.realtimeSelection }
+                    val realtimeVoiceLabel = when {
+                        !realtimeEnabled -> ""
+                        state.realtimeVoiceId != null -> {
+                            val v = state.realtimeVoiceOptions.firstOrNull { it.id == state.realtimeVoiceId }
+                            v?.name ?: state.realtimeVoiceId
+                        }
+                        state.realtimeDefaultVoiceName.isNotBlank() -> {
+                            stringResource(R.string.modelsettings_realtime_default_voice_format, state.realtimeDefaultVoiceName)
+                        }
+                        else -> ""
+                    }
+                    PreferenceListItem(
+                        icon = Icons.Default.GraphicEq,
+                        title = stringResource(R.string.modelsettings_defaults_voice_title),
+                        subtitle = realtimeVoiceLabel,
+                        showDivider = false,
+                        onClick = if (realtimeEnabled && !state.isMutationBlocked) {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.RealtimeVoice)) }
+                        } else {
+                            null
+                        },
+                        iconContainer = Color.Transparent,
+                        iconTint = if (realtimeEnabled) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         },
                     )
                 }
@@ -193,7 +223,6 @@ fun DefaultModelSettingsScreen(
                 title = stringResource(R.string.modelsettings_dialog_pick_voice),
                 currentVoiceId = state.ttsVoiceId,
                 options = state.ttsVoiceOptions,
-                allowCustomInput = state.ttsVoiceCustomInputAllowed,
                 isLoading = state.isTtsVoiceLoading,
                 onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it)) },
                 onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
@@ -206,6 +235,18 @@ fun DefaultModelSettingsScreen(
             onAction = onAction,
             onAddService = onAddService,
         )
+
+        DefaultModelDialog.RealtimeVoice -> {
+            VoicePickerDialog(
+                title = stringResource(R.string.modelsettings_dialog_pick_voice),
+                currentVoiceId = state.realtimeActiveVoiceId,
+                options = state.realtimeVoiceOptions,
+                defaultVoiceId = state.realtimeDefaultVoiceId,
+                isLoading = state.isRealtimeVoiceLoading,
+                onPick = { onAction(DefaultModelSettingsAction.SelectRealtimeVoice(it)) },
+                onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
+            )
+        }
 
         null -> Unit
     }
@@ -240,7 +281,10 @@ private fun RealtimeModelChoiceDialog(
         onPick = { onAction(DefaultModelSettingsAction.SelectRealtimeModel(it.selection())) },
         onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
         emptyContent = {
-            EmptyCatalogWithAddService { onAddService(DefaultModelDialog.RealtimeModel) }
+            EmptyCatalogWithAddService {
+                onAction(DefaultModelSettingsAction.DismissDialog)
+                onAddService(DefaultModelDialog.RealtimeModel)
+            }
         },
     )
 }
@@ -323,7 +367,10 @@ private fun ModelChoiceDialog(
         onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
         // 目录为空时提供补配服务的行动出口；保存后回到本页再次确认一次用途。
         emptyContent = {
-            EmptyCatalogWithAddService { onAddService(target) }
+            EmptyCatalogWithAddService {
+                onAction(DefaultModelSettingsAction.DismissDialog)
+                onAddService(target)
+            }
         },
     )
 }

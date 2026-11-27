@@ -11,7 +11,7 @@
     <string name="gimi_sheet_search_exit">退出搜索</string>
     <string name="voice_picker_search_hint">输入关键词搜索音色</string>
     <!-- 音色选择抽屉：自 :feature:modelsettings 迁入，供聊天语音页与默认模型设置共用（见 AGENTS.md 共享豁免）。 -->
-    <string name="voice_picker_search">搜索名称、音色 ID、特质或场景</string>
+    <string name="voice_picker_search">搜索音色</string>
     <string name="voice_picker_current">当前：%1$s</string>
     <string name="voice_picker_current_none">当前：使用默认音色</string>
     <string name="voice_picker_current_custom">当前：%1$s（自定义值，不在系统音色列表中）</string>

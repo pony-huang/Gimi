@@ -13,6 +13,7 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Tool
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
@@ -35,6 +36,7 @@ import org.junit.Before
 import org.junit.Test
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 
 /**
  * OpenAI Realtime 模型的 WebSocket 边界：握手后第一帧是 session.update、
@@ -61,7 +63,6 @@ class OpenAiRealtimeModelTest {
         model = "gpt-realtime-2.1",
         apiKey = "sk-test",
         voice = "cedar",
-        silenceDurationMs = OpenAiRealtimeProtocol.DEFAULT_SILENCE_DURATION_MS,
         webSocketClient = OkHttpClient(),
     )
 
@@ -110,8 +111,8 @@ class OpenAiRealtimeModelTest {
         val session = sessionUpdate.getAsJsonObject("session")
         assertEquals("test persona", session.get("instructions").asString)
         assertEquals("cedar", session.get("voice").asString)
-        assertEquals("server_vad", session.getAsJsonObject("audio").getAsJsonObject("input")
-            .getAsJsonObject("turn_detection").get("type").asString)
+        assertTrue(session.getAsJsonObject("audio").getAsJsonObject("input")
+            .get("turn_detection").isJsonNull)
         pump.cancel()
         connection.closeSession()
     }
@@ -188,6 +189,189 @@ class OpenAiRealtimeModelTest {
         assertEquals(0, truncate.get("content_index").asInt)
         assertEquals(0L, truncate.get("audio_end_ms").asLong)
         connection.closeSession()
+    }
+
+    @Test
+    fun `local turn control sends append commit and response create in order`() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = JsonParser.parseString(text).asJsonObject.get("type").asString
+                controls += type
+                if (type == "session.update") webSocket.send("""{"type":"session.updated"}""")
+            }
+        }))
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) { runCatching { connection.receive().collect {} } }
+        try {
+            connection.sendRealtime(RealtimeInput.Audio(Blob(mimeType = "audio/pcm;rate=24000", data = ByteArray(16))))
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("input_audio_buffer.append" !in controls) delay(10) }
+            }
+            val sink = connection as RealtimeTurnControlSink
+            sink.commitAudioTurn()
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("response.create" !in controls) delay(10) }
+            }
+            assertEquals(
+                listOf("session.update", "input_audio_buffer.append", "input_audio_buffer.commit", "response.create"),
+                controls.toList(),
+            )
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun `commit before session ack waits for buffered audio to flush first`() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val socket = java.util.concurrent.atomic.AtomicReference<WebSocket>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                controls += JsonParser.parseString(text).asJsonObject.get("type").asString
+                if (text.contains("session.update")) socket.set(webSocket)
+            }
+        }))
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) { runCatching { connection.receive().collect {} } }
+        try {
+            connection.sendRealtime(RealtimeInput.Audio(Blob(mimeType = "audio/pcm;rate=24000", data = ByteArray(16))))
+            val commit = async { (connection as RealtimeTurnControlSink).commitAudioTurn() }
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (socket.get() == null) delay(10) }
+                delay(100)
+            }
+            assertTrue("配置确认前不应提交音频", "input_audio_buffer.commit" !in controls)
+            socket.get().send("""{"type":"session.updated"}""")
+            withContext(Dispatchers.IO) { withTimeoutOrNull(5_000) { commit.await() } }
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("response.create" !in controls) delay(10) }
+            }
+            assertEquals(
+                listOf("session.update", "input_audio_buffer.append", "input_audio_buffer.commit", "response.create"),
+                controls.toList(),
+            )
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun `barge in before response created cancels the requested response and suppresses its audio`() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val socket = java.util.concurrent.atomic.AtomicReference<WebSocket>()
+        val emittedAudio = java.util.concurrent.atomic.AtomicInteger()
+        val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = JsonParser.parseString(text).asJsonObject.get("type").asString
+                controls += type
+                when (type) {
+                    "session.update" -> {
+                        socket.set(webSocket)
+                        webSocket.send("""{"type":"session.updated"}""")
+                    }
+                    "response.cancel" -> {
+                        webSocket.send("""{"type":"response.output_audio.delta","delta":"AQID"}""")
+                        webSocket.send("""{"type":"response.done","response":{"status":"cancelled"}}""")
+                    }
+                }
+            }
+        }))
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) {
+            runCatching {
+                connection.receive().collect {
+                    if (it.content != null) emittedAudio.incrementAndGet()
+                    if (it.turnComplete == true) completed.set(true)
+                }
+            }
+        }
+        try {
+            val sink = connection as RealtimeTurnControlSink
+            sink.commitAudioTurn()
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (socket.get() == null) delay(10) }
+            }
+            sink.cancelResponse()
+            assertEquals("created 前不应提前取消", 0, controls.count { it == "response.cancel" })
+            socket.get().send("""{"type":"response.created"}""")
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (!completed.get()) delay(10) }
+            }
+            assertEquals(1, controls.count { it == "response.cancel" })
+            assertEquals(0, emittedAudio.get())
+
+            // 取消窗口不能污染下一轮合法响应。
+            socket.get().send("""{"type":"response.created"}""")
+            socket.get().send("""{"type":"response.output_audio.delta","delta":"AQID"}""")
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (emittedAudio.get() == 0) delay(10) }
+            }
+            assertEquals(1, emittedAudio.get())
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun `local barge in cancels and truncates an active response`() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = JsonParser.parseString(text).asJsonObject.get("type").asString
+                controls += type
+                if (type == "session.update") {
+                    webSocket.send("""{"type":"session.updated"}""")
+                    webSocket.send("""{"type":"response.created"}""")
+                    webSocket.send("""{"type":"response.output_item.added","item":{"type":"function_call","call_id":"c1","name":"get_weather"}}""")
+                    webSocket.send("""{"type":"response.function_call_arguments.delta","call_id":"c1","delta":"{\"city\":"}""")
+                    webSocket.send("""{"type":"response.output_item.added","item":{"type":"message","role":"assistant","id":"a1"}}""")
+                    webSocket.send("""{"type":"response.output_audio.delta","delta":"AQID"}""")
+                }
+                if (type == "response.cancel") {
+                    webSocket.send("""{"type":"response.function_call_arguments.done","call_id":"c1","name":"get_weather","arguments":"{\"city\":\"杭州\"}"}""")
+                    webSocket.send("""{"type":"response.output_audio.delta","delta":"AQID"}""")
+                    webSocket.send("""{"type":"response.done","response":{"status":"cancelled"}}""")
+                }
+            }
+        }))
+        val connection = model().connect(connectRequest(tools = listOf(weatherDeclaration())))
+        val received = java.util.concurrent.atomic.AtomicBoolean(false)
+        val receivedAudioCount = java.util.concurrent.atomic.AtomicInteger()
+        val lateToolCalls = java.util.concurrent.atomic.AtomicInteger()
+        val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+        val pump = launch(Dispatchers.IO) {
+            runCatching { connection.receive().collect {
+                if (it.content != null) {
+                    received.set(true)
+                    receivedAudioCount.incrementAndGet()
+                    if (it.content?.parts.orEmpty().any { part -> part.functionCall != null }) lateToolCalls.incrementAndGet()
+                }
+                if (it.turnComplete == true) completed.set(true)
+            } }
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (!received.get()) delay(10) }
+            }
+            assertTrue(received.get())
+            val beforeCancel = receivedAudioCount.get()
+            val sink = connection as RealtimeTurnControlSink
+            sink.cancelResponse()
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("conversation.item.truncate" !in controls || !completed.get()) delay(10) }
+            }
+            assertEquals(listOf("response.cancel", "conversation.item.truncate"), controls.drop(1))
+            assertEquals("取消后的残余音频不得上抛", beforeCancel, receivedAudioCount.get())
+            assertEquals("取消后才定稿的工具调用不得执行", 0, lateToolCalls.get())
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
     }
 
     @Test
@@ -292,6 +476,7 @@ class OpenAiRealtimeModelTest {
                     webSocket.send("""{"type":"response.function_call_arguments.delta","call_id":"c1","delta":"{\"city\":"}""")
                     webSocket.send("""{"type":"response.done","response":{"status":"cancelled"}}""")
                     // 响应 B：参数完整但走兜底冲出（无 arguments.done）。
+                    webSocket.send("""{"type":"response.created"}""")
                     webSocket.send("""{"type":"response.output_item.added","item":{"type":"function_call","call_id":"c2","name":"get_weather"}}""")
                     webSocket.send("""{"type":"response.function_call_arguments.delta","call_id":"c2","delta":"{\"city\":\"上海\"}"}""")
                     webSocket.send("""{"type":"response.done","response":{"status":"completed"}}""")
@@ -385,6 +570,168 @@ class OpenAiRealtimeModelTest {
             assertEquals(listOf("旧回答", "新回答"), transcripts.toList())
             assertEquals(listOf("response.cancel", "conversation.item.truncate", "input_audio_buffer.clear",
                 "conversation.item.create", "response.create"), controls.drop(1))
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun manualSubmissionSuppressesResponseCreatedAfterItWasRequested() = runTest {
+        val controls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val transcripts = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val socket = java.util.concurrent.atomic.AtomicReference<WebSocket>()
+        var responseCreates = 0
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = JsonParser.parseString(text).asJsonObject.get("type").asString
+                controls += type
+                when (type) {
+                    "session.update" -> {
+                        socket.set(webSocket)
+                        webSocket.send("""{"type":"session.updated"}""")
+                    }
+                    "response.create" -> {
+                        responseCreates++
+                        if (responseCreates == 2) {
+                            webSocket.send("""{"type":"response.created","response":{"id":"old"}}""")
+                        }
+                    }
+                    "response.cancel" -> {
+                        webSocket.send("""{"type":"response.output_audio_transcript.delta","delta":"旧尾音"}""")
+                        webSocket.send("""{"type":"response.done","response":{"status":"cancelled"}}""")
+                    }
+                }
+            }
+        }))
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) {
+            runCatching { connection.receive().collect { it.outputTranscription?.text?.let(transcripts::add) } }
+        }
+        try {
+            val sink = connection as RealtimeTurnControlSink
+            sink.commitAudioTurn()
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while ("response.create" !in controls) delay(10) }
+            }
+            val manual = connection as github.ponyhuang.gimi.data.modelaccess.shared.RealtimeManualInputSink
+            manual.submitUserContent(Content.fromText(Role.USER, "改成一句话"))
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (controls.count { it == "response.create" } < 2) delay(10) }
+            }
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (controls.none { it == "response.cancel" }) delay(10) }
+            }
+            assertEquals("延迟 created 的旧响应必须被取消", 1, controls.count { it == "response.cancel" })
+
+            sink.cancelResponse()
+            socket.get().send("""{"type":"response.created","response":{"id":"new"}}""")
+            socket.get().send("""{"type":"response.output_audio_transcript.delta","delta":"新回答"}""")
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) { while (controls.count { it == "response.cancel" } < 2) delay(10) }
+            }
+            assertEquals("手动输入的待确认响应也必须可被本地打断取消", 2, controls.count { it == "response.cancel" })
+            assertEquals(emptyList<String>(), transcripts.toList())
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun `sendHistory buffers and flushes conversation items before audio`() = runTest {
+        val sentFrames = java.util.concurrent.CopyOnWriteArrayList<String>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                sentFrames += text
+                if (text.contains("session.update")) {
+                    webSocket.send("""{"type":"session.updated"}""")
+                }
+            }
+        }))
+
+        val connection = model().connect(connectRequest())
+        // 配置确认前注入会话历史与音频
+        connection.sendHistory(listOf(
+            Content.fromText(Role.USER, "你好，之前聊到哪里了？"),
+            Content.fromText(Role.MODEL, "上次聊到了实时语音会话。"),
+        ))
+        val pcm = ByteArray(16) { it.toByte() }
+        connection.sendRealtime(RealtimeInput.Audio(Blob(mimeType = "audio/pcm;rate=24000", data = pcm)))
+
+        val pump = launch(Dispatchers.IO) { runCatching { connection.receive().collect {} } }
+        try {
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) {
+                    while (sentFrames.size < 4) delay(10)
+                    true
+                }
+            }
+            assertEquals(4, sentFrames.size)
+
+            // 1. session.update
+            val f0 = JsonParser.parseString(sentFrames[0]).asJsonObject
+            assertEquals("session.update", f0.get("type").asString)
+
+            // 2. conversation.item.create for user
+            val f1 = JsonParser.parseString(sentFrames[1]).asJsonObject
+            assertEquals("conversation.item.create", f1.get("type").asString)
+            assertEquals("user", f1.getAsJsonObject("item").get("role").asString)
+            assertEquals("input_text", f1.getAsJsonObject("item").getAsJsonArray("content")[0].asJsonObject.get("type").asString)
+            assertEquals("你好，之前聊到哪里了？", f1.getAsJsonObject("item").getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+
+            // 3. conversation.item.create for assistant
+            val f2 = JsonParser.parseString(sentFrames[2]).asJsonObject
+            assertEquals("conversation.item.create", f2.get("type").asString)
+            assertEquals("assistant", f2.getAsJsonObject("item").get("role").asString)
+            assertEquals("output_text", f2.getAsJsonObject("item").getAsJsonArray("content")[0].asJsonObject.get("type").asString)
+            assertEquals("上次聊到了实时语音会话。", f2.getAsJsonObject("item").getAsJsonArray("content")[0].asJsonObject.get("text").asString)
+
+            // 4. input_audio_buffer.append
+            val f3 = JsonParser.parseString(sentFrames[3]).asJsonObject
+            assertEquals("input_audio_buffer.append", f3.get("type").asString)
+        } finally {
+            connection.closeSession()
+            pump.cancel()
+        }
+    }
+
+    @Test
+    fun `sendHistory after sessionConfigured sends immediately`() = runTest {
+        val sentFrames = java.util.concurrent.CopyOnWriteArrayList<String>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                sentFrames += text
+                if (text.contains("session.update")) {
+                    webSocket.send("""{"type":"session.updated"}""")
+                }
+            }
+        }))
+
+        val connection = model().connect(connectRequest())
+        val pump = launch(Dispatchers.IO) { runCatching { connection.receive().collect {} } }
+        try {
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) {
+                    while (sentFrames.isEmpty()) delay(10)
+                    true
+                }
+            }
+            // session.update 已发出，再调用 sendHistory
+            connection.sendHistory(listOf(
+                Content.fromText(Role.USER, "追加历史"),
+            ))
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(5_000) {
+                    while (sentFrames.size < 2) delay(10)
+                    true
+                }
+            }
+            assertEquals(2, sentFrames.size)
+            val f1 = JsonParser.parseString(sentFrames[1]).asJsonObject
+            assertEquals("conversation.item.create", f1.get("type").asString)
+            assertEquals("user", f1.getAsJsonObject("item").get("role").asString)
+            assertEquals("追加历史", f1.getAsJsonObject("item").getAsJsonArray("content")[0].asJsonObject.get("text").asString)
         } finally {
             connection.closeSession()
             pump.cancel()

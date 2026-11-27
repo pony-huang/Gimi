@@ -110,6 +110,84 @@ class AdkVoiceAudioBackendTest {
     }
 
     @Test
+    fun nativeRealtimeAcquiresHistoryAndSendsItToConnection() = runBlocking {
+        val historyContent = listOf(Content.fromText(Role.USER, "历史问"), Content.fromText(Role.MODEL, "历史答"))
+        val call = mockk<ChatbotConversationWriter.Call>(relaxed = true) {
+            coEvery { resolve() } returns "c1"
+            coEvery { acquire() } returns historyContent
+        }
+        val writer = mockk<ChatbotConversationWriter> {
+            every { bind("c1") } returns call
+        }
+        val connection = mockk<LiveConnection>(relaxed = true) {
+            every { receive() } returns emptyFlow()
+        }
+        val liveModel = mockk<Model> {
+            coEvery { connect(any()) } returns connection
+        }
+        coEvery { models.create(any(), any()) } returns liveModel
+        coEvery { models.realtimeUplink(any()) } returns github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink(
+            resampled = false, sampleRateHz = 24000,
+        )
+
+        val backend = AdkVoiceAudioBackend(
+            models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(),
+            javax.inject.Provider { writer },
+        )
+        val session = backend.openDuplex(
+            github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration(
+                style = github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle.CHATBOT,
+                pipeline = github.ponyhuang.gimi.domain.voice.repository.VoicePipeline.NATIVE_REALTIME,
+                conversationId = "c1",
+                modelSelection = github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection("instance", "connection", "model"),
+            ),
+        )
+        val job = launch {
+            session.events().collect {}
+        }
+        delay(100)
+        coVerify(exactly = 1) { call.acquire() }
+        coVerify(exactly = 1) { connection.sendHistory(historyContent) }
+        job.cancel()
+        session.close()
+    }
+
+    @Test
+    fun nativeRealtimeEmitsFailedWhenHistoryAcquisitionFailsWithBusy() = runBlocking {
+        val call = mockk<ChatbotConversationWriter.Call>(relaxed = true) {
+            coEvery { resolve() } returns "c1"
+            coEvery { acquire() } throws VoiceAudioBackendException(RealtimeVoiceFailure.ConversationBusy)
+        }
+        val writer = mockk<ChatbotConversationWriter> {
+            every { bind("c1") } returns call
+        }
+        coEvery { models.realtimeUplink(any()) } returns github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink(
+            resampled = false, sampleRateHz = 24000,
+        )
+
+        val backend = AdkVoiceAudioBackend(
+            models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(),
+            javax.inject.Provider { writer },
+        )
+        val session = backend.openDuplex(
+            github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration(
+                style = github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle.CHATBOT,
+                pipeline = github.ponyhuang.gimi.domain.voice.repository.VoicePipeline.NATIVE_REALTIME,
+                conversationId = "c1",
+                modelSelection = github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection("instance", "connection", "model"),
+            ),
+        )
+        val events = mutableListOf<github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceEvent>()
+        session.events().collect { events.add(it) }
+        assertEquals(1, events.size)
+        assertEquals(
+            github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.ConversationBusy),
+            events.single(),
+        )
+        session.close()
+    }
+
+    @Test
     fun pcmInputTextDeltasAndLazySynthesisKeepTheirExistingBehavior(): Unit = runBlocking {
         withTimeout(5_000) {
             every { recognition.transcribeStreaming(pcm) } returns flowOf(RecognitionEvent.Final(" 用户输入 "))

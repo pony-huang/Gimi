@@ -146,10 +146,48 @@ fun ChatRoute(
         viewModel.effects.collect { effect ->
             if (effect is ChatEffect.OpenA2uiUrl) {
                 val uri = effect.url.toUri()
-                if (uri.scheme in setOf("http", "https")) {
-                    try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
-                    catch (_: android.content.ActivityNotFoundException) {
-                        Toast.makeText(context, context.getString(R.string.chat_a2ui_link_failed), Toast.LENGTH_SHORT).show()
+                when (uri.scheme) {
+                    "http", "https" -> {
+                        try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                        catch (_: android.content.ActivityNotFoundException) {
+                            Toast.makeText(context, context.getString(R.string.chat_a2ui_link_failed), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    "orpheus" -> {
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        } catch (_: android.content.ActivityNotFoundException) {
+                            // 未安装网易云音乐客户端时，若有数字 originalId 则回退至网页版，否则打开网易云首页。
+                            val id = uri.lastPathSegment?.takeIf { it.all(Char::isDigit) }
+                            val fallbackWeb = when (uri.host) {
+                                "song" if id != null -> "https://music.163.com/#/song?id=$id"
+                                "playlist" if id != null -> "https://music.163.com/#/playlist?id=$id"
+                                else -> "https://music.163.com/"
+                            }.toUri()
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, fallbackWeb))
+                            } catch (_: android.content.ActivityNotFoundException) {
+                                Toast.makeText(context, context.getString(R.string.chat_a2ui_link_failed), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    "spotify" -> {
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        } catch (_: android.content.ActivityNotFoundException) {
+                            // 未安装 Spotify 客户端时，将 spotify:<type>:<id> 转换为 https://open.spotify.com/<type>/<id> 网页回退。
+                            val parts = effect.url.removePrefix("spotify:").split(':').filter(String::isNotBlank)
+                            val fallbackWeb = if (parts.size >= 2 && parts[0] in setOf("track", "album", "playlist", "artist", "episode", "show")) {
+                                "https://open.spotify.com/${parts[0]}/${parts[1]}"
+                            } else {
+                                "https://open.spotify.com/"
+                            }.toUri()
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, fallbackWeb))
+                            } catch (_: android.content.ActivityNotFoundException) {
+                                Toast.makeText(context, context.getString(R.string.chat_a2ui_link_failed), Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 }
                 return@collect
@@ -296,7 +334,13 @@ fun ChatRoute(
                 .firstOrNull { it.id == chatbotState.sessionId }
                 ?.takeIf { it.lastMessage.isNotBlank() || chatbotState.chat.messages.isNotEmpty() }
                 ?.title.orEmpty(),
-            roleChips = { ChatbotRoleChipsRoute(chatbotState.sessionId, edgePadding = 26.dp) },
+            roleChips = {
+                ChatbotRoleChipsRoute(
+                    chatbotState.sessionId,
+                    edgePadding = 26.dp,
+                    showCenteredLockedRole = true,
+                )
+            },
             onVoiceVisibleChange = { voicePageVisible = it },
             drawerOpen = drawerOpen,
         ) { onOpenVoice ->

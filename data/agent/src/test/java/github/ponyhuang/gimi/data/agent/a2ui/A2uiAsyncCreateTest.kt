@@ -48,6 +48,83 @@ class A2uiAsyncCreateTest {
     }
 
     @Test
+    fun previewReachesChatBeforeFinalSnapshotAndOnlyFinalIsArchived() = runTest(timeout = 15.seconds) {
+        val sessions = InMemorySessionService()
+        val previewSeen = CompletableDeferred<Unit>()
+        val execution = execution(sessions, afterPreview = { previewSeen.await() }) {}
+        val statuses = mutableListOf<A2uiGenerationStatus>()
+
+        execution.send("show image", emptyList()).collect { event ->
+            event.functionResponses.forEach { response ->
+                val task = response.a2uiTask ?: return@forEach
+                statuses += task.status
+                if (task.status == A2uiGenerationStatus.PENDING && response.a2uiDocument != null) {
+                    assertTrue(response.a2uiDocument!!.messages.last().contains("Preview"))
+                    assertFalse(sessions.getSession(key)!!.events.any { it.author == A2uiGenerationTaskCodec.AUTHOR })
+                    previewSeen.complete(Unit)
+                }
+            }
+        }
+
+        assertTrue(previewSeen.isCompleted)
+        assertEquals(listOf(A2uiGenerationStatus.PENDING, A2uiGenerationStatus.PENDING, A2uiGenerationStatus.COMPLETED), statuses)
+        assertTrue(A2uiToolResult.extract(A2uiToolResult.TOOL_NAME, archivedResult(sessions))!!
+            .messages.last().contains("fixture.invalid"))
+    }
+
+    @Test
+    fun completedCardReachesChatWhileParentIsStillGenerating() = runTest(timeout = 15.seconds) {
+        val sessions = InMemorySessionService()
+        val terminalSeen = CompletableDeferred<Unit>()
+        val execution = execution(sessions, beforeParentAnswer = { terminalSeen.await() }) {}
+        val statuses = mutableListOf<A2uiGenerationStatus>()
+
+        execution.send("show image", emptyList()).collect { event ->
+            if (event.parts.any { it.text == "parent answer" }) assertTrue(terminalSeen.isCompleted)
+            event.functionResponses.forEach { response ->
+                val task = response.a2uiTask ?: return@forEach
+                statuses += task.status
+                if (task.status == A2uiGenerationStatus.COMPLETED) {
+                    assertNotNull(response.a2uiDocument)
+                    assertFalse(sessions.getSession(key)!!.events.any { it.author == A2uiGenerationTaskCodec.AUTHOR })
+                    terminalSeen.complete(Unit)
+                }
+            }
+        }
+
+        assertEquals(listOf(A2uiGenerationStatus.PENDING, A2uiGenerationStatus.COMPLETED), statuses)
+        assertEquals(A2uiGenerationStatus.COMPLETED, A2uiGenerationTaskCodec.extract(archivedResult(sessions))!!.status)
+    }
+
+    @Test
+    fun stalledGenerationTurnsIntoRetryableFailure() = runTest {
+        val creates = A2uiCreateScope(this)
+        val task = A2uiGenerationTask("call", "surface", "invocation", "image URL", setOf("Image"))
+        creates.submit(task) { awaitCancellation() }
+        creates.markPendingSent(task.surfaceId)
+        val result = creates.snapshot().single().result.await()
+        assertEquals(A2uiGenerationStatus.FAILED, A2uiGenerationTaskCodec.extract(result)!!.status)
+        assertEquals(45_000L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun generationCanFinishBeforeThePendingResponseIsDelivered() = runTest {
+        val published = CompletableDeferred<Map<String, Any>>()
+        val creates = A2uiCreateScope(this) { published.complete(it) }
+        val task = A2uiGenerationTask("call", "surface", "invocation", "image URL", setOf("Image"))
+        val preview = A2uiDocument(task.surfaceId, listOf("fixture"))
+        creates.submit(task) { publish ->
+            publish(preview)
+            emptyMap()
+        }
+        val result = creates.snapshot().single().result.await()
+        assertEquals(A2uiGenerationStatus.COMPLETED, A2uiGenerationTaskCodec.extract(result)!!.status)
+        assertFalse(published.isCompleted)
+        creates.markPendingSent(task.surfaceId)
+        assertEquals(preview, A2uiToolResult.extract(A2uiToolResult.TOOL_NAME, published.await()))
+    }
+
+    @Test
     fun stoppingAfterParentAnswerCancelsWorkerAndArchivesCancellation() = runTest(timeout = 15.seconds) {
         val sessions = InMemorySessionService()
         val started = CompletableDeferred<Unit>()
@@ -89,7 +166,7 @@ class A2uiAsyncCreateTest {
 
         val documents = events.flatMap { it.functionResponses }.mapNotNull { it.a2uiDocument }
         assertTrue(documents.isNotEmpty())
-        assertTrue(documents.all { it.deleted })
+        assertTrue(documents.last().deleted)
         assertTrue(A2uiToolResult.extract(A2uiToolResult.TOOL_NAME, archivedResult(sessions))!!.deleted)
     }
 
@@ -101,15 +178,34 @@ class A2uiAsyncCreateTest {
         return event.customMetadata!![A2uiGenerationTaskCodec.RESULT_KEY] as Map<String, Any?>
     }
 
-    private suspend fun execution(sessions: InMemorySessionService, mutation: String? = null, before: suspend () -> Unit): github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution {
+    private suspend fun execution(
+        sessions: InMemorySessionService,
+        mutation: String? = null,
+        afterPreview: (suspend () -> Unit)? = null,
+        beforeParentAnswer: suspend () -> Unit = {},
+        before: suspend () -> Unit,
+    ): github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution {
         var calls = 0
         val worker = object : Model {
             override val name = "worker"
             override fun generateContent(request: LlmRequest, stream: Boolean) = flow {
                 before()
-                emit(LlmResponse(content = Content(role = Role.MODEL, parts = listOf(Part(functionCall = FunctionCall(
-                    name = "render_a2ui", args = mapOf("components" to """[{"id":"root","component":"Image","url":"https://fixture.invalid/image.png"}]""", "data" to "{}"),
-                ))))))
+                assertTrue(stream)
+                val preview = """{"final":false,"components":[{"id":"root","component":"Text","text":"Preview"}],"data":{}}""" + "\n"
+                val final = """{"final":true,"components":[{"id":"root","component":"Image","url":"https://fixture.invalid/image.png"}],"data":{}}"""
+                if (afterPreview != null) {
+                    for (chunk in preview.chunked(preview.length / 2)) {
+                        emit(LlmResponse(content = Content.fromText(Role.MODEL, chunk), partial = true))
+                    }
+                    afterPreview()
+                }
+                if (afterPreview != null) {
+                    emit(LlmResponse(content = Content.fromText(Role.MODEL, final + "\n"), partial = true))
+                    awaitCancellation()
+                }
+                emit(LlmResponse(content = Content.fromText(Role.MODEL, final), partial = true))
+                val aggregate = if (afterPreview != null) preview + final else final
+                emit(LlmResponse(content = Content.fromText(Role.MODEL, aggregate), partial = false))
             }
         }
         val parent = object : Model {
@@ -126,7 +222,10 @@ class A2uiAsyncCreateTest {
                     listOf(Part(functionCall = FunctionCall(id = "mutate", name = "generate_a2ui", args = mapOf(
                         "intent" to mutation, "target_surface_id" to payload["surfaceId"],
                     ))))
-                } else listOf(Part(text = "parent answer"))
+                } else {
+                    beforeParentAnswer()
+                    listOf(Part(text = "parent answer"))
+                }
                 emit(LlmResponse(content = Content(role = Role.MODEL, parts = parts)))
             }
         }

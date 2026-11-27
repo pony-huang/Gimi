@@ -112,6 +112,20 @@ data class ModelServiceDetailUiState(
     val supportsTools: Boolean get() = draft?.supportsOfficialTools == true
     val pendingSelectionCount: Int get() = pendingModelKeys.size
 
+    /** 当前搜索和分类范围内可显示及批量勾选的模型。 */
+    val visibleCandidates: List<ModelCandidateRow>
+        get() {
+            val normalizedQuery = modelQuery.trim()
+            val category = selectedCategory?.takeIf { selected -> candidates.any { it.capability == selected } }
+            return candidates
+                .filter { candidate -> category == null || candidate.capability == category }
+                .filter { candidate ->
+                    normalizedQuery.isEmpty() ||
+                        candidate.model.id.contains(normalizedQuery, ignoreCase = true) ||
+                        candidate.model.name.contains(normalizedQuery, ignoreCase = true)
+                }
+        }
+
     /** 是否存在需要确认的未保存修改（含模型选择工作集未确认的差异由确认键承载）。 */
     val hasUnsavedChanges: Boolean get() = isDirty
 
@@ -139,6 +153,8 @@ sealed interface ModelServiceDetailAction {
     data class ModelQueryChanged(val value: String) : ModelServiceDetailAction
     data class SelectCategory(val capability: ServiceCapability?) : ModelServiceDetailAction
     data class ToggleModel(val key: String) : ModelServiceDetailAction
+    /** 将当前搜索和分类范围内的候选加入待确认选择。 */
+    data object SelectAllVisibleModels : ModelServiceDetailAction
     data object ConfirmModels : ModelServiceDetailAction
     data object ShowAddDialog : ModelServiceDetailAction
     data object DismissAddDialog : ModelServiceDetailAction

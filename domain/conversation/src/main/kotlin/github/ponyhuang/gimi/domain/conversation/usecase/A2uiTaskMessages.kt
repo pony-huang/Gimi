@@ -18,7 +18,7 @@ fun List<Message>.interruptA2uiTasks(): List<Message> = map { message ->
     message.copy(functionResponses = message.functionResponses.map { response ->
         val task = response.a2uiTask
         if (task?.status == A2uiGenerationStatus.PENDING) {
-            response.copy(a2uiTask = task.copy(status = A2uiGenerationStatus.CANCELLED))
+            response.copy(a2uiDocument = null, a2uiTask = task.copy(status = A2uiGenerationStatus.CANCELLED))
         } else response
     })
 }

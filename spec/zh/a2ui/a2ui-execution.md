@@ -6,14 +6,14 @@
 
 ## 协议背景与权威参考
 
-A2UI（agentic UI）让 LLM agent 通过产出 JSON 生成原生化 Compose 交互界面。agent 绝不生成或执行任意 UI 代码；**组件 catalog 就是契约**，声明 agent 可用的组件、属性与函数。运行时与 UI 层与设计系统无关——本项目用自建聊天 catalog 渲染。
+A2UI（agentic UI）让 LLM agent 通过产出 JSON 生成原生化 Compose 交互界面。agent 绝不生成或执行任意 UI 代码；**组件 catalog 就是契约**，声明 agent 可用的组件、属性与函数。运行时与 UI 层与设计系统无关——本项目用AndroidX Material 3 Basic Catalog 渲染。
 
 权威参考（协议持续演进，采用或升级前重新抓取）：
 
 - Compose 渲染器页面：<https://developer.android.com/develop/ui/compose/agentic.md.txt>（抓取于 2026-10-19）
 - A2UI 协议主页：<https://a2ui.org/>；规范：<https://a2ui.org/specification/v0.9.1-a2ui/>；catalogs：<https://a2ui.org/concepts/catalogs/>
 
-依赖（全部 `1.0.0-alpha01`，见 `gradle/libs.versions.toml`）：`androidx.a2ui:a2ui-engine`（解析/schema 校验，仅 `:data:a2ui`）、`androidx.a2ui:a2ui-model`（`:data:a2ui`、`:feature:chat`）、`androidx.a2ui.compose:compose-runtime` 与 `compose-ui`（Snapshot 细粒度更新、catalog、渐进渲染；仅 `:feature:chat`）、`androidx.compose.material3:material3-a2ui`（Basic Catalog + `A2uiSurface` 宿主；仅 `:feature:chat`）。
+依赖（全部 `1.0.0-alpha02`，见 `gradle/libs.versions.toml`）：`androidx.a2ui:a2ui-engine`（解析/schema 校验，仅 `:data:a2ui`）、`androidx.a2ui:a2ui-model`（`:data:a2ui`、`:feature:chat`）、`androidx.a2ui.compose:compose-runtime` 与 `compose-ui`（Snapshot 细粒度更新、catalog、渐进渲染；仅 `:feature:chat`）、`androidx.compose.material3:material3-a2ui`（Basic Catalog + `A2uiSurface` 宿主；仅 `:feature:chat`）。
 
 ## 一分钟总览
 
@@ -22,9 +22,9 @@ LLM 发出 generate_a2ui 工具调用（intent / target_surface_id / changes / c
    |  A2uiToolContribution — 仅当 a2uiSupported 且设置开启时声明
    v
 A2uiGeneration — 重放已有 surface 状态、把 catalog 收缩到用到的组件、
-   |             隔离的纯 UI 子代理渲染 JSON（无业务工具）、1 次自我纠错重试
+   |             隔离的纯 UI 子代理在创建时流式生成预览和最终快照
    v
-A2uiCreateScope — 立即返回 pending；生成在旁路 scope 进行
+A2uiCreateScope — 立即返回 pending；生成在旁路 scope 进行，可投递已校验的预览
    v
 AndroidxA2uiProtocol.validate (data/a2ui) — 官方引擎解析 + schema + 图检查
    v  （以 author="a2ui_generation" 的 Event 持久化；PENDING/COMPLETED/FAILED/CANCELLED）
@@ -45,16 +45,16 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 | `:domain:a2ui` | `A2uiGenerationTask`（含状态/编解码）、`A2uiCapabilities`、`A2uiDocument`、`A2uiInteraction`、`A2uiRecord`、`A2uiProtocol` 接口、交互/工具结果编解码——纯 JVM（仅 kotlinx-serialization） | Compose、Android、Hilt、引擎类型 |
 | `:data:a2ui` | `AndroidxA2uiProtocol`（经官方引擎 validate + replay）、`CatalogSchema`、`CatalogComponentReferences`、`ProtocolJsonReader` | Compose；执行宿主函数 |
 | `:data:agent/a2ui` | `A2uiToolContribution`、`A2uiGeneration`（含 catalog 收缩、路由指令）、`A2uiCreateScope`、`A2uiCreateRetry` | 业务工具执行 |
-| `:feature:chat/a2ui` | `ChatA2uiCatalog` 自定义组件、`ChatA2uiCoordinator`（会话同步/提交）、主题、surface 宿主、preview | agent 装配；协议解析 |
+| `:feature:chat/a2ui` | `ChatA2uiCatalog` 接线、`ChatA2uiCoordinator`（会话同步/提交）、surface 宿主、preview | agent 装配；协议解析 |
 
 会话管道：`ChatRunModels` 携带 a2ui 视图；`A2uiTaskMessages` 按 `surfaceId` 替换任务快照、无活跃运行时把遗留 PENDING 翻成 CANCELLED；`data/conversation EventMapper` 把 `a2ui_generation` 作者的事件转成合成的 `generate_a2ui` function-response，让调用/响应芯片配对。
 
 ## 生成链路（data/agent/a2ui）
 
-- **工具契约**：`generate_a2ui(intent, target_surface_id, changes, component_names)`。`processLlmRequest` 注入动态路由指令（由能力 schema 生成）：A2UI 强制场景 vs Markdown、逐组件路由（容器、表格、天气、音乐）、以及如何处理 `a2ui_interaction` 提交。
+- **工具契约**：`generate_a2ui(intent, target_surface_id, changes, component_names)`。`processLlmRequest` 注入动态路由指令（由能力 schema 生成）：A2UI 强制场景 vs Markdown、标准容器、输入和媒体组件路由、以及如何处理 `a2ui_interaction` 提交。
 - **catalog 收缩**：生成 schema 只含基础组件 + 请求组件 + 其 `$ref` 闭包；未被引用的 `$defs` 被剥离（否则 schema 的任意组件构造会把整个 catalog 拖进每次校验）。更新时经 `previousComponentNames` 保活先前组件。
-- **子代理**：隔离的纯 UI agent（自备模型、无业务工具），强制单次 `render_a2ui` 调用（`Mode.ANY`）。校验失败时把错误文本追加为纠错提示重试一次；二次失败返回工具失败。网络/SDK 错误绝不重试。
-- **异步创建**：`A2uiCreateScope` 立即返回 `pending`，生成在旁路 scope 进行；runner 流结束后结果归档为事件——取消经 `NonCancellable` 持久化为 CANCELLED，失败持久化为 FAILED（保留重试入口）。
+- **子代理**：异步创建请求 JSON Lines，先输出简短预览快照，再输出最终快照，两者独立校验。流式输出无效时用其他生成路径共用的单次 `render_a2ui` 调用纠错一次。网络/SDK 错误不重试。异步创建最多等待 45 秒，超时后进入可重试的失败状态。
+- **异步创建**：`A2uiCreateScope` 立即返回 `pending`，生成在旁路 scope 进行。预览和最终状态就绪后按卡片分别投递，即使主回复还在生成。runner 流结束后最终结果归档为事件——取消经 `NonCancellable` 持久化为 CANCELLED，失败持久化为 FAILED（保留重试入口）。
 - **重试**：仅限 FAILED/CANCELLED 任务；从归档的 `changes` 重跑生成，无父运行、无业务工具。
 
 ## 校验链路（data/a2ui）
@@ -63,30 +63,23 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 
 ## 渲染链路（feature/chat/a2ui）
 
-- **Catalog**：`chatA2uiCatalog` —— catalogId `https://gimi.app/a2ui/catalogs/chat/v1`，inline，Material Basic Catalog 原语 + 自定义组件：`ChatA2uiText/Button`、容器（`Disclosure`/`Tabs`/`DetailSheet`）、`WeatherToday`、`MusicPlayer`、`DataTable`、媒体渲染器（coil3 图片、视频/音频播放）、画廊预览。自定义组件覆写 `isReady` 实现逐组件加载态；`ChatA2uiChild` 渲染 Success/Loading/Error。
-- **协调器**：每会话一个官方 `A2uiMessageProcessor`；提交经 `canSubmit` 门控（agent 未在运行）。`sync` 对重放记录做差异：仅数据变化只补丁 `updateDataModel`（删除仍在显示的 surface 会因必需绑定缺失导致 Compose 崩溃）；否则删除 + 重推。出站客户端事件变成 `A2uiInteraction` 聊天回合（草稿不进历史）。
-- **宿主 UI**：`ChatA2uiContent` 无状态，按 surface id 渲染，另有 `A2uiTaskStatus` 占位卡（转圈/失败/取消 + 重试）。surface 在 `ChatScreen`/`MessageBubble` 按所属消息过滤。`ChatA2uiTheme` 只覆写字号/形状——应用配色与系统字体缩放直通。
-
-## 新增自定义 catalog 组件
-
-1. 在 `:feature:chat/a2ui` 实现组件（组件 + 数据契约 + 明暗双套 `*Previews.kt`），注册进 `ChatA2uiCatalog`——其定义随后进入生成与校验共享的能力 schema 导出。
-2. 若 LLM 需要 schema 表达不了的路由规则，在 `A2uiGenerationInstructions`/`A2uiGeneration` 加条件指令块（仅当收缩后的 catalog 含该组件时注入）。
-3. 生成收缩会自动带上新组件：模型经 `component_names` 请求时进入 schema，再经 `$ref` 闭包到达校验器——除非用到新的 common-type 形状（那要核对 `CatalogSchema` 的 `common_types` 映射），无需在 `:data:a2ui` 单独注册。
-4. 跑 `ChatA2uiCatalogValidationTest`、`A2uiComponentGraphTest` 与 data/a2ui 协议测试；确认 preview 明暗都渲染正常。
+- **Catalog**：`chatA2uiCatalog` 提供 AndroidX Material 3 Basic Catalog，接入媒体、链接处理和有界的 List 视口。`chatA2uiCustomCatalog` 独立持有 12 个 Gimi 卡片和控件（含同时兼容网易云音乐与 Spotify 的 `MusicPlayerCard`，以网易红为基础默认主题色并支持专辑封面动态取色、Media3 卡片内流式播放与 Spotify Connect 远程控制、歌单列表弹窗、红心收藏事件及 `orpheus://` / `spotify:` 客户端跳转回退）。聊天宿主向生成和校验导出版本化联合目录，同时注册联合目录和官方目录用于渲染。每个 surface 仍使用一个 A2UI 0.9.1 目录 ID。有明确起止时间的日程使用 Agenda，状态进展使用 Timeline。Switch 只写入绑定的数据模型，提交业务变更仍需 Button 事件。
+- **协调器**：每会话一个官方 `A2uiMessageProcessor`；提交经 `canSubmit` 门控（agent 未在运行）。`sync` 对重放记录做差异：仅数据变化只补丁 `updateDataModel`（删除仍在显示的 surface 会因必需绑定缺失导致 Compose 崩溃）；保留相同 id 和类型的增量组件更新原 surface，其余结构变更删除后重推。出站客户端事件变成 `A2uiInteraction` 聊天回合（草稿不进历史）。目录 ID 不匹配的历史 surface 会跳过渲染。
+- **宿主 UI**：`ChatA2uiContent` 无状态，按 surface id 渲染，另有 `A2uiTaskStatus` 占位卡（转圈/失败/取消 + 重试）。surface 在 `ChatScreen`/`MessageBubble` 按所属消息过滤。surface 继承聊天的 Material 主题。 新收到的多组件卡片可先渲染结构，再经官方处理器补齐已校验的组件树。历史卡片直接渲染。
 
 ## 横切规则
 
 1. **不可信输入**：agent JSON 先经官方引擎解析与 schema 校验才进 UI 状态；错误态可见（逐组件 Loading/Error）；业务动作仍是常规授权工具——提交只携带结构化交互数据。
 2. **分层边界**：只有 `:feature:chat` 碰 Compose a2ui 依赖；`:data:a2ui` 用引擎但不碰 Compose。唯一有意保留的反向边是 `:feature:chat` `testImplementation(project(":data:a2ui"))`，让 JVM 测试校验真实 catalog↔校验器契约。
-3. **i18n**：宿主字符串在 `feature/chat` 的 `chat_a2ui_*`（中文默认 + `values-en`）；提示词要求可见标签用用户语言；catalog 函数用 ICU `MessageFormat`。
-4. **Preview 优先**：每个自定义组件都带 `*Previews.kt` 明暗双套 fixture；不加自动化 UI 交互测试。
+3. **i18n**：宿主字符串在 `feature/chat` 的 `chat_a2ui_*`（中文默认 + `values-en`）；提示词要求可见标签用用户语言；格式化使用 Basic Catalog 的标准函数。
+4. **Preview 优先**：Basic Catalog 画廊和任务状态保留明暗双套 preview；不加自动化 UI 交互测试。
 5. **R8**：目前无 a2ui 专属 proguard 规则——androidx 依赖自带 consumer 规则。
 
 ## 升级清单
 
 1. 重新抓取 Compose 渲染器页面与 a2ui.org 规范；确认当前协议版本，不要默认仍是 0.9.1。
 2. 五个依赖保持版本对齐；检查接口弃用（如 `A2uiComponent` → `A2uiComponentV2` 式）与 catalog 协商行为变化。
-3. 更新硬编码的 `"v0.9.1"` 字符串（`A2uiGeneration.kt` 消息构造、`ChatA2uiCoordinator.kt` 删除消息）；catalog schema 变化时同步更新 catalogId。
+3. 更新硬编码的 `"v0.9.1"` 字符串（`A2uiGeneration.kt` 消息构造、`ChatA2uiCoordinator.kt` 删除消息）；核对 AndroidX 工厂提供的 catalogId。
 4. 核对 `CatalogSchema` 的 `common_types` 映射仍覆盖官方定义；重跑 `ChatA2uiCatalogValidationTest`、`A2uiComponentGraphTest` 与 data/a2ui 协议测试。
 
 ## 坑

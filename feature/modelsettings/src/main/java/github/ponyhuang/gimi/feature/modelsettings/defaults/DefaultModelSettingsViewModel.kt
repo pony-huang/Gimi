@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.model.resolveConnection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
@@ -122,11 +123,29 @@ class DefaultModelSettingsViewModel @Inject constructor(
             is DefaultModelSettingsAction.SelectVoice -> {
                 mutate { updateSettings.voice(action.voiceId) }
             }
+            is DefaultModelSettingsAction.SelectRealtimeVoice -> {
+                mutate {
+                    val selection = settingsSnapshot.value.realtimeSelection
+                    val defaultId = uiState.value.realtimeDefaultVoiceId
+                    val voiceId = action.voiceId
+                    if (selection == null || voiceId.isNullOrBlank() || voiceId == defaultId) {
+                        updateSettings.realtimeVoice(null)
+                    } else {
+                        updateSettings.realtimeVoice(RealtimeVoiceOverride(selection, voiceId))
+                    }
+                }
+            }
             is DefaultModelSettingsAction.SelectModel -> {
                 mutate { select(action.target, action.selection) }
             }
             is DefaultModelSettingsAction.SelectRealtimeModel -> {
-                mutate { updateSettings.realtimeModel(action.selection) }
+                mutate {
+                    if (settingsSnapshot.value.realtimeSelection != action.selection) {
+                        updateSettings.realtimeModel(action.selection)
+                        // 切换 Realtime 模型时自动重置为新模型的默认音色（清除旧模型的音色覆盖，避免跨模型音色 ID 不兼容）
+                        updateSettings.realtimeVoice(null)
+                    }
+                }
             }
             DefaultModelSettingsAction.ConsumeNotice -> mutableNotice.value = null
         }
@@ -176,6 +195,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
             DefaultModelDialog.TtsVoice -> Unit
             // Realtime 模型有清除语义，走专用动作。
             DefaultModelDialog.RealtimeModel -> Unit
+            DefaultModelDialog.RealtimeVoice -> Unit
         }
     }
 
@@ -213,6 +233,12 @@ class DefaultModelSettingsViewModel @Inject constructor(
                 connection.templateId?.let { voiceCapabilities.isSupported(it, ModelCapability.TTS) } == true
         }
 
+    private fun DefaultModelSettings.resolveRealtimeConnection() =
+        instances.resolveConnection(realtimeSelection)?.takeIf { connection ->
+            ModelCapability.Realtime in connection.model.capabilities &&
+                connection.templateId?.let { voiceCapabilities.realtimeSupport(it) != null } == true
+        }
+
     private fun DefaultModelSettings.toUiState(
         dialog: DefaultModelDialog?,
         isMutationBlocked: Boolean,
@@ -233,6 +259,28 @@ class DefaultModelSettingsViewModel @Inject constructor(
             predicate = { ModelCapability.TTS in it.capabilities },
             requiredCapability = { ModelCapability.TTS },
         ).filter { instances.resolveConnection(it.selection()) != null }
+
+        val realtimeConnection = resolveRealtimeConnection()
+        val realtimeTemplateId = realtimeConnection?.templateId
+        val realtimeModelId = realtimeConnection?.model?.id
+        val realtimeSupport = realtimeTemplateId?.let { voiceCapabilities.realtimeSupport(it) }
+        val realtimeDefaultVoiceId = if (realtimeModelId != null) {
+            realtimeSupport?.defaultVoiceFor(realtimeModelId)
+                ?: realtimeSupport?.builtInVoices?.firstOrNull()?.id.orEmpty()
+        } else ""
+        val realtimeVoiceOptions = if (realtimeModelId != null) {
+            realtimeSupport?.voicesFor(realtimeModelId).orEmpty()
+        } else emptyList()
+        val realtimeDefaultVoiceName = if (realtimeDefaultVoiceId.isNotBlank()) {
+            realtimeVoiceOptions.firstOrNull { it.id == realtimeDefaultVoiceId }?.name ?: realtimeDefaultVoiceId
+        } else ""
+        val validRealtimeSelection = realtimeSelection.takeIf { selection ->
+            realtimeRows.any { it.selection() == selection }
+        }
+        val realtimeOverride = realtimeVoice?.takeIf { it.selection == validRealtimeSelection }
+        val realtimeVoiceId = realtimeOverride?.voiceId
+        val realtimeActiveVoiceId = realtimeVoiceId ?: realtimeDefaultVoiceId
+
         return DefaultModelSettingsUiState(
             assistantSelection = assistantSelection,
             fastSelection = fastSelection,
@@ -241,7 +289,6 @@ class DefaultModelSettingsViewModel @Inject constructor(
             ttsVoiceId = ttsVoiceId.takeIf { ttsTemplateId != null }.orEmpty(),
             ttsVoiceOptions = ttsVoiceOptions,
             isTtsVoiceLoading = isTtsVoiceLoading,
-            ttsVoiceCustomInputAllowed = voiceCatalog.allowsCustomVoice(ttsTemplateId),
             chatModels = configuredInstances.rows(
                 predicate = { ModelCapability.LLM in it.capabilities },
             ),
@@ -250,10 +297,14 @@ class DefaultModelSettingsViewModel @Inject constructor(
                 requiredCapability = { it.recognitionCapability },
             ),
             ttsModels = ttsRows,
-            realtimeSelection = realtimeSelection.takeIf { selection ->
-                realtimeRows.any { it.selection() == selection }
-            },
+            realtimeSelection = validRealtimeSelection,
             realtimeModels = realtimeRows,
+            realtimeVoiceId = realtimeVoiceId,
+            realtimeActiveVoiceId = realtimeActiveVoiceId,
+            realtimeDefaultVoiceId = realtimeDefaultVoiceId,
+            realtimeDefaultVoiceName = realtimeDefaultVoiceName,
+            realtimeVoiceOptions = realtimeVoiceOptions,
+            isRealtimeVoiceLoading = false,
             dialog = dialog,
             isMutationBlocked = isMutationBlocked,
         )

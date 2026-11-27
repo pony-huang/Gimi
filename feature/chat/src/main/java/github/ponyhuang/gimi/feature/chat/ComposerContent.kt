@@ -141,8 +141,10 @@ internal fun DefaultComposerInputContent(
 
     Column(
         modifier = modifier.padding(
-            horizontal = 10.dp,
-            vertical = 6.dp,
+            start = 10.dp,
+            end = 10.dp,
+            top = 5.dp,
+            bottom = 5.dp,
         ),
     ) {
         SnackbarHost(hostState = snackbarHostState)
@@ -164,9 +166,10 @@ internal fun DefaultComposerInputContent(
                         .padding(
                             start = 6.dp,
                             end = 6.dp,
-                            bottom = 48.dp,
+                            // 紧凑胶囊高度：底部留出 42.dp 容纳 40.dp 底栏操作行并保留适度呼吸间距
+                            bottom = 42.dp,
                         )
-                        .defaultMinSize(minHeight = 44.dp)
+                        .defaultMinSize(minHeight = 24.dp)
                         .onPreviewKeyEvent { event ->
                             // 物理键盘回车（无 Shift/Ctrl/Alt）触发发送；Shift+Enter 留给换行。
                             // 与"发送"按钮显隐规则一致：仅在有内容可发时触发。
@@ -376,7 +379,7 @@ private fun TextInput(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 10.dp),
+                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 3.dp),
         ) {
             if (text.isBlank()) {
                 Text(

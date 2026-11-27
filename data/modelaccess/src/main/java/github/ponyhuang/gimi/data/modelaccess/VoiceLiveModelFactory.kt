@@ -100,7 +100,6 @@ class VoiceLiveModelFactory @Inject constructor(
                     model = modelId,
                     apiKey = connection.apiKey,
                     voice = resolveVoice(support, modelId, voice),
-                    silenceDurationMs = QwenRealtimeProtocol.DEFAULT_SILENCE_DURATION_MS,
                     workspaceId = connection.workspaceId,
                     webSocketClient = webSocketClient,
                 )
@@ -109,7 +108,6 @@ class VoiceLiveModelFactory @Inject constructor(
                     model = modelId,
                     apiKey = connection.apiKey,
                     voice = resolveVoice(support, modelId, voice),
-                    silenceDurationMs = OpenAiRealtimeProtocol.DEFAULT_SILENCE_DURATION_MS,
                     webSocketClient = webSocketClient,
                 )
                 // 未知厂商的实时模型无原生适配器；防御性回落级联（其模型未声明

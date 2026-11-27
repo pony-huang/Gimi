@@ -12,15 +12,11 @@ import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QWEN_AUDIO_SERVICE_I
 
 /**
  * OpenAI Realtime 的原生适配器声明。
- *
- * OpenAI 的会话音色集固定为内置音色，不接受自定义 voice_id（自定义音色需上传样本走
- * Voice Consents，不在本链路内），因此这里只给下拉不给自由输入。
  */
 @Singleton
 class OpenAiRealtimeVoiceSupport @Inject constructor() : RealtimeVoiceSupport {
     override val serviceId: String = OPENAI_SPEECH_SERVICE_ID
     override val builtInVoices = OpenAiRealtimeVoices.all
-    override val customVoiceAllowed: Boolean = false
     override val uplink: RealtimeUplink = RealtimeUplink(sampleRateHz = 24_000, resampled = true)
 
     /** OpenAI 两个 Realtime 模型共用同一套音色，缺省音色与模型无关。 */
@@ -42,7 +38,6 @@ class QwenRealtimeVoiceSupport @Inject constructor() : RealtimeVoiceSupport {
     /** 音色集随模型变化，服务级没有统一的内置音色表。 */
     override val builtInVoices = emptyList<TtsVoice>()
 
-    override val customVoiceAllowed: Boolean = true
     override val uplink: RealtimeUplink = RealtimeUplink(sampleRateHz = 16_000, resampled = false)
 
     /** 按模型代际给可选系统音色；未收录的模型没有可选音色，只剩自由输入。 */

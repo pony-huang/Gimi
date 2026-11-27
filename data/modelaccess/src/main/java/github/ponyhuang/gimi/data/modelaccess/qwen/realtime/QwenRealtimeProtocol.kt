@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.modelaccess.qwen.realtime
 
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.gson.JsonArray
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
@@ -16,8 +17,8 @@ import github.ponyhuang.gimi.data.modelaccess.shared.qwenFunctionToolArray
  * - 上行原生接受 16 kHz PCM16（OpenAI 要 24k），下行固定 24 kHz；格式用
  *   `input_audio_format`/`output_audio_format` 的 `"pcm"` 字符串声明，采样率不随会话配置。
  * - 音色仅在**第一次** `session.update` 生效；重连即新会话，重新下发即可。
- * - 打断由服务端自动完成（`response.done` 返回 `status=cancelled`），客户端不发送
- *   截断/取消事件，只在 `speech_started` 后丢弃残余音频增量（静默窗口）。
+ * - 判轮完全由本地 VAD 驱动：客户端提交音频后显式 `response.create`；本地开口时
+ *   发送 `response.cancel`，并在静默窗口内丢弃残余音频增量。
  * - 请求头恒定附加 `x-dashscope-dataInspection: disable`（跟随官方示例的默认行为）。
  *
  * 工具（实时助手模式）：function 工具按官方文档的嵌套结构下发（声明对象包在
@@ -33,11 +34,68 @@ internal object QwenRealtimeProtocol {
         add("session", JsonObject().apply { addProperty("instructions", instructions) })
     }
 
+    /**
+     * 构建消息类型的 [CLIENT_ITEM_CREATE] 事件。
+     * 用户消息文本使用 input_text；助手消息使用 output_text；系统消息使用 input_text。
+     * 支持可选的 [previousItemId] 与 [itemId]。
+     */
+    fun createMessageItem(
+        content: com.google.adk.kt.types.Content,
+        itemId: String? = null,
+        previousItemId: String? = null,
+    ): JsonObject {
+        val roleStr = when (content.role) {
+            com.google.adk.kt.types.Role.USER -> "user"
+            com.google.adk.kt.types.Role.MODEL -> "assistant"
+            com.google.adk.kt.types.Role.SYSTEM -> "system"
+            else -> throw IllegalArgumentException("Unsupported role for realtime conversation item: ${content.role}")
+        }
+        val parts = JsonArray()
+        content.parts.forEach { part ->
+            if (part.thought == true) return@forEach
+            if (part.text != null) {
+                parts.add(JsonObject().apply {
+                    addProperty("type", if (roleStr == "assistant") "output_text" else "input_text")
+                    addProperty("text", part.text)
+                })
+            }
+        }
+        require(parts.size() > 0) { "Message item content parts must not be empty" }
+        return JsonObject().apply {
+            addProperty("type", CLIENT_ITEM_CREATE)
+            if (previousItemId != null) {
+                addProperty("previous_item_id", previousItemId)
+            }
+            add("item", JsonObject().apply {
+                if (itemId != null) {
+                    addProperty("id", itemId)
+                }
+                addProperty("type", "message")
+                addProperty("role", roleStr)
+                add("content", parts)
+            })
+        }
+    }
+
+    /**
+     * 将会话历史转为 [CLIENT_ITEM_CREATE] 客户端事件列表，用于在新全双工会话初始化时注入历史上下文。
+     * 过滤思考过程与空轮次。
+     */
+    fun historyMessages(history: List<com.google.adk.kt.types.Content>): List<JsonObject> = history.mapNotNull { content ->
+        val filteredParts = content.parts.filter { part ->
+            part.thought != true && part.text != null
+        }
+        if (filteredParts.isEmpty()) null
+        else runCatching { createMessageItem(content.copy(parts = filteredParts)) }.getOrNull()
+    }
+
 
     // —— 客户端事件类型 ——
 
     private const val CLIENT_SESSION_UPDATE = "session.update"
     private const val CLIENT_APPEND_AUDIO = "input_audio_buffer.append"
+    private const val CLIENT_COMMIT_AUDIO = "input_audio_buffer.commit"
+    private const val CLIENT_CANCEL_RESPONSE = "response.cancel"
     private const val CLIENT_ITEM_CREATE = "conversation.item.create"
     private const val CLIENT_CREATE_RESPONSE = "response.create"
 
@@ -58,12 +116,6 @@ internal object QwenRealtimeProtocol {
     private const val SERVER_RESPONSE_DONE = "response.done"
     private const val SERVER_ERROR = "error"
 
-    /** server_vad 的静音判轮时长（毫秒）；官方推荐对话区间 400-800，取中值与 OpenAI 路径一致。 */
-    const val DEFAULT_SILENCE_DURATION_MS = 500L
-
-    /** server_vad 的灵敏度取官方默认 0.5。 */
-    private const val DEFAULT_VAD_THRESHOLD = 0.5
-
     /** 关闭平台侧内容审查的请求头；跟随官方示例恒定下发。 */
     private const val DATA_INSPECTION_HEADER = "x-dashscope-dataInspection"
 
@@ -78,14 +130,8 @@ internal object QwenRealtimeProtocol {
     fun sessionUpdate(
         instructions: String,
         voice: String,
-        silenceDurationMs: Long = DEFAULT_SILENCE_DURATION_MS,
         tools: List<FunctionDeclaration> = emptyList(),
     ): JsonObject {
-        val turnDetection = JsonObject().apply {
-            addProperty("type", "server_vad")
-            addProperty("threshold", DEFAULT_VAD_THRESHOLD)
-            addProperty("silence_duration_ms", silenceDurationMs)
-        }
         val modalities = JsonArray().apply {
             add("audio")
             add("text")
@@ -96,7 +142,8 @@ internal object QwenRealtimeProtocol {
             addProperty("instructions", instructions)
             addProperty("input_audio_format", "pcm")
             addProperty("output_audio_format", "pcm")
-            add("turn_detection", turnDetection)
+            // Manual 模式：本地 VAD 切句后由客户端 commit + response.create。
+            add("turn_detection", JsonNull.INSTANCE)
             if (tools.isNotEmpty()) add("tools", qwenFunctionToolArray(tools))
         }
         return JsonObject().apply {
@@ -129,6 +176,17 @@ internal object QwenRealtimeProtocol {
         addProperty("type", CLIENT_CREATE_RESPONSE)
     }
 
+    /** 本地 VAD 判轮结束：先提交音频，再显式请求模型响应。 */
+    fun commitAudioTurn(): List<JsonObject> = listOf(
+        JsonObject().apply { addProperty("type", CLIENT_COMMIT_AUDIO) },
+        createResponse(),
+    )
+
+    /** 本地 VAD 检测到开口时取消服务端正在生成的响应。 */
+    fun cancelResponse(): JsonObject = JsonObject().apply {
+        addProperty("type", CLIENT_CANCEL_RESPONSE)
+    }
+
     /**
      * 构建 wss 连接请求：模型走查询参数，密钥走 Bearer 头，恒定附加内容审查开关头。
      *
@@ -157,7 +215,7 @@ internal object QwenRealtimeProtocol {
             .build()
     }
 
-    /** 解析一帧服务端 JSON；未知事件向前兼容地忽略（smart_turn 专属事件在 server_vad 下不出现）。 */
+    /** 解析一帧服务端 JSON；未知事件向前兼容地忽略。 */
     fun parse(payload: JsonObject): QwenRealtimeEvent {
         val type = payload.get("type")?.asString ?: return QwenRealtimeEvent.Ignored
         return when (type) {
@@ -225,7 +283,7 @@ internal sealed interface QwenRealtimeEvent {
     /** 会话配置已生效；此后才允许上行音频。 */
     data object SessionUpdated : QwenRealtimeEvent
 
-    /** 服务端检测到用户开始说话；进入静默窗口，服务端自动打断进行中的响应。 */
+    /** 服务端兼容事件：用户开始说话；进入静默窗口并通知编排层停播。 */
     data object SpeechStarted : QwenRealtimeEvent
 
     /** 用户输入已提交成轮；编排层据此推进「响应中」。 */

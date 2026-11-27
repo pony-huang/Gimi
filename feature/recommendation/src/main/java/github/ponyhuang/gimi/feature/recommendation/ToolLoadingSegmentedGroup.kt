@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Rule
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -55,20 +55,30 @@ internal fun ToolLoadingSegmentedGroup(
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.Rule,
+                imageVector = Icons.Default.Build,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier
+                    .size(22.dp)
+                    .padding(top = 1.dp),
             )
-            Text(
-                text = stringResource(R.string.recommendation_tool_loading_title),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.recommendation_tool_loading_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.recommendation_tool_loading_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Spacer(Modifier.height(12.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

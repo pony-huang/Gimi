@@ -133,10 +133,9 @@
 
     <string name="chat_stt_configure_default_first">Please configure the speech recognition model in Settings first</string>
 
-    <string name="chat_drawer_auto_speak">Auto-play</string>
+    <string name="chat_drawer_auto_speak">Read replies aloud automatically</string>
     <string name="chat_drawer_plugins">Plugins</string>
     <string name="chat_drawer_local_environment">Local environment</string>
-    <string name="chat_drawer_auto_speak_subtitle">Read replies aloud automatically</string>
     <string name="chat_drawer_personalize">Personalization</string>
     <string name="chat_drawer_empty_history">No recent conversations</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
@@ -241,67 +240,55 @@
     <string name="chat_official_tool_deepseek_web_fetch">Web fetch</string>
     <string name="chat_official_tool_deepseek_web_search_description">Search the web for links, summaries, and optional page content.</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">Fetch a web page and return its title and Markdown content.</string>
+    <string name="chat_a2ui_table_empty">No matching rows</string>
+    <string name="chat_a2ui_sort_asc">Ascending</string>
+    <string name="chat_a2ui_sort_desc">Descending</string>
+    <string name="chat_a2ui_subtotal">Subtotal</string>
+    <string name="chat_a2ui_tax">Tax</string>
+    <string name="chat_a2ui_shipping">Shipping</string>
+    <string name="chat_a2ui_shipping_free">Free</string>
+    <string name="chat_a2ui_discount">Discount</string>
+    <string name="chat_a2ui_total">Total</string>
+    <string name="chat_a2ui_feels">Feels like</string>
+    <string name="chat_a2ui_humidity">Humidity</string>
+    <string name="chat_a2ui_wind">Wind</string>
+    <string name="chat_a2ui_weather_high">H %1$s</string>
+    <string name="chat_a2ui_weather_low">L %1$s</string>
+    <string name="chat_a2ui_chart_empty">No chart data</string>
+    <string name="chat_a2ui_over_period">over period</string>
+    <string name="chat_a2ui_ohlc_open">O</string>
+    <string name="chat_a2ui_ohlc_high">H</string>
+    <string name="chat_a2ui_ohlc_low">L</string>
+    <string name="chat_a2ui_ohlc_close">C</string>
+    <string name="chat_a2ui_agenda_empty">Nothing scheduled</string>
+    <string name="chat_a2ui_agenda_all_day">All day</string>
+    <string name="chat_a2ui_table_rows">%1$d rows</string>
+    <string name="chat_a2ui_table_range">%1$d–%2$d of %3$d</string>
+    <string name="chat_a2ui_prev_page">Previous page</string>
+    <string name="chat_a2ui_next_page">Next page</string>
+    <string name="chat_a2ui_selected_count">%1$d selected</string>
+    <string name="chat_a2ui_sample">Sample data</string>
+    <string name="chat_a2ui_stock_trend">Trend from %1$s to %2$s</string>
     <string name="chat_a2ui_failed">Unable to display this card. Ask the assistant to try again.</string>
     <string name="chat_a2ui_link_failed">Unable to open link</string>
     <string name="chat_a2ui_audio">Audio</string>
+    <string name="chat_a2ui_music_open_netease">Open in music app</string>
+    <string name="chat_a2ui_music_like">Add to Liked Songs</string>
+    <string name="chat_a2ui_music_unlike">Remove from Liked Songs</string>
+    <string name="chat_a2ui_music_play">Play</string>
+    <string name="chat_a2ui_music_pause">Pause</string>
+    <string name="chat_a2ui_music_previous">Previous track</string>
+    <string name="chat_a2ui_music_next">Next track</string>
+    <string name="chat_a2ui_music_open_queue">Open track queue</string>
+    <string name="chat_a2ui_music_queue_title">Playback queue</string>
+    <string name="chat_a2ui_music_queue_count">(%1$d tracks)</string>
+    <string name="chat_a2ui_music_trial_badge">Preview · VIP</string>
+    <string name="chat_a2ui_music_vip_badge">VIP</string>
 
-    <!-- A2UI weather cards -->
-    <string name="chat_weather_today">Today</string>
-    <string name="chat_weather_updated_at">Updated %1$s</string>
-    <string name="chat_weather_temperature_value">%1$d°</string>
-    <string name="chat_weather_percent_value">%1$d%%</string>
-    <string name="chat_weather_not_available">—</string>
-    <string name="chat_weather_metric_humidity">Humidity</string>
-    <string name="chat_weather_metric_wind">Wind</string>
-    <string name="chat_weather_metric_precipitation">Rain</string>
-    <string name="chat_weather_wind_speed">%1$d km/h</string>
-    <string name="chat_weather_condition_clear">Clear</string>
-    <string name="chat_weather_condition_partly_cloudy">Partly cloudy</string>
-    <string name="chat_weather_condition_cloudy">Cloudy</string>
-    <string name="chat_weather_condition_rain">Showers</string>
-    <string name="chat_weather_condition_thunderstorm">Thunderstorms</string>
-    <string name="chat_weather_condition_snow">Light snow</string>
-    <string name="chat_weather_condition_fog">Fog</string>
-    <string name="chat_weather_condition_wind">Windy</string>
-    <string name="chat_weather_condition_unknown">Unknown weather</string>
 
-    <!-- A2UI generic music player -->
-    <string name="chat_player_open">Open player</string>
-    <string name="chat_player_open_named">Open in %1$s</string>
-    <string name="chat_player_next">Next track</string>
-    <string name="chat_player_play">Play</string>
-    <string name="chat_player_pause">Pause</string>
-    <string name="chat_player_artwork">Album artwork</string>
-    <string name="chat_player_generic_name">Music</string>
 
-    <!-- A2UI news list -->
-    <!-- A2UI read-only data table -->
-    <string name="chat_table_default_heading">Table</string>
-    <string name="chat_table_empty">No data</string>
-    <string name="chat_table_copy">Copy table</string>
-    <string name="chat_table_export_image">Save as image</string>
-    <string name="chat_table_expand">View fullscreen</string>
-    <string name="chat_table_share">Share table</string>
-    <string name="chat_table_close">Close</string>
-    <string name="chat_table_export_failed">Failed to export table</string>
     <string name="chat_timeline_steps">%1$d steps</string>
     <string name="chat_timeline_elapsed">%1$.1f s total</string>
-    <string name="chat_player_playing">Now playing</string>
-    <string name="chat_player_paused">Paused</string>
-    <string name="chat_player_saved">Saved</string>
-    <string name="chat_player_save">Save</string>
-    <string name="chat_player_previous">Previous track</string>
-    <string name="chat_player_shuffle">Shuffle</string>
-    <string name="chat_player_repeat">Change repeat mode</string>
-    <string name="chat_weather_location_today">%1$s · Today</string>
-    <string name="chat_weather_high_low">High %1$d° / Low %2$d°</string>
-    <string name="chat_a2ui_collection_empty">No content</string>
-    <string name="chat_a2ui_position_vertical">%1$d / %2$d · Scroll vertically</string>
-    <string name="chat_a2ui_position_horizontal">%1$d / %2$d · Swipe horizontally</string>
-    <string name="chat_a2ui_expanded">Expanded</string>
-    <string name="chat_a2ui_collapsed">Collapsed</string>
-    <string name="chat_a2ui_expand">Expand content</string>
-    <string name="chat_a2ui_collapse">Collapse content</string>
     <string name="session_export_single">Export</string>
     <string name="session_export_actions">Conversation actions</string>
     <string name="session_delete_single">Delete</string>
@@ -387,6 +374,7 @@
     <string name="voice_settings_missing_models">Choose the required models below.</string>
     <string name="voice_settings_saving">Saving voice settings</string>
     <string name="voice_settings_after_hangup">End the call to change settings</string>
+    <string name="voice_current_role">Current role</string>
     <string name="voice_settings_unsaved">Unsaved</string>
     <string name="voice_settings_scope_hint">Changes apply to this chat and save automatically when the configuration is complete</string>
     <string name="voice_semi_settings_note">Semi-cascaded is not available yet: the pipeline cannot be selected, but models and voice can be pre-configured</string>
@@ -465,7 +453,6 @@
     <string name="chat_mode_chatbot">Chatbot</string>
     <string name="chatbot_intro_title">Chatbot mode</string>
     <string name="chatbot_intro_body">Supports official web search and file upload; no tools, MCP, permissions, or local tools.</string>
-    <string name="chatbot_intro_hint">Need to run tasks or orchestrate tools? Switch to %1$s.</string>
     <string name="chatbot_model_services">Model services</string>
     <string name="chatbot_failure">Generation did not finish. Try again.</string>
     <string name="chatbot_send_busy">The conversation is still processing or too many tasks are running. Please try again shortly.</string>

@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeInstructionSink
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -41,19 +42,19 @@ import kotlinx.coroutines.launch
  *
  * 内部经 [VoiceLiveModelFactory] 取得厂商原生模型（[OpenAiRealtimeModel] /
  * [QwenRealtimeModel]，ADK Model）并持有其 [LiveConnection]，负责连接生命周期：
- * 会话配置在模型层下发；本类负责断线退避重连（重连即新会话、上下文不重放）与
- * 鉴权失败即终止。对编排层只暴露领域事件与 16 kHz 音频上行——重采样与否由
+ * 会话配置在模型层下发；本类负责断线退避重连（重连即新会话，并按最近会话历史
+ * 重新注入上下文）与鉴权失败即终止。对编排层只暴露领域事件与 16 kHz 音频上行——重采样与否由
  * [uplinkProvider] 契约决定：OpenAI 需升采样到 24 kHz（相位跨重连持续，采集链
  * 不受影响），Qwen 原生 16 kHz 直喂。契约在首个事件/首帧上行时惰性解析一次
  * （门面构造非挂起，而目录等待是挂起操作），重复解析无害。
  *
  * 实时助手模式的工具执行由 [tools] 承载：工具声明随会话配置下发，模型发起的
  * function_call 经 [RealtimeToolRoundRunner] 在门面内执行（不阻塞事件接收），
- * 结果经连接的 [RealtimeFunctionCallSink] 写回并触发二轮推理；断线时执行中的
- * 轮次随 coroutineScope 取消——重连即新会话，工具轮不跨连接续跑。
+ * 结果经连接的 [RealtimeFunctionCallSink] 写回并触发二轮推理；本地打断和断线时
+ * 执行中的轮次均被取消——重连即新会话，工具轮不跨连接续跑。
  *
- * 断线期间上行进入小缓冲（满则丢最旧），重连成功后一次冲出；发送失败静默转缓冲，
- * 不向编排层暴露瞬时抖动——会话不可恢复时以 [RealtimeVoiceEvent.Failed] 收尾。
+ * 断线期间上行与本地判轮提交进入小缓冲，重连成功后按音频、提交的顺序重放；
+ * 发送失败静默转缓冲，不向编排层暴露瞬时抖动——会话不可恢复时以 [RealtimeVoiceEvent.Failed] 收尾。
  */
 internal class NativeRealtimeDuplexSession(
     private val models: VoiceLiveModelFactory,
@@ -66,7 +67,7 @@ internal class NativeRealtimeDuplexSession(
     private val tools: RealtimeVoiceToolBridge? = null,
     /**
      * Chatbot 分区的会话写入器；null 表示实时助手（行为不变，不落库）。
-     * Chatbot 每轮终稿经 [RealtimeChatbotTranscript] 写入，起呼与重连不注入历史上下文。
+     * Chatbot 每轮终稿经 [RealtimeChatbotTranscript] 写入，起呼与重连注入历史上下文。
      */
     private val persistence: ChatbotConversationWriter.Call? = null,
     private val instructionProvider: () -> String = { instructions },
@@ -84,20 +85,40 @@ internal class NativeRealtimeDuplexSession(
     /** 重连等待期与发送失败瞬间的上行缓冲；消费方不感知断线。 */
     private val pendingAudio = ArrayDeque<ByteArray>()
     private var pendingBytes = 0
+    /** 断线等待期的本地判轮提交；与缓冲音频一起在新连接上按序重放。 */
+    private var pendingCommitTurn = false
 
     @Volatile private var closed = false
 
     override fun events(): Flow<RealtimeVoiceEvent> = flow {
-        resolveUplink()
+        val initialHistory = try {
+            resolveUplink()
+            persistence?.acquire().orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: VoiceAudioBackendException) {
+            Log.w(TAG, "初始化 Realtime 会话失败", e)
+            emit(RealtimeVoiceEvent.Failed(e.failure))
+            return@flow
+        } catch (e: Exception) {
+            Log.w(TAG, "解析 Realtime 上行或历史失败", e)
+            emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Configuration))
+            return@flow
+        }
         var attempt = 0
         var reconnected = false
         while (true) {
             try {
                 val connection = connectOnce()
                 synchronized(lock) { this@NativeRealtimeDuplexSession.connection = connection }
+                val history = if (reconnected) persistence?.currentHistory().orEmpty() else initialHistory
+                if (history.isNotEmpty()) {
+                    connection.sendHistory(history)
+                }
                 emit(RealtimeVoiceEvent.Ready(reconnected))
                 reconnected = true
                 flushPendingAudio(connection)
+                flushPendingCommit(connection)
                 // coroutineScope 把工具执行轮挂到本连接上：事件流终止（断线）即取消，
                 // 重连后的新会话不再接收上一连接遗留的工具轮结果。
                 coroutineScope {
@@ -180,6 +201,23 @@ internal class NativeRealtimeDuplexSession(
         appliedInstructions = updated
     }
 
+    override suspend fun commitTurn() {
+        val active = synchronized(lock) {
+            val active = connection
+            if (active == null) pendingCommitTurn = true
+            active
+        } ?: return
+        val sink = active as? RealtimeTurnControlSink
+            ?: throw UnsupportedOperationException("This realtime provider does not support local turn control")
+        sink.commitAudioTurn()
+    }
+
+    override suspend fun interrupt() {
+        cancelPendingToolRounds()
+        val active = synchronized(lock) { connection } ?: return
+        (active as? RealtimeTurnControlSink)?.cancelResponse()
+    }
+
     override suspend fun prepareInput(input: VoiceManualInput): VoiceManualInput {
         val active = synchronized(lock) { connection } ?: error("Realtime connection is not ready")
         val sink = active as? RealtimeManualInputSink
@@ -203,9 +241,7 @@ internal class NativeRealtimeDuplexSession(
         val active = synchronized(lock) { connection } ?: error("Realtime connection is not ready")
         val sink = active as? RealtimeManualInputSink
             ?: throw UnsupportedOperationException("Manual input unavailable")
-        val pendingTools = synchronized(lock) { toolJobs.toList() }
-        pendingTools.forEach { it.cancel() }
-        pendingTools.forEach { it.join() }
+        cancelPendingToolRounds()
         updateInstructions(active)
         sink.submitUserContent(Content(role = Role.USER, parts = buildList {
             input.text.takeIf(String::isNotBlank)?.let { add(com.google.adk.kt.types.Part(text = it)) }
@@ -226,6 +262,7 @@ internal class NativeRealtimeDuplexSession(
             connection = null
             pendingAudio.clear()
             pendingBytes = 0
+            pendingCommitTurn = false
             current
         }
         runCatching { current?.closeSession() }
@@ -234,6 +271,15 @@ internal class NativeRealtimeDuplexSession(
         persistence?.release()
         // 桥自建资源（应用函数工具集等）随会话释放；共享单例资源不在其列。
         runCatching { tools?.close() }
+    }
+
+    private suspend fun cancelPendingToolRounds() {
+        while (true) {
+            val pendingTools = synchronized(lock) { toolJobs.toList() }
+            if (pendingTools.isEmpty()) break
+            pendingTools.forEach { it.cancel() }
+            pendingTools.forEach { it.join() }
+        }
     }
 
     private suspend fun connectOnce(): LiveConnection {
@@ -323,6 +369,14 @@ internal class NativeRealtimeDuplexSession(
                 return
             }
         }
+    }
+
+    private suspend fun flushPendingCommit(connection: LiveConnection) {
+        if (!synchronized(lock) { pendingCommitTurn }) return
+        val sink = connection as? RealtimeTurnControlSink
+            ?: throw UnsupportedOperationException("This realtime provider does not support local turn control")
+        synchronized(lock) { pendingCommitTurn = false }
+        sink.commitAudioTurn()
     }
 
     private suspend fun clearConnection() {

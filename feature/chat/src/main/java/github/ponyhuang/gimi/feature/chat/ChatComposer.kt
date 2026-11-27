@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,6 +69,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
 import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.delay
@@ -682,6 +684,31 @@ internal fun ChatComposerEmpty() {
         onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
+        isVoiceInputAvailable = true,
+        onOpenVoice = {},
+        modelSelectorContent = {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "deepseek-flash 高",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
+                }
+            }
+        },
     )
 }
 
@@ -692,6 +719,31 @@ internal fun ChatComposerFilled() {
         onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
+        isVoiceInputAvailable = true,
+        onOpenVoice = {},
+        modelSelectorContent = {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "deepseek-flash 高",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
+                }
+            }
+        },
     )
 }
 
@@ -729,42 +781,44 @@ internal fun ChatComposerGenerating() {
     )
 }
 
-@Preview(showBackground = true)
+@Preview(name = "聊天胶囊 · 完整空闲态 · 浅色", showBackground = true, widthDp = 390)
+@Preview(name = "聊天胶囊 · 完整空闲态 · 深色", showBackground = true, widthDp = 390, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatComposerEmptyPreview() {
-    MaterialTheme {
+    GimiTheme {
         ChatComposerEmpty()
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "聊天胶囊 · 已输入文本 · 浅色", showBackground = true, widthDp = 390)
+@Preview(name = "聊天胶囊 · 已输入文本 · 深色", showBackground = true, widthDp = 390, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatComposerFilledPreview() {
-    MaterialTheme {
+    GimiTheme {
         ChatComposerFilled()
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390)
 @Composable
 private fun ChatComposerLongFilledPreview() {
-    MaterialTheme {
+    GimiTheme {
         ChatComposerLongFilled()
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390)
 @Composable
 private fun ChatComposerWithAttachmentsPreview() {
-    MaterialTheme {
+    GimiTheme {
         ChatComposerWithAttachments()
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390)
 @Composable
 private fun ChatComposerGeneratingPreview() {
-    MaterialTheme {
+    GimiTheme {
         ChatComposerGenerating()
     }
 }

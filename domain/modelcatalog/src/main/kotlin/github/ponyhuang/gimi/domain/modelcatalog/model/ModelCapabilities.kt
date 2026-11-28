@@ -61,11 +61,21 @@ data class DocumentInputCapability(
     val maxUploadBytes: Long = 512 * 1024 * 1024,
 ) : HasIngestMode
 
+/**
+ * 模型可接收的多模态输入能力。
+ *
+ * 远端目录同步仅返回模型 ID，未确认的输入模态默认为空（null），避免未经确认即展示
+ * 「视觉 / 文档 / 音频」徽标而造成误解。
+ *
+ * @property vision 图像（及可选视频）输入能力；null 表示未确认或不支持视觉输入。
+ * @property audioInput 音频输入能力；null 表示未确认或不支持音频输入。
+ * @property documentInput 文档输入能力；null 表示未确认或不支持文档输入。
+ */
 @Serializable
 data class MultimodalCapabilities(
-    val vision: VisionCapability? = VisionCapability(),
-    val audioInput: AudioInputCapability? = AudioInputCapability(),
-    val documentInput: DocumentInputCapability? = DocumentInputCapability(),
+    val vision: VisionCapability? = null,
+    val audioInput: AudioInputCapability? = null,
+    val documentInput: DocumentInputCapability? = null,
 ) {
     val supportsImages: Boolean get() = vision != null
     val supportsAudio: Boolean get() = audioInput != null

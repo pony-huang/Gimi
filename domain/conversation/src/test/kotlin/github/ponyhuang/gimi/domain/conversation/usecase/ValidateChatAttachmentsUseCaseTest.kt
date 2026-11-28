@@ -19,7 +19,11 @@ import org.junit.Test
 class ValidateChatAttachmentsUseCaseTest {
     private val validate = ValidateChatAttachmentsUseCase()
     private val selection = ModelSelection("instance", "connection", "model")
-    private val model = Model("model", "Model")
+    private val model = Model(
+        "model",
+        "Model",
+        multimodal = MultimodalCapabilities(documentInput = DocumentInputCapability()),
+    )
     private val instance = ModelServiceInstance(
         id = "instance", name = "Service", templateId = "openai",
         isEnabled = true, isOfficialToolsEnabled = false, sharedApiKey = "key",

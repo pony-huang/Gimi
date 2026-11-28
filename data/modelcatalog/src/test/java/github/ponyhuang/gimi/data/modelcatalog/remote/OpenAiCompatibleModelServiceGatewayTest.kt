@@ -76,6 +76,7 @@ class OpenAiCompatibleModelServiceGatewayTest {
         val models = gateway.fetchModels(connection())
 
         assertEquals(listOf("model-a", "model-b"), models.map { it.id })
+        assertTrue(models.none { it.multimodal.isMultimodal })
         assertEquals(1, calls.get())
     }
 

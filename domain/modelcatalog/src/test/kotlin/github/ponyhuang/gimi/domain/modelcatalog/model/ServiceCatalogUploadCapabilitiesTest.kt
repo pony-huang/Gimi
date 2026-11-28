@@ -36,7 +36,14 @@ class ServiceCatalogUploadCapabilitiesTest {
 
     @Test
     fun nonUploadTemplatesKeepTheirDeclaredCapabilities() {
-        val instance = uploadInstance(templateId = "kimi", isFileUploadEnabled = false)
+        val inlineDocumentModel = model.copy(
+            multimodal = MultimodalCapabilities(documentInput = DocumentInputCapability()),
+        )
+        val instance = uploadInstance(
+            templateId = "kimi",
+            isFileUploadEnabled = false,
+            baseModel = inlineDocumentModel,
+        )
         assertSame(instance, instance.withDerivedUploadCapabilities())
         assertTrue(
             instance.connections.first().models.first().multimodal.documentInput!!.ingestMode ==
@@ -55,6 +62,7 @@ class ServiceCatalogUploadCapabilitiesTest {
     private fun uploadInstance(
         templateId: String = "deepseek",
         isFileUploadEnabled: Boolean,
+        baseModel: Model = model,
     ) = ModelServiceInstance(
         id = "instance-$templateId",
         name = templateId,
@@ -69,7 +77,7 @@ class ServiceCatalogUploadCapabilitiesTest {
                 capability = ServiceCapability.Conversation,
                 protocol = ApiProtocol.OpenaiChatcompletions,
                 endpoint = "https://example.com",
-                models = listOf(model, model.copy(id = "model-2")),
+                models = listOf(baseModel, baseModel.copy(id = "model-2")),
             ),
         ),
     )

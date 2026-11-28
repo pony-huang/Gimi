@@ -2271,7 +2271,15 @@ class ChatViewModelCharacterizationTest {
                 capability = ServiceCapability.Conversation,
                 protocol = ApiProtocol.OpenaiChatcompletions,
                 endpoint = "https://example.test",
-                models = listOf(Model(id = "model", name = "Model")),
+                models = listOf(
+                    Model(
+                        id = "model",
+                        name = "Model",
+                        multimodal = github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities(
+                            documentInput = github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability(),
+                        ),
+                    ),
+                ),
             ),
         ),
     )

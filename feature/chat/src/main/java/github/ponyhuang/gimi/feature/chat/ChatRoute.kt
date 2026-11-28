@@ -1,11 +1,16 @@
 package github.ponyhuang.gimi.feature.chat
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -26,7 +31,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiMusicActions
+import github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiDeviceActions
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalA2uiDeviceActions
 import github.ponyhuang.gimi.feature.chat.a2ui.LocalChatA2uiMusicActions
+import github.ponyhuang.gimi.domain.a2ui.A2uiFlashlightState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
@@ -110,6 +118,13 @@ fun ChatRoute(
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var flashlightPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    val flashlightPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        flashlightPermissionDenied = !granted && context.findComponentActivity()?.let {
+            !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+        } == true
+        viewModel.refreshA2uiFlashlight()
+    }
     val chatNoticeConfigureChatModel = stringResource(R.string.chat_notice_configure_chat_model)
     val chatNoticeAlreadyNewConversation = stringResource(R.string.chat_notice_already_new_conversation)
     val chatNoticeModelSwitchBlocked = stringResource(R.string.chat_notice_model_switch_blocked)
@@ -145,6 +160,7 @@ fun ChatRoute(
     var voicePageVisible by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(viewModel) {
+        viewModel.refreshA2uiFlashlight()
         viewModel.onAction(ChatAction.ResumeChat)
         onPauseOrDispose {}
     }
@@ -230,6 +246,7 @@ fun ChatRoute(
             )
             ChatNotice.DocumentTotalSizeLimitExceeded -> chatNoticeDocumentTotalSizeLimit
             ChatNotice.A2uiMusicLikeFailed -> stringResource(R.string.chat_a2ui_music_like_failed)
+            ChatNotice.A2uiDeviceChangeFailed -> stringResource(R.string.chat_a2ui_device_change_failed)
             ChatNotice.UploadedFileDeleteFailed -> chatNoticeUploadedFileDeleteFailed
             ChatNotice.UploadedFilesRefreshFailed -> chatNoticeUploadedFilesRefreshFailed
             is ChatNotice.McpServerSkipped -> context.getString(
@@ -403,7 +420,33 @@ fun ChatRoute(
                                     canRecommend = !uiState.isInitializing && !uiState.isAgentRunning,
                                 )
                             } else null
-                            CompositionLocalProvider(LocalChatA2uiMusicActions provides musicActions) {
+                            val deviceActions = musicActions?.let {
+                                ChatA2uiDeviceActions(
+                                    volume = viewModel.a2uiVolume,
+                                    flashlight = viewModel.a2uiFlashlight,
+                                    changingVolume = uiState.a2uiChangingVolume,
+                                    changingFlashlight = uiState.a2uiChangingFlashlight,
+                                    permissionNeedsSettings = flashlightPermissionDenied,
+                                    setVolume = { level -> viewModel.setA2uiVolume(currentSessionId, level) },
+                                    setFlashlight = { enabled -> viewModel.setA2uiFlashlight(currentSessionId, enabled) },
+                                    requestFlashlightPermission = {
+                                        if (viewModel.a2uiFlashlight.value == A2uiFlashlightState.PermissionRequired) {
+                                            if (flashlightPermissionDenied) {
+                                                context.startActivity(Intent(
+                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                    Uri.fromParts("package", context.packageName, null),
+                                                ))
+                                            } else {
+                                                flashlightPermission.launch(Manifest.permission.CAMERA)
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                            CompositionLocalProvider(
+                                LocalChatA2uiMusicActions provides musicActions,
+                                LocalA2uiDeviceActions provides deviceActions,
+                            ) {
                                 ChatScaffold(
                                     state = uiState,
                                     recommendations = recommendations,

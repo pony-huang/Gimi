@@ -1,5 +1,11 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.a2ui.A2uiDeviceControls
+import github.ponyhuang.gimi.domain.a2ui.A2uiFlashlightState
+import github.ponyhuang.gimi.domain.a2ui.A2uiMediaVolume
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.onStart
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -102,10 +108,55 @@ class ChatViewModel @Inject constructor(
     private val chatAgent: github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository,
     internal val a2uiRendererFunctions: github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions =
         github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions(),
+    private val a2uiDeviceControls: A2uiDeviceControls? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val flashlightRefresh = MutableStateFlow(0L)
+    internal val a2uiVolume = (a2uiDeviceControls?.observeVolume() ?: flowOf<A2uiMediaVolume?>(null))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal val a2uiFlashlight = flashlightRefresh.flatMapLatest {
+        a2uiDeviceControls?.observeFlashlight()?.onStart { emit(A2uiFlashlightState.Loading) }
+            ?: flowOf(A2uiFlashlightState.Disabled)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), A2uiFlashlightState.Loading)
+
+    internal fun refreshA2uiFlashlight() {
+        flashlightRefresh.update { it + 1 }
+    }
+
+    internal fun setA2uiVolume(sessionId: String, level: Int) {
+        val controls = a2uiDeviceControls ?: return
+        updateA2uiDevice(sessionId, volume = true) { controls.setVolume(level) }
+    }
+
+    internal fun setA2uiFlashlight(sessionId: String, enabled: Boolean) {
+        val controls = a2uiDeviceControls ?: return
+        updateA2uiDevice(sessionId, volume = false) { controls.setFlashlight(enabled) }
+    }
+
+    private fun updateA2uiDevice(sessionId: String, volume: Boolean, apply: suspend () -> Boolean) {
+        val state = _uiState.value
+        if (sessionId.isBlank() || state.sessionId != sessionId || state.isInitializing) return
+        if (if (volume) state.a2uiChangingVolume else state.a2uiChangingFlashlight) return
+        _uiState.update {
+            if (volume) it.copy(a2uiChangingVolume = true) else it.copy(a2uiChangingFlashlight = true)
+        }
+        viewModelScope.launch {
+            try {
+                if (!apply()) _uiState.update {
+                    if (it.sessionId == sessionId) it.copy(notice = ChatNotice.A2uiDeviceChangeFailed) else it
+                }
+            } finally {
+                _uiState.update {
+                    if (volume) it.copy(a2uiChangingVolume = false) else it.copy(a2uiChangingFlashlight = false)
+                }
+            }
+        }
+    }
 
     private val fileUploads = ChatFileUploadCoordinator(
         scope = viewModelScope,

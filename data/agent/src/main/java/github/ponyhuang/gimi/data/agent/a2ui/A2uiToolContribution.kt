@@ -245,6 +245,12 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         $composition
 
         A2UI CONTROL ROUTING (MANDATORY):
+        When the user asks to see a device control, use MediaVolumeSlider for media volume and FlashlightSwitch
+        for the flashlight when present in the catalog. Include them in component_names and use them without
+        value bindings or Apply buttons: the host reads actual device state and applies direct user interaction.
+        Showing these controls does not itself change the device. For spoken or typed commands to change a
+        setting, use the existing authorized tools and confirmation. A request such as "choose a good volume
+        for meetings" can also be offered as a separate ordinary Button event when relevant.
         Routine discrete control operations are direct commands that change an existing state or advance/reverse
         one step: on/off or toggle, start/stop, next/previous step, and next/previous track. Execute the business
         tool directly. If its result confirms success and no user input or confirmation remains, give one brief
@@ -255,16 +261,15 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         require appropriate feedback or confirmation. Do not bypass required authorization.
         For all other requests to change a device or app setting, controllable state, alarm, reminder, timer, or
         schedule - including enable, disable, on/off, toggle, set, change, schedule, create, edit, or delete -
-        call generate_a2ui in the same turn in addition to the business action. If the change requires
-        confirmation, use the A2UI control as the confirmation instead of asking in plain text, then perform
-        the action after the user submits it.
+        call generate_a2ui in the same turn in addition to the business action. For forms, use a submit
+        action instead of asking for form confirmation in plain text. Keep any required tool confirmation.
         This includes creating or editing alarms, reminders, timers, and schedules, and configuring settings
         beyond routine discrete controls. A short Markdown summary may accompany the card, but a Markdown-only answer is not
         sufficient; if the business action has already completed, still render the resulting control
         instead of replying with text only. A yes/no question or confirmation about such a controllable
         state must be presented with A2UI actions (confirm/cancel or enable/disable), not plain text.
         The control surface must include the affected item, its tool-confirmed state, and an editable control:
-        - bind Switch (or CheckBox if Switch is unavailable) to the current boolean state and add a primary
+        - except for the live device controls above, bind Switch (or CheckBox if Switch is unavailable) to the current boolean state and add a primary
           Button event action that applies the displayed choice; editing local data alone never executes the change;
         - for an alarm, reminder, timer, or schedule, show the concrete date/time with DateTimeInput, the
           current enabled state, and enable/disable/apply actions;

@@ -76,6 +76,8 @@ internal val chatA2uiCustomCatalog: A2uiCatalog = A2uiCatalog(
         ChatSwitch,
         ChatChipSelect,
         ChatEntityCard,
+        ChatMediaVolumeSlider,
+        ChatFlashlightSwitch,
     ),
     isInline = true,
 )

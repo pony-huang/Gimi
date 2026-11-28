@@ -483,4 +483,13 @@
     <string name="chat_web_citations_overflow">+%1$d</string>
     <string name="chat_a2ui_music_recommend">Recommend similar music</string>
     <string name="chat_a2ui_music_like_failed">Could not change your NetEase favorite. Check the plugin and your sign-in.</string>
+    <string name="chat_a2ui_device_volume">Media volume</string>
+    <string name="chat_a2ui_device_percent">%1$d%%</string>
+    <string name="chat_a2ui_device_flashlight">Flashlight</string>
+    <string name="chat_a2ui_device_reading">Reading device state…</string>
+    <string name="chat_a2ui_device_unavailable">Device control is unavailable</string>
+    <string name="chat_a2ui_device_camera_required">Camera permission is required to control the flashlight</string>
+    <string name="chat_a2ui_device_camera_grant">Grant camera permission</string>
+    <string name="chat_a2ui_device_camera_settings">Open app permission settings</string>
+    <string name="chat_a2ui_device_change_failed">The device did not confirm this change</string>
 </resources>

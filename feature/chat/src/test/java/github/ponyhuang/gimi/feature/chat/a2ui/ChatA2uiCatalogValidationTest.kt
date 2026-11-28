@@ -31,7 +31,7 @@ class ChatA2uiCatalogValidationTest {
 
         assertEquals(
             setOf("BarChart", "PieChart", "CandlestickChart", "WeatherCard", "ReceiptCard", "StockTicker",
-                "DataTable", "KeyValueList", "Timeline", "Agenda", "MusicPlayerCard", "Switch", "ChipSelect", "EntityCard"),
+                "DataTable", "KeyValueList", "Timeline", "Agenda", "MusicPlayerCard", "Switch", "ChipSelect", "EntityCard", "MediaVolumeSlider", "FlashlightSwitch"),
             componentNames(extended) - componentNames(basic),
         )
         assertNotEquals(basic.id, extended.id)
@@ -47,7 +47,7 @@ class ChatA2uiCatalogValidationTest {
                 """{"version":"v0.9.1","createSurface":{"surfaceId":"extended","catalogId":"${catalog.id}","sendDataModel":true}}""",
                 """{"version":"v0.9.1","updateDataModel":{"surfaceId":"extended","path":"/","value":{"reminder":true,"liked":true,"topics":["deploys"],"slices":[{"label":"Food","value":20}]}}}""",
                 """{"version":"v0.9.1","updateComponents":{"surfaceId":"extended","components":[
-                  {"id":"root","component":"Column","children":["bar","pie","candlestick","weather","receipt","stock","table","pairs","timeline","agenda","music","switch","chips","entity"]},
+                  {"id":"root","component":"Column","children":["bar","pie","candlestick","weather","receipt","stock","table","pairs","timeline","agenda","music","switch","chips","volume","torch","entity"]},
                   {"id":"bar","component":"BarChart","format":"currency","data":[{"x":"Food","y":20,"series":"Budget"}]},
                   {"id":"pie","component":"PieChart","format":"compact","data":{"path":"/slices"},"donut":true,"centerLabel":"Total"},
                   {"id":"candlestick","component":"CandlestickChart","title":"HLVR","format":"currency","data":[{"date":"Sep 1","open":182.4,"high":182.48,"low":178.71,"close":179.46}]},
@@ -61,6 +61,8 @@ class ChatA2uiCatalogValidationTest {
                   {"id":"music","component":"MusicPlayerCard","title":"Goon Gumpas","artist":"Aphex Twin","durationSeconds":153,"progressSeconds":51,"isPlaying":true,"provider":"spotify","deviceId":"speaker-1","externalUrl":"https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC","songId":"8f3c9a12b4e567890123456789abcdef","originalId":"139774","liked":{"path":"/liked"},"tracks":[{"title":"Goon Gumpas","artist":"Aphex Twin","durationSeconds":153},{"title":"Avril 14th","artist":"Aphex Twin","externalUrl":"spotify:track:1a2b3c","isVip":true}]},
                   {"id":"switch","component":"Switch","label":"Reminder","value":{"path":"/reminder"}},
                   {"id":"chips","component":"ChipSelect","label":"Topics","value":{"path":"/topics"},"options":[{"value":"deploys","label":"Deploys"},{"value":"security","label":"Security"}]},
+                  {"id":"volume","component":"MediaVolumeSlider"},
+                  {"id":"torch","component":"FlashlightSwitch"},
                   {"id":"entity","component":"EntityCard","title":"Café Central","subtitle":"Coffee house","meta":"Open until 22:00","badge":{"label":"Popular","color":"success"},"rating":4.5,"ratingCount":12840,"actions":[{"label":"Directions","href":"https://maps.google.com"},{"label":"Pick","variant":"solid"}]}
                 ]}}""",
             ),

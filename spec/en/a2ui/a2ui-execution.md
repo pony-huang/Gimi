@@ -73,6 +73,13 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 - **Direct function call**: An explicitly registered operation with arguments and a result. The call itself needs no new model turn. A NetEase heart click calls the enabled plugin's favorite tool and changes the heart after success. Agent tool `seek_a2ui_music_player` targets one mounted, seekable player in the calling session and surface.
 - The two direct calls use Gimi's in-process wiring with the existing AndroidX 0.9.1 renderer. A future v1.0 transport can reuse the operation contracts. Rendering and replay never execute these calls.
 
+## Live device controls
+
+- `MediaVolumeSlider` and `FlashlightSwitch` read live device state from the host. Neither accepts a generated value. Rendering a new or historical surface only subscribes to state.
+- Releasing the volume slider applies one authorized write and reads the resulting media volume. Visible sliders also track changes from hardware controls or Agent tool calls.
+- Toggling the flashlight checks tool authorization and camera permission. The switch reflects the system torch callback, including changes initiated outside Gimi. The permission button requests camera access without applying a pending toggle.
+- Normal Agent tool calls retain their existing confirmation flow. A separate ordinary Button event can submit a request for the Agent to choose a setting.
+
 ## Cross-cutting rules
 
 1. **Untrusted input**: agent JSON is parsed and schema-validated by the official engine before reaching UI state; error states are surfaced (per-component Loading/Error); business actions remain normal authorized tools — submissions only carry structured interaction data.

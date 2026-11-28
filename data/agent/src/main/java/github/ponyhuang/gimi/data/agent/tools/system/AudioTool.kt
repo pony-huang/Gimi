@@ -5,6 +5,7 @@ import android.media.AudioManager
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.domain.a2ui.A2uiMediaVolume
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,6 +29,7 @@ class AudioTool @Inject constructor(
         description = "Sets the device media volume to an absolute level. The applied level is clamped to the device's minimum and maximum.",
         requireConfirmation = true,
     )
+    @Synchronized
     fun setMediaVolume(
         @Param("Target media volume level.")
         level: Int,
@@ -47,12 +49,41 @@ class AudioTool @Inject constructor(
         description = "Adjusts the device media volume relative to its current level by a signed number of steps.",
         requireConfirmation = true,
     )
+    @Synchronized
     fun adjustMediaVolume(
         @Param("Number of media-volume levels to add or subtract. Use a positive number to increase volume and a negative number to decrease it.")
         delta: Int,
     ): Map<String, Int> {
         val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         return setMediaVolume(current + delta) + mapOf("delta" to delta)
+    }
+
+    internal fun readVolumeForControl(authorized: Boolean): A2uiMediaVolume? {
+        val manager = audioManager ?: return null
+        val stream = AudioManager.STREAM_MUSIC
+        return try {
+            A2uiMediaVolume(
+                level = manager.getStreamVolume(stream),
+                minimum = manager.getStreamMinVolume(stream),
+                maximum = manager.getStreamMaxVolume(stream),
+                adjustable = authorized && !manager.isVolumeFixed,
+            )
+        } catch (_: SecurityException) {
+            null
+        }
+    }
+
+    @Synchronized
+    internal fun setVolumeFromControl(level: Int): Boolean {
+        val state = readVolumeForControl(authorized = true) ?: return false
+        if (!state.adjustable) return false
+        val target = level.coerceIn(state.minimum, state.maximum)
+        return try {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == target
+        } catch (_: SecurityException) {
+            false
+        }
     }
 
     private fun mediaVolumeState(): Map<String, Int> = mapOf(

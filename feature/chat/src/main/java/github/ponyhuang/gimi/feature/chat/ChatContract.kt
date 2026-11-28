@@ -126,6 +126,9 @@ sealed interface ChatNotice {
     /** 网易云收藏操作未获成功确认，界面保留原状态。 */
     data object A2uiMusicLikeFailed : ChatNotice
 
+    /** 系统未确认设备控件请求的状态。 */
+    data object A2uiDeviceChangeFailed : ChatNotice
+
     data object ConfigureChatModel : ChatNotice
     /** 当前会话已经是新会话，无需重复创建。 */
     data object AlreadyNewConversation : ChatNotice

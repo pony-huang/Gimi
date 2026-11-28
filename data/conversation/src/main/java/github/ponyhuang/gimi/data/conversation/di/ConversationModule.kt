@@ -108,7 +108,9 @@ object ConversationModule {
         context,
         ConversationMetadataDatabase::class.java,
         ConversationMetadataDatabase.DATABASE_NAME,
-    ).fallbackToDestructiveMigration(dropAllTables = true)
+    ).addMigrations(ConversationMetadataDatabase.MIGRATION_7_8)
+        // 7 → 8 有无损迁移；只有更早版本或无匹配路径的升级才回退清库。
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
     @Provides

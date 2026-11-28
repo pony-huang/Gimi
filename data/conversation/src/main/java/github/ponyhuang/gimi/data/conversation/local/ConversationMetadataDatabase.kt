@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -146,5 +148,18 @@ abstract class ConversationMetadataDatabase : RoomDatabase() {
     abstract fun uploadedFileDao(): UploadedFileDao
     companion object {
         const val DATABASE_NAME = "conversation-metadata.db"
+
+        /**
+         * 7 → 8：为 uploaded_files 增加可空的本地归档绑定列。
+         *
+         * 非破坏性迁移保留既有会话元数据与已上传文件记录——这些是用户数据，新增一列
+         * 没有理由清空整库。列名与 [UploadedFileEntity.localPath] 一致；SQLite 的
+         * ADD COLUMN ... TEXT 默认 NULL，与 Kotlin 侧默认值 null 对齐。
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE uploaded_files ADD COLUMN localPath TEXT")
+            }
+        }
     }
 }

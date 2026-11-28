@@ -210,16 +210,17 @@ private const val TAG = "ModelTemplateDatabase"
 /**
  * 模板定义（协议集合、默认端点、端点策略）以内置清单为准，只合并候选模型目录：
  * 既有行可能来自旧版本，若保留其协议集合，模板收紧后的约束（如 DeepSeek / MiniMax
- * 对话固定 Messages）对老安装永远不生效。既有（含远端刷新得到）的候选模型保留，缺失的内置
- * 模型补齐，内置新增的能力连接直接采用内置定义。
+ * 对话固定 Messages）对老安装永远不生效。内置模型的元数据（名称、能力与多模态声明）始终
+ * 以内置清单为准；既有（含远端刷新得到）但不在内置清单中的候选模型追加在后，新增的
+ * 能力连接直接采用内置定义。
  */
 internal fun mergeTemplateCatalogs(
     existing: List<TemplateConnection>,
     defaults: List<TemplateConnection>,
 ): List<TemplateConnection> = defaults.map { default ->
     val stored = existing.firstOrNull { it.capability == default.capability } ?: return@map default
-    val existingIds = stored.catalog.mapTo(HashSet()) { it.id }
-    default.copy(catalog = stored.catalog + default.catalog.filterNot { it.id in existingIds })
+    val defaultIds = default.catalog.mapTo(HashSet()) { it.id }
+    default.copy(catalog = default.catalog + stored.catalog.filterNot { it.id in defaultIds })
 }
 
 /** Persistence-only model origin used to reconcile remote and manually entered models. */
@@ -261,11 +262,14 @@ internal data class StoredModel(
         } else {
             capabilities
         }
+        // 当前没有任何确认来源会为持久化模型写入多模态输入能力；旧版本在 encodeDefaults=true 下
+        // 曾把非空默认（vision + audioInput + documentInput 全开）写进 Room 模板行与实例加密快照，
+        // 读取时统一清空，仅由实例级"文件上传"开关在运行期按需推导 documentInput。
         return github.ponyhuang.gimi.domain.modelcatalog.model.Model(
             id = modelId,
             name = modelName,
             capabilities = caps,
-            multimodal = multimodal,
+            multimodal = MultimodalCapabilities(),
         )
     }
 }

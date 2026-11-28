@@ -200,6 +200,11 @@ private fun ModelChoiceCard(
     onToggle: () -> Unit,
 ) {
     val multimodal = row.model.multimodal
+    val supportsImages = multimodal.supportsImages
+    val supportsDocuments = multimodal.documentInput != null &&
+        multimodal.documentInput?.ingestMode != github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.PATH_TEXT &&
+        multimodal.documentInput?.ingestMode != github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.NOT_SUPPORTED
+    val supportsAudio = multimodal.supportsAudio
     Row(
         Modifier.fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
@@ -247,18 +252,18 @@ private fun ModelChoiceCard(
                     modifier = Modifier.padding(top = 1.dp),
                 )
             }
-            if (multimodal.isMultimodal) {
+            if (supportsImages || supportsDocuments || supportsAudio) {
                 Row(
                     Modifier.padding(top = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (multimodal.supportsImages) {
+                    if (supportsImages) {
                         ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_vision))
                     }
-                    if (multimodal.supportsDocuments) {
+                    if (supportsDocuments) {
                         ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_documents))
                     }
-                    if (multimodal.supportsAudio) {
+                    if (supportsAudio) {
                         ModelCapabilityBadge(stringResource(R.string.modelsettings_model_badge_audio))
                     }
                 }

@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -17,8 +18,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -344,15 +347,35 @@ fun RealtimeVoiceScreen(
     }
     val scene = voiceScene(colors)
     val draft = uiState.draft
+    val editing = uiState.composer.editing
+    val hasStageLowerContent = failed ||
+        uiState.switching ||
+        state.inputAttachments.isNotEmpty() ||
+        state.inputText.isNotBlank() ||
+        state.responseText.isNotBlank() ||
+        state.spokenText.isNotBlank() ||
+        state.speakingText.isNotBlank()
     // M3 Emphasized decelerate 曲线：进入时前段快、尾段柔和落位；顶栏几何与聊天页一致，保持静止。
     val clampedProgress = EmphasizedDecelerate.transform(transitionProgress.coerceIn(0f, 1f))
     val maxOrbCap by animateDpAsState(
-        targetValue = if (uiState.composer.editing) 180.dp else 340.dp,
+        targetValue = when {
+            !editing -> 340.dp
+            hasStageLowerContent -> 108.dp
+            else -> 140.dp
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
         ),
         label = "voice-orb-cap",
+    )
+    val orbOffsetY by animateDpAsState(
+        targetValue = if (editing) 0.dp else 16.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "voice-orb-offset-y",
     )
     Scaffold(
         modifier = Modifier
@@ -375,7 +398,12 @@ fun RealtimeVoiceScreen(
                     }
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
                     .imePadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = if (uiState.composer.editing) 12.dp else 30.dp),
+                    .padding(
+                        start = if (editing) 16.dp else 20.dp,
+                        end = if (editing) 16.dp else 20.dp,
+                        top = if (editing) 6.dp else 12.dp,
+                        bottom = if (editing) 10.dp else 30.dp,
+                    ),
             ) {
                 VoiceInputDock(
                     state = uiState,
@@ -390,16 +418,26 @@ fun RealtimeVoiceScreen(
                     composerContent = composerContent,
                     settingsEnabled = !uiState.settingsLocked && !started && !uiState.switching,
                 )
-                VoiceConfigMicroPills(
-                    uiState = uiState,
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                )
+                // 文本编辑态下收起底部双行配置微胶囊（已浓缩至输入卡底栏摘要），为软键盘上方的粒子球与字幕留出空间。
+                AnimatedVisibility(
+                    visible = !editing,
+                    enter = fadeIn(tween(150)) + expandVertically(tween(180)),
+                    exit = fadeOut(tween(100)) + shrinkVertically(tween(150)),
+                ) {
+                    VoiceConfigMicroPills(
+                        uiState = uiState,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
+                }
             }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).padding(horizontal = 16.dp)) {
             Box(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp).height(48.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = if (editing) 4.dp else 8.dp)
+                    .height(if (editing) 40.dp else 48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (uiState.conversationTitle.isNotBlank()) {
@@ -419,11 +457,12 @@ fun RealtimeVoiceScreen(
                     }
                 }
             }
-            // 球体略低于上半区中心，同时保留下方约 43% 空间给字幕与错误恢复内容；
-            // 状态文字按参考视频样式移入球心，由 VoiceOrb 自行渲染。
+            // 常规态：球体略低于上半区中心，同时保留下方约 43% 空间给字幕与错误恢复内容；
+            // 文本输入态（方案 A）：无字幕时释放空置下半区并归零球体下移偏移，保持舒展正圆且与角色行保持安全间距。
+            val showLowerBox = !editing || hasStageLowerContent
             Column(
                 Modifier
-                    .weight(1.2f)
+                    .weight(if (showLowerBox) 1.2f else 1f)
                     .fillMaxWidth()
                     .graphicsLayer {
                         val orbScale = 0.76f + 0.24f * clampedProgress
@@ -434,46 +473,58 @@ fun RealtimeVoiceScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .weight(1f, fill = showLowerBox)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     val orbSize = minOf(maxWidth, maxHeight, maxOrbCap)
                     VoiceOrb(
                         state = state,
                         switching = uiState.switching,
                         statusText = stringResource(status),
-                        modifier = Modifier.size(orbSize).offset(y = 16.dp),
+                        modifier = Modifier.size(orbSize).offset(y = orbOffsetY),
                         ink = scene.ink,
                         isVisible = isVisible,
                     )
                 }
+                if (editing && !hasStageLowerContent && roleChips != null) {
+                    Spacer(Modifier.height(6.dp))
+                    roleChips()
+                }
             }
-            Box(Modifier.weight(.9f).fillMaxWidth()) {
-                when {
-                    failed -> Column(
-                        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Button(onClick = onRetry) {
-                            Text(stringResource(if (savingFailed) R.string.voice_retry_save else R.string.voice_retry))
+            if (showLowerBox) {
+                Box(Modifier.weight(.9f).fillMaxWidth()) {
+                    when {
+                        failed -> Column(
+                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Button(onClick = onRetry) {
+                                Text(stringResource(if (savingFailed) R.string.voice_retry_save else R.string.voice_retry))
+                            }
                         }
+                        uiState.switching -> VoiceSwitchingIndicator(scene, Modifier.padding(top = 20.dp))
+                        else -> VoiceCaptions(
+                            inputText = state.inputText,
+                            inputAttachments = state.inputAttachments,
+                            onOpenDocument = onOpenDocument,
+                            responseText = state.responseText,
+                            spokenText = state.spokenText,
+                            speakingText = state.speakingText,
+                            revision = state.revision,
+                            responseColor = scene.caption,
+                            responseDimColor = scene.captionDim,
+                            fadeColor = scene.fade,
+                            compact = editing,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
-                    uiState.switching -> VoiceSwitchingIndicator(scene, Modifier.padding(top = 20.dp))
-                    else -> VoiceCaptions(
-                        inputText = state.inputText,
-                        inputAttachments = state.inputAttachments,
-                        onOpenDocument = onOpenDocument,
-                        responseText = state.responseText,
-                        spokenText = state.spokenText,
-                        speakingText = state.speakingText,
-                        revision = state.revision,
-                        responseColor = scene.caption,
-                        responseDimColor = scene.captionDim,
-                        fadeColor = scene.fade,
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 }
             }
         }
-        if (roleChips != null) {
+        if (roleChips != null && !editing) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.BottomCenter,
@@ -1457,8 +1508,8 @@ private fun RealtimeVoiceScreenReadyPreview() {
     }
 }
 
-@Preview(name = "语音页 · 通话中文字与文件输入 · 浅色", widthDp = 390, heightDp = 844, locale = "zh")
-@Preview(name = "语音页 · 通话中文字与文件输入 · 深色", widthDp = 390, heightDp = 844, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "语音页 · 通话中文字与文件输入 · 浅色", widthDp = 390, heightDp = 540, locale = "zh")
+@Preview(name = "语音页 · 通话中文字与文件输入 · 深色", widthDp = 390, heightDp = 540, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RealtimeVoiceScreenEditingPreview() {
     GimiTheme {
@@ -1466,6 +1517,8 @@ private fun RealtimeVoiceScreenEditingPreview() {
             uiState = RealtimeVoiceUiState(
                 active = true,
                 settingsLocked = true,
+                conversationTitle = "简历修改建议",
+                modelName = "qwen3-omni-flash-realtime",
                 settings = previewVoiceSettings(),
                 pipeline = VoicePipeline.NATIVE_REALTIME,
                 cascadedAvailable = true,

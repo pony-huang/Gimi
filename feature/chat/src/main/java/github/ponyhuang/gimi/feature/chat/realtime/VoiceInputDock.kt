@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,23 +23,39 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
 import github.ponyhuang.gimi.feature.chat.AttachmentList
 import github.ponyhuang.gimi.feature.chat.ComposerInputContentParams
 import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.ui.theme.LocalGimiDarkTheme
+
+/**
+ * 语音文本编辑卡内嵌顶栏与底栏所需的通话控制及链路摘要上下文。
+ *
+ * 由 [VoiceInputDock] 在展开态注入，使嵌入在 `ChatComposer` 内部的 [VoiceComposerInput]
+ * 能直接渲染「输入中，收音已暂停」胶囊、快捷挂断键以及底部链路模型摘要，无需额外外部悬浮工具行。
+ *
+ * @property onEndCall 顶部快捷挂断回调。
+ * @property endCallEnabled 快捷挂断是否可点（通话已启动且非切换中）。
+ * @property pipelineSummary 底部辅助显示的当前链路与主模型摘要（如「级联 · deepseek-flash」）。
+ */
+internal data class VoiceComposerDockContext(
+    val onEndCall: () -> Unit = {},
+    val endCallEnabled: Boolean = true,
+    val pipelineSummary: String = "",
+)
+
+internal val LocalVoiceComposerDockContext = compositionLocalOf { VoiceComposerDockContext() }
 
 /**
  * 语音底部操作栏：按照 Material 3 Expressive Button-Groups 规范统一布局。
@@ -48,7 +65,8 @@ import github.ponyhuang.gimi.feature.chat.R
  * 2. 中央 Hero 按钮：高权重通话胶囊，待启动为 28dp 全圆胶囊 (Call)，通话中弹性形变为 16dp 圆角方枕 (CallEnd)。
  * 3. 右翼连结组 [静音, 退出]：静音采用中性灰底与形态微收缩（去除高亮红强刺激），退出键独占鲜艳实心红。
  *
- * 点击键盘展开文字编辑器时，整体弹性过渡为全宽输入与附件卡片。
+ * 点击键盘展开文字编辑器（方案 A）时，收音暂停状态、快捷挂断与链路模型摘要全部内嵌进输入卡，
+ * 释放垂直空间避免软键盘弹出时挤压中央粒子球。
  */
 @Composable
 internal fun VoiceInputDock(
@@ -69,6 +87,26 @@ internal fun VoiceInputDock(
     val settingsDescription = stringResource(
         if (state.settingsLocked) R.string.voice_settings_after_hangup else R.string.voice_more_options,
     )
+    val pipelineTitle = stringResource(
+        when (state.pipeline) {
+            VoicePipeline.CASCADED -> R.string.voice_pipeline_cascaded
+            VoicePipeline.SEMI_CASCADED -> R.string.voice_pipeline_semi_cascaded
+            VoicePipeline.NATIVE_REALTIME -> R.string.voice_pipeline_native_realtime
+        },
+    )
+    val primaryModelName = state.modelName.ifBlank { state.chatModelName }
+    val pipelineSummary = if (primaryModelName.isNotBlank()) {
+        "$pipelineTitle · $primaryModelName"
+    } else {
+        pipelineTitle
+    }
+    val dockContext = remember(onCall, enabled, state.active, pipelineSummary) {
+        VoiceComposerDockContext(
+            onEndCall = onCall,
+            endCallEnabled = enabled && state.active,
+            pipelineSummary = pipelineSummary,
+        )
+    }
     val dockSpring = spring<Dp>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow,
@@ -79,65 +117,47 @@ internal fun VoiceInputDock(
             animationSpec = dockSpring,
             label = "voice-input-width",
         )
-        val controlsHeight by animateDpAsState(
-            targetValue = if (editing) 48.dp else 0.dp,
-            animationSpec = dockSpring,
-            label = "voice-controls-rise",
-        )
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.fillMaxWidth().height(controlsHeight).clipToBounds()) {
-                if (editing) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.voice_input_paused),
-                        Modifier.weight(1f).padding(start = 8.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onSurfaceVariant,
+        AnimatedContent(
+            targetState = editing,
+            transitionSpec = {
+                (fadeIn(tween(150, delayMillis = 40)) togetherWith fadeOut(tween(90)))
+                    .using(
+                        SizeTransform(clip = false) { _, _ ->
+                            spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            )
+                        },
                     )
-                    DockButton(painterResource(R.drawable.ic_settings_voice), settingsDescription, onSettings, enabled && settingsEnabled)
-                    DockButton(Icons.Default.CallEnd, stringResource(R.string.voice_end), onCall, enabled, contentColor = colors.error)
-                    DockButton(Icons.Default.MicOff, stringResource(R.string.voice_input_paused), {}, false)
-                }
-            }
-
-            AnimatedContent(
-                targetState = editing,
-                transitionSpec = {
-                    (fadeIn(tween(150, delayMillis = 40)) togetherWith fadeOut(tween(90)))
-                        .using(
-                            SizeTransform(clip = false) { _, _ ->
-                                spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                )
-                            },
-                        )
-                },
-                label = "voice-input-content",
-            ) { expanded ->
-                if (expanded) {
+            },
+            label = "voice-input-content",
+        ) { expanded ->
+            if (expanded) {
+                CompositionLocalProvider(LocalVoiceComposerDockContext provides dockContext) {
                     Surface(
                         modifier = Modifier.width(width),
-                        shape = RoundedCornerShape(28.dp),
+                        shape = RoundedCornerShape(26.dp),
                         color = colors.surfaceContainer,
+                        border = BorderStroke(0.8.dp, colors.outlineVariant),
                         tonalElevation = 0.dp,
                     ) {
                         composerContent()
                     }
-                } else {
-                    VoiceSplitConnectedButtonDock(
-                        state = state,
-                        width = width,
-                        enabled = enabled,
-                        settingsEnabled = settingsEnabled,
-                        settingsDescription = settingsDescription,
-                        onSettings = onSettings,
-                        onChat = onChat,
-                        onCall = onCall,
-                        onMute = onMute,
-                        onBack = onBack,
-                        dockSpring = dockSpring,
-                    )
                 }
+            } else {
+                VoiceSplitConnectedButtonDock(
+                    state = state,
+                    width = width,
+                    enabled = enabled,
+                    settingsEnabled = settingsEnabled,
+                    settingsDescription = settingsDescription,
+                    onSettings = onSettings,
+                    onChat = onChat,
+                    onCall = onCall,
+                    onMute = onMute,
+                    onBack = onBack,
+                    dockSpring = dockSpring,
+                )
             }
         }
     }
@@ -162,7 +182,7 @@ private fun VoiceSplitConnectedButtonDock(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    val isDark = colors.background.luminance() < 0.5f
+    val isDark = LocalGimiDarkTheme.current
 
     val callCorner by animateDpAsState(
         targetValue = if (state.active) 16.dp else 28.dp,
@@ -351,34 +371,12 @@ private fun VoiceSplitConnectedButtonDock(
     }
 }
 
-@Composable
-private fun DockButton(icon: ImageVector, description: String, onClick: () -> Unit, enabled: Boolean, filled: Boolean = false, containerColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent, contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface, shape: androidx.compose.ui.graphics.Shape = CircleShape) =
-    DockButton(rememberVectorPainter(icon), description, onClick, enabled, filled, containerColor, contentColor, shape)
-
-@Composable
-private fun DockButton(
-    icon: Painter,
-    description: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-    filled: Boolean = false,
-    containerColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent,
-    contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
-    shape: androidx.compose.ui.graphics.Shape = CircleShape,
-) {
-    val tint = if (enabled) contentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .38f)
-    IconButton(
-        onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp), shape = shape,
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = if (filled) containerColor else androidx.compose.ui.graphics.Color.Transparent,
-            contentColor = tint,
-            disabledContainerColor = if (filled) containerColor.copy(alpha = containerColor.alpha * .5f) else androidx.compose.ui.graphics.Color.Transparent,
-            disabledContentColor = tint,
-        ),
-    ) { Icon(icon, description, Modifier.size(22.dp), tint = tint) }
-}
-
-/** 编辑器仅接收受控参数，选择器和 Android 副作用继续由现有 ChatComposer 承载。 */
+/**
+ * 语音通话内嵌文字编辑器（方案 A）：
+ * 顶部状态栏内嵌「输入中，收音已暂停」胶囊、快捷挂断键与收起按钮；
+ * 中部承载附件列表与多行输入框；
+ * 底部工具栏左侧放置添加附件与当前链路/模型摘要，右侧放置主色圆形发送按钮。
+ */
 @Composable
 internal fun VoiceComposerInput(
     params: ComposerInputContentParams,
@@ -386,37 +384,182 @@ internal fun VoiceComposerInput(
     onClose: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val isDark = LocalGimiDarkTheme.current
+    val dockContext = LocalVoiceComposerDockContext.current
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
-        if (params.messageData.attachments.isNotEmpty()) AttachmentList(
-            params.messageData.attachments, params.onRemoveAttachment,
-            Modifier.fillMaxWidth().heightIn(max = 112.dp),
-            uploadStates = params.attachmentUploadStates, onRetryUpload = params.onRetryAttachmentUpload,
-        )
-        Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp)) {
-            if (params.messageData.text.isEmpty()) Text(stringResource(R.string.voice_input_placeholder), color = colors.onSurfaceVariant)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        // 顶部状态栏：左置收音暂停胶囊，右置快捷挂断与收起键盘
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = colors.surfaceContainerHigh,
+                tonalElevation = 0.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(colors.outline, CircleShape),
+                    )
+                    Text(
+                        text = stringResource(R.string.voice_input_paused),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                val hangupBg = colors.errorContainer
+                val hangupTint = if (isDark) colors.onErrorContainer else colors.error
+                Surface(
+                    onClick = dockContext.onEndCall,
+                    enabled = dockContext.endCallEnabled && !params.isGenerating,
+                    modifier = Modifier.size(30.dp),
+                    shape = CircleShape,
+                    color = if (dockContext.endCallEnabled) hangupBg else hangupBg.copy(alpha = 0.45f),
+                    contentColor = if (dockContext.endCallEnabled) hangupTint else hangupTint.copy(alpha = 0.45f),
+                    tonalElevation = 0.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.CallEnd,
+                            contentDescription = stringResource(R.string.voice_end),
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onClose,
+                    enabled = !params.isGenerating,
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    contentColor = colors.onSurfaceVariant,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.voice_input_collapse),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSurfaceVariant,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = colors.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (params.messageData.attachments.isNotEmpty()) {
+            AttachmentList(
+                attachments = params.messageData.attachments,
+                onRemoveAttachment = params.onRemoveAttachment,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 96.dp),
+                uploadStates = params.attachmentUploadStates,
+                onRetryUpload = params.onRetryAttachmentUpload,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .heightIn(min = 36.dp),
+        ) {
+            if (params.messageData.text.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.voice_input_placeholder),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.onSurfaceVariant,
+                )
+            }
             BasicTextField(
-                value = params.messageData.text, onValueChange = params.onTextChange,
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
-                enabled = !params.isGenerating, maxLines = 4,
+                value = params.messageData.text,
+                onValueChange = params.onTextChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focus),
+                enabled = !params.isGenerating,
+                maxLines = 4,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
-                cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                cursorBrush = SolidColor(colors.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { if (sendEnabled) params.onSendClick() }),
             )
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = params.onAttachmentsClick, enabled = !params.isGenerating) {
-                Icon(Icons.Default.Add, stringResource(R.string.stream_ai_compose_composer_add_attachments_button), tint = colors.onSurface)
-            }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onClose, enabled = !params.isGenerating) { Text(stringResource(R.string.voice_input_collapse), color = colors.onSurfaceVariant) }
-            FilledIconButton(
-                onClick = params.onSendClick, enabled = sendEnabled && !params.isGenerating,
-                modifier = Modifier.size(40.dp), shape = CircleShape,
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = params.onAttachmentsClick,
+                enabled = !params.isGenerating,
+                modifier = Modifier.size(36.dp),
             ) {
-                if (params.isGenerating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.ArrowUpward, stringResource(R.string.voice_input_send))
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.stream_ai_compose_composer_add_attachments_button),
+                    tint = colors.onSurface,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (dockContext.pipelineSummary.isNotBlank()) {
+                Text(
+                    text = dockContext.pipelineSummary,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 6.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            FilledIconButton(
+                onClick = params.onSendClick,
+                enabled = sendEnabled && !params.isGenerating,
+                modifier = Modifier.size(38.dp),
+                shape = CircleShape,
+            ) {
+                if (params.isGenerating) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.ArrowUpward,
+                        contentDescription = stringResource(R.string.voice_input_send),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }

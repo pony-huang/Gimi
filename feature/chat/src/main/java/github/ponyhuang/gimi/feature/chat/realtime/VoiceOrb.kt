@@ -8,8 +8,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +28,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
 import github.ponyhuang.gimi.ui.theme.BrandBlue
@@ -189,7 +192,14 @@ internal fun VoiceOrb(
         ?: remember { mutableFloatStateOf(PreviewSwirl) }
     val geometry = remember { SharedParticleGeometry }
     val trailBuffer = remember { VoiceParticleTrailBuffer(ParticleCount) }
-    Box(modifier, contentAlignment = Alignment.Center) {
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val diameter = minOf(maxWidth, maxHeight)
+        // 输入态或小尺寸预览下球体直径收缩，字号随球径降档并强制单行，避免球心文案折成上下两行挤压球面。
+        val statusStyle = when {
+            diameter < 110.dp -> MaterialTheme.typography.titleSmall
+            diameter < 168.dp -> MaterialTheme.typography.titleMedium
+            else -> MaterialTheme.typography.headlineSmall
+        }
         if (isVisible) {
             Canvas(Modifier.matchParentSize()) {
                 drawParticleOrb(
@@ -200,11 +210,15 @@ internal fun VoiceOrb(
         }
         Crossfade(targetState = statusText, animationSpec = tween(200), label = "voiceStatus") { text ->
             Text(
-                text,
-                modifier = Modifier.fillMaxWidth(),
+                text = text,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.headlineSmall,
+                style = statusStyle,
                 color = ink.copy(alpha = .97f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

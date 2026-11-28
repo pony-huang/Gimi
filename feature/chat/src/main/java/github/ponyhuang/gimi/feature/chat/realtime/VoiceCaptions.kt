@@ -58,6 +58,8 @@ internal fun VoiceCaptions(
     modifier: Modifier = Modifier,
     inputAttachments: List<FileAttachment> = emptyList(),
     onOpenDocument: (FileAttachment) -> Unit = {},
+    /** 文本输入展开且软键盘弹出时的紧凑排版：收窄字号、行距与渐隐遮罩，防止小视窗裁切字幕。 */
+    compact: Boolean = false,
 ) {
     val heard = spokenText + speakingText
     val text = responseText.ifBlank { heard }
@@ -80,12 +82,12 @@ internal fun VoiceCaptions(
     Column(modifier) {
         if (inputAttachments.isNotEmpty()) {
             Column(
-                Modifier.fillMaxWidth().heightIn(max = 130.dp).verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().heightIn(max = if (compact) 72.dp else 130.dp).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.End,
             ) {
                 MessageAttachments(inputAttachments, onOpenDocument)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
         }
         if (inputText.isNotBlank()) {
             // 用户话语气泡：配色与聊天页用户气泡同源（浅色容器），靠右与回答字幕区分开。
@@ -96,18 +98,30 @@ internal fun VoiceCaptions(
                     color = LocalUserBubbleColors.current.container,
                     contentColor = LocalUserBubbleColors.current.onContainer,
                 ) {
-                    Text(inputText, Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = inputText,
+                        modifier = Modifier.padding(
+                            horizontal = if (compact) 12.dp else 14.dp,
+                            vertical = if (compact) 6.dp else 10.dp,
+                        ),
+                        style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                        maxLines = if (compact) 2 else 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(if (compact) 6.dp else 10.dp))
         }
         if (text.isNotBlank()) key(revision) {
             val scroll = rememberScrollState()
             var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
+                val isCompactViewport = compact || maxHeight < 140.dp
+                val verticalInsetDp = if (isCompactViewport) 6.dp else 24.dp
+                val fadeBottomHeight = if (isCompactViewport) 16.dp else 48.dp
+                val fadeTopHeight = if (isCompactViewport) 12.dp else 24.dp
                 val viewport = with(LocalDensity.current) { maxHeight.toPx() }
-                val inset = with(LocalDensity.current) { 24.dp.toPx() }
+                val inset = with(LocalDensity.current) { verticalInsetDp.toPx() }
                 val focus = if (tracked) heardEnd - 1 else text.lastIndex
                 LaunchedEffect(text, focus, layout, viewport, scroll.maxValue) {
                     val result = layout ?: return@LaunchedEffect
@@ -117,13 +131,18 @@ internal fun VoiceCaptions(
                     scroll.animateScrollTo(target, tween(450))
                 }
                 // enabled=false 同时禁止拖动、鼠标滚轮和用户滚动语义；文本仍保留完整可访问内容。
-                Column(Modifier.fillMaxSize().verticalScroll(scroll, enabled = false).padding(vertical = 24.dp)) {
-                    Text(annotated, fontSize = 24.sp, lineHeight = 36.sp, letterSpacing = (-.5).sp,
-                        onTextLayout = { layout = it })
+                Column(Modifier.fillMaxSize().verticalScroll(scroll, enabled = false).padding(vertical = verticalInsetDp)) {
+                    Text(
+                        text = annotated,
+                        fontSize = if (isCompactViewport) 15.sp else 24.sp,
+                        lineHeight = if (isCompactViewport) 22.sp else 36.sp,
+                        letterSpacing = if (isCompactViewport) (-0.2).sp else (-.5).sp,
+                        onTextLayout = { layout = it },
+                    )
                 }
-                if (scroll.value > 0) Box(Modifier.fillMaxWidth().height(24.dp)
+                if (scroll.value > 0) Box(Modifier.fillMaxWidth().height(fadeTopHeight)
                     .background(Brush.verticalGradient(listOf(fadeColor, Color.Transparent))))
-                Box(Modifier.fillMaxWidth().height(48.dp).align(Alignment.BottomCenter)
+                Box(Modifier.fillMaxWidth().height(fadeBottomHeight).align(Alignment.BottomCenter)
                     .background(Brush.verticalGradient(listOf(Color.Transparent, fadeColor))))
             }
         }

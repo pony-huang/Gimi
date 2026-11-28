@@ -240,14 +240,14 @@ private fun VoiceMutedPreview() {
         muted = true), modelName = "DeepSeek V4"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
-/** 胶囊编辑与附件状态；小屏和深浅色使用生产布局及纯展示参数。 */
-@Preview(name = "Capsule editing light", widthDp = 360, heightDp = 640, locale = "zh-rCN")
-@Preview(name = "Capsule editing dark", widthDp = 360, heightDp = 640, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+/** 胶囊编辑与附件状态；包含软键盘弹出后的紧凑可视高度（heightDp = 520）及深浅色生产布局预览。 */
+@Preview(name = "Capsule editing light (IME compact)", widthDp = 390, heightDp = 520, locale = "zh-rCN")
+@Preview(name = "Capsule editing dark (IME compact)", widthDp = 390, heightDp = 520, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceCapsuleEditingPreview() = VoiceCapsulePreview(attachments = false)
 
-@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 720, locale = "zh-rCN")
-@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 720, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 560, locale = "zh-rCN")
+@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 560, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceCapsuleAttachmentsPreview() = VoiceCapsulePreview(attachments = true)
 
@@ -264,6 +264,8 @@ private fun VoiceCapsulePreview(attachments: Boolean) {
         RealtimeVoiceScreen(
             uiState = RealtimeVoiceUiState(
                 active = true,
+                conversationTitle = "简历修改建议",
+                modelName = "deepseek-flash",
                 voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, inputPaused = true),
                 composer = VoiceComposerUiState(editing = true, draft = draft),
             ),

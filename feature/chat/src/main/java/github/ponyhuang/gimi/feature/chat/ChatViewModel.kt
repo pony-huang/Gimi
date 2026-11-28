@@ -100,6 +100,8 @@ class ChatViewModel @Inject constructor(
     private val appUpdateRepository: AppUpdateRepository,
     private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
     private val chatAgent: github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository,
+    internal val a2uiRendererFunctions: github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions =
+        github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -147,6 +149,28 @@ class ChatViewModel @Inject constructor(
                 } else state }
             },
         )
+    }
+
+    internal fun setA2uiNeteaseLiked(sessionId: String, songId: String, liked: Boolean) {
+        val state = _uiState.value
+        if (sessionId.isBlank() || state.sessionId != sessionId || state.isInitializing ||
+            songId in state.a2uiPendingNeteaseLikes
+        ) return
+        _uiState.update { it.copy(a2uiPendingNeteaseLikes = it.a2uiPendingNeteaseLikes + songId) }
+        viewModelScope.launch {
+            try {
+                val changed = chatAgent.setA2uiNeteaseTrackLiked(sessionId, songId, liked)
+                _uiState.update {
+                    when {
+                        changed -> it.copy(a2uiNeteaseLikes = it.a2uiNeteaseLikes + (songId to liked))
+                        it.sessionId == sessionId -> it.copy(notice = ChatNotice.A2uiMusicLikeFailed)
+                        else -> it
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(a2uiPendingNeteaseLikes = it.a2uiPendingNeteaseLikes - songId) }
+            }
+        }
     }
 
     private fun submitA2uiInteraction(sessionId: String, interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction) {

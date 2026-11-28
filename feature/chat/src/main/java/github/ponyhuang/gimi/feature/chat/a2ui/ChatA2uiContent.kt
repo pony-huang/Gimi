@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.a2ui.A2uiSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -38,11 +39,13 @@ internal fun ChatA2uiContent(
     Column(Modifier.fillMaxWidth()) {
         surfaces.forEach { surface ->
             key(surface.id) {
-                A2uiSurface(
-                    surfaceModel = surface,
-                    modifier = Modifier.fillMaxWidth(),
-                    errorContent = { A2uiError() },
-                )
+                CompositionLocalProvider(LocalChatA2uiSurfaceId provides surface.id) {
+                    A2uiSurface(
+                        surfaceModel = surface,
+                        modifier = Modifier.fillMaxWidth(),
+                        errorContent = { A2uiError() },
+                    )
+                }
             }
         }
         tasks.filter { task ->

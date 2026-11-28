@@ -74,6 +74,10 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AgentModule {
 
+    @Provides
+    @Singleton
+    fun provideA2uiRendererFunctions() = github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions()
+
     private const val TAG: String = "AgentModule"
     private const val LEGACY_TOOL_VECTOR_STORE_NAME: String = "tool-vector-search"
     private const val TOOL_VECTOR_STORE_NAME: String = "tool-vector-search-use-v1"

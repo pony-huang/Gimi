@@ -67,6 +67,12 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 - **协调器**：每会话一个官方 `A2uiMessageProcessor`；提交经 `canSubmit` 门控（agent 未在运行）。`sync` 对重放记录做差异：仅数据变化只补丁 `updateDataModel`（删除仍在显示的 surface 会因必需绑定缺失导致 Compose 崩溃）；保留相同 id 和类型的增量组件更新原 surface，其余结构变更删除后重推。出站客户端事件变成 `A2uiInteraction` 聊天回合（草稿不进历史）。目录 ID 不匹配的历史 surface 会跳过渲染。
 - **宿主 UI**：`ChatA2uiContent` 无状态，按 surface id 渲染，另有 `A2uiTaskStatus` 占位卡（转圈/失败/取消 + 重试）。surface 在 `ChatScreen`/`MessageBubble` 按所属消息过滤。surface 继承聊天的 Material 主题。 新收到的多组件卡片可先渲染结构，再经官方处理器补齐已校验的组件树。历史卡片直接渲染。
 
+## 音乐卡片函数调用
+
+- **A2UI 交互**（`A2uiInteraction`）：来自聊天界面的事件，携带用户动作及其上下文，发起新的 Agent 回合。音乐推荐按钮通过这条路径发送 `recommend_similar_music`。
+- **直接函数调用**：使用明确参数请求执行已注册的操作，并取得执行结果，调用本身无需开启新的模型回合。点击网易云红心会调用已启用插件的收藏工具，成功后更新红心。Agent 工具 `seek_a2ui_music_player` 只操作调用会话和 surface 中唯一已挂载且可跳转的播放器。
+- 两种直接调用通过 Gimi 的进程内接线与现有 AndroidX 0.9.1 渲染器配合。未来接入 v1.0 传输时可复用操作契约。界面渲染及历史重放均不会执行这些调用。
+
 ## 横切规则
 
 1. **不可信输入**：agent JSON 先经官方引擎解析与 schema 校验才进 UI 状态；错误态可见（逐组件 Loading/Error）；业务动作仍是常规授权工具——提交只携带结构化交互数据。

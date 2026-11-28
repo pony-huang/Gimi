@@ -481,4 +481,6 @@
     <string name="chat_model_always_search">Always online</string>
     <string name="chat_web_citations_open_failed">Could not open source link</string>
     <string name="chat_web_citations_overflow">+%1$d</string>
+    <string name="chat_a2ui_music_recommend">Recommend similar music</string>
+    <string name="chat_a2ui_music_like_failed">Could not change your NetEase favorite. Check the plugin and your sign-in.</string>
 </resources>

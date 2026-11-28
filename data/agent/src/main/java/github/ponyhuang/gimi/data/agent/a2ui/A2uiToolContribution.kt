@@ -24,12 +24,14 @@ class A2uiToolContribution @Inject constructor(
     private val models: AgentModelRuntime,
     private val protocol: A2uiProtocol,
     private val settings: RecommendationRepository,
+    private val renderer: A2uiRendererFunctions,
 ) : AgentContribution {
     override val id = "a2ui"
     override fun revision(): Any? = a2uiEnabled()
     override fun tools(spec: AgentBuildSpec): List<BaseTool> = if (spec.a2uiSupported && a2uiEnabled()) {
         listOf(
             GenerateA2uiTool(A2uiGeneration(models.createModel(models.selectModelConfig(spec.selection)), protocol), protocol),
+            A2uiSeekMusicTool(renderer),
         )
     } else {
         emptyList()
@@ -217,7 +219,9 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         - NetEase: fetch playUrl via netease_song_detail for the primary track, pass encrypted 32-char hex songId for API actions,
           pass numeric originalId when available for orpheus:// client jump, and include tracks for multi-song queues.
           On play_track, call netease_song_detail for that songId and update the existing surfaceId with the resolved audioUrl.
-          On toggle_like, call netease_song_like with songId and like.
+          Set provider to "netease" for NetEase cards so the user's heart click can execute directly.
+          On a legacy NetEase toggle_like event, call netease_song_like with songId and like.
+          On recommend_similar_music, use the submitted track context to find and recommend similar music.
         - Spotify: pass provider="spotify", songId (track ID or spotify:track:URI), externalUrl (open.spotify.com or spotify: URI),
           coverUrl (album.images[0].url), durationSeconds (or duration_ms), and when available from spotify_now_playing pass
           isPlaying, progressSeconds (from progress_ms), and deviceId. On spotify_toggle_playback, play_track, spotify_next,

@@ -67,6 +67,12 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 - **Coordinator**: one session-scoped official `A2uiMessageProcessor`; submissions gated by `canSubmit` (agent not running). `sync` diffs replayed records: data-only changes patch just `updateDataModel` (deleting a displayed surface crashes Compose on required bindings); additive component revisions update the existing surface when retained ids and types match; other structural changes delete and re-push. Outbound client events become `A2uiInteraction` chat turns (not persisted to history as drafts). Historical surfaces that reference a different catalog ID are skipped by the renderer.
 - **Host UI**: stateless surface host in `ChatA2uiContent` keyed by surface id, plus `A2uiTaskStatus` placeholder cards (spinner/failed/cancelled + retry). Surfaces are filtered by owning message in `ChatScreen`/`MessageBubble`. The surface inherits the chat Material theme. Newly received multi-component cards can show their structure first and then receive the full validated component tree through the official processor. Historical surfaces render directly.
 
+## Music card function calls
+
+- **A2UI interaction** (`A2uiInteraction`): A surface event that carries the user's action and context into a new Agent turn. The music recommendation button emits `recommend_similar_music` through this path.
+- **Direct function call**: An explicitly registered operation with arguments and a result. The call itself needs no new model turn. A NetEase heart click calls the enabled plugin's favorite tool and changes the heart after success. Agent tool `seek_a2ui_music_player` targets one mounted, seekable player in the calling session and surface.
+- The two direct calls use Gimi's in-process wiring with the existing AndroidX 0.9.1 renderer. A future v1.0 transport can reuse the operation contracts. Rendering and replay never execute these calls.
+
 ## Cross-cutting rules
 
 1. **Untrusted input**: agent JSON is parsed and schema-validated by the official engine before reaching UI state; error states are surfaced (per-component Loading/Error); business actions remain normal authorized tools — submissions only carry structured interaction data.

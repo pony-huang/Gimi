@@ -77,6 +77,18 @@ class ValidateChatAttachmentsUseCaseTest {
     }
 
     @Test
+    fun modelWithoutDeclaredVisionStillAcceptsImagesWithDefaultMimes() {
+        // fixture 的 model 未声明视觉能力：按「假定支持」放行默认 MIME 内的图片，
+        // 不因目录缺模态元数据而拒绝；MIME 之外的类型仍按不支持拦截。
+        val image = draft("a.jpg", 100).copy(mimeType = "image/jpeg", category = AttachmentCategory.IMAGE)
+        assertNull(validate(selection, listOf(instance), listOf(image)))
+        val unsupported = draft("a.bin", 100)
+            .copy(mimeType = "application/octet-stream", category = AttachmentCategory.IMAGE)
+        assertEquals(ChatAttachmentValidationFailure.UnsupportedOrTooLarge(unsupported.displayName),
+            validate(selection, listOf(instance), listOf(unsupported)))
+    }
+
+    @Test
     fun pathTextModeAcceptsDocumentsWithoutSizeLimits() {
         val source = instanceWith(pathTextModel())
         assertNull(validate(selection, listOf(source), listOf(draft("big.pdf", 100L * 1024 * 1024))))

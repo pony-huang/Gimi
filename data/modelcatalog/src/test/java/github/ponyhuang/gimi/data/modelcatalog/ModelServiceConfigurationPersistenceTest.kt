@@ -318,6 +318,8 @@ class ModelServiceConfigurationPersistenceTest {
         )!!
         assertEquals(ApiProtocol.Anthropic, resolved.protocol)
         assertEquals("https://api.deepseek.com/anthropic", resolved.modelBaseUrl)
+        // 目录未声明视觉能力时按「假定支持」放行：supportsImages 不随目录缺元数据变 false。
+        assertTrue(resolved.supportsImages)
         // Room 里升级前的双协议模板行也必须被内置约束覆盖
         assertEquals(
             listOf(ApiProtocol.Anthropic),

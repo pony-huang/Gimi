@@ -36,8 +36,9 @@ Configure four repository Actions secrets with the same production key as the di
 - `RELEASE_KEY_ALIAS`: signing alias.
 - `RELEASE_KEY_PASSWORD`: private key password.
 
-The main branch rules require a pull request and forbid direct pushes. CI runs only on development
-branch pushes and pull requests. Protect `v*` tags against updates and deletion; tags are created
+The main branch rules require a pull request and forbid direct pushes. CI runs on pull requests and
+on pushes to `main` (post-merge verification); feature-branch pushes do not trigger CI, so a branch
+with an open pull request is not verified twice. Protect `v*` tags against updates and deletion; tags are created
 locally by the releaser. A repository admin configures these
 GitHub settings; editing the YAML does not enable them.
 
@@ -49,9 +50,9 @@ GitHub settings; editing the YAML does not enable them.
 2. Compile the affected modules and run their behavior tests locally; assemble the debug app when
    resources, DI, or build configuration are involved. UI work follows the preview-first requirement
    in AGENTS.md.
-3. Push a development branch to run release script tests, architecture checks, JVM unit tests,
-   debug APK assembly, plugin compilation, and lint. Development branches are all branches except
-   `main`, `backup/**`, and `dependabot/**`. Local commits alone do not run CI.
+3. Push a development branch to share the work; CI is not triggered by feature-branch pushes.
+   Open a pull request to run release script tests, architecture checks, JVM unit tests, debug APK
+   assembly, plugin compilation, and lint. Local commits alone do not run CI.
 4. Open the pull request with actual verification results. A pull request targeting main runs the
    `Build & Test` check.
 

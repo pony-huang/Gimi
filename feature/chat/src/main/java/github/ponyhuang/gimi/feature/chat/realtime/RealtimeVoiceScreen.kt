@@ -23,7 +23,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1296,24 +1295,33 @@ internal fun VoiceConfigMicroPills(
     }
 }
 
-/** 链路模式微胶囊：实心次级高对比底色，突出当前所处链路。 */
+@Composable
+private fun VoiceSummaryPill(
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        tonalElevation = 0.dp,
+    ) {
+        Box(Modifier.padding(horizontal = 8.dp, vertical = 3.dp)) {
+            content()
+        }
+    }
+}
+
 @Composable
 private fun VoicePipelineBadgePill(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier.widthIn(max = 96.dp),
-        shape = CircleShape,
-        color = colors.surfaceContainerHighest,
-        tonalElevation = 0.dp,
-    ) {
+    VoiceSummaryPill(modifier.widthIn(max = 96.dp)) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = colors.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1332,15 +1340,8 @@ private fun VoiceRoleMicroPill(
     maxPillWidth: Dp = 172.dp,
 ) {
     val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier.widthIn(max = maxPillWidth),
-        shape = CircleShape,
-        color = colors.surfaceContainer,
-        border = BorderStroke(0.8.dp, colors.outlineVariant),
-        tonalElevation = 0.dp,
-    ) {
+    VoiceSummaryPill(modifier.widthIn(max = maxPillWidth)) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

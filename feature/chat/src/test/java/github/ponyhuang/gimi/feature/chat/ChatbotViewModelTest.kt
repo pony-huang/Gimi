@@ -346,14 +346,14 @@ class ChatbotViewModelTest {
                 vm.uiState.value.chat.draftUploadStates["/tmp/draft.docx"],
             )
             // 上传成功即进注册表（与是否发送无关）：抽屉"上传的文件"列表据此展示；
-            // 缺这条记录会导致 Chatbot 上传的文件在任何界面都查不到。localPath 是
-            // 打开附件的本地绑定初始值（chip 阶段为草稿路径，发送归档后回写工作区路径）。
+            // 缺这条记录会导致 Chatbot 上传的文件在任何界面都查不到。chip 阶段不绑定
+            // localPath：上传时草稿还在 cache 目录，是会被系统回收甚至复用的临时副本，
+            // 写入即悬空绑定。绑定只由发送归档收口或打开时下载兜底回写真实工作区路径。
             assertEquals(
                 listOf(
                     UploadedFileEntry(
                         "uploaded-file", "deepseek", "季度报表.docx",
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 10, 1,
-                        "/tmp/draft.docx",
                     ),
                 ),
                 vm.uiState.value.uploadedFiles,

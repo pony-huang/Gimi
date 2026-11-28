@@ -36,6 +36,20 @@ AGENTS.md 维护默认验证决策表和必需检查。本文说明测试质量�
 
 基线配置在连接设备上生成并提交于 `app/src/release/generated/baselineProfiles/baseline-prof.txt`。修改 `MainApplication`/`MainActivity` 启动路径或首屏组合后重新生成：`ANDROID_SERIAL=<serial> ./gradlew :app:generateReleaseBaselineProfile`。`:baselineprofile` 的 `StartupBenchmark` 按设计拒绝模拟器，且需要允许安装 instrumentation 包的设备；基准变体带 `profileable` 并使用 debug 签名。
 
+## 高频失败模式
+
+CI 与本地反复出现几类失败，动手前先从日志分类。瞬态基础设施失败（依赖下载被限流返回 HTTP 429、网络抖动）在任何测试执行前就使构建失败；artifact 解析错误与状态码失败意味着重跑，而非改代码。真实测试失败必须查根因。
+
+时序敏感测试让真实异步 I/O 与测试调度器赛跑，本地稳定也会在 CI 负载下闪失——本地 MockWebServer 的握手拒绝可先于测试协程的下一次调度到达。预防这一类：生产代码保持单一失败报告源（一个通道或异常路径拥有失败分类，不允许第二条路径抢先报错）；测试顺序确定性（先消费失败帧再触发发送）；断言失败分类而非时序窗口；修复后本地多次重跑验证——CI 绿一次不等于稳定。`runTest` 内跑真时钟（`Dispatchers.IO`）的看门狗是常见变体，测试不得依赖短调度窗口。
+
+JVM 测试因未 mock 的 Android API（如 `android.util.Log`）失败：在途代码触碰这类 API 时，先确认归属模块的 Robolectric 或默认值配置，提交前运行该模块。
+
+红测试不得无主滞留：当场修复，或记录归属与引入它的改动。CI 全绿是合并与发版的门禁，无主红测试会毒化后续所有信号。
+
+保持测试工作区干净：写文件的测试使用临时目录，固定路径产物在 teardown 还原；提交前检查 `git status`（ObjectBox JSON 落盘曾踩坑）。
+
+框架与平台坑会复发：MockK `every { }` 里的属性读取被同名形参遮蔽、domain 模块任务名是 `test`（非 `testDebugUnitTest`）、Robolectric 库模块须开 `isIncludeAndroidResources`。按模块类型选对任务名，选最小验证目标。
+
 ## 诊断与结果报告
 
 先检查现有逻辑和运行证据。原因仍不明确时，使用聚焦测试复现行为并验证假设，非核心代码也适用。

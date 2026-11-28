@@ -59,6 +59,38 @@ Baseline profiles are generated on a connected device and committed at
 pair in `:baselineprofile` refuses emulators by design and needs a device that permits
 instrumentation installs; a benchmark build type is profileable and signed with the debug key.
 
+## Recurring failure patterns
+
+CI and local runs repeatedly hit a small set of failure classes; classify the failure from the log
+before acting. Transient infrastructure failures (dependency downloads rejected with HTTP 429, network
+blips) abort the build before any test executes; artifact-resolution errors and status-code failures
+mean rerun, not a code change. Real test failures need a root cause.
+
+Timing-sensitive tests that race real async I/O against the test scheduler flake under CI load even
+when green locally — a local MockWebServer handshake rejection can land before the test coroutine's
+next dispatch. Prevent this class by giving production code a single failure-reporting source (one
+channel or exception path owns failure classification; no second path may preempt it), by making test
+ordering deterministic (consume the failure frame before triggering the send), by asserting failure
+classification rather than timing windows, and by rerunning the fixed test several times locally:
+one green CI run does not prove stability. Watchdog code that runs on a real clock (`Dispatchers.IO`)
+inside `runTest` is the recurring variant; tests must not depend on short scheduling windows there.
+
+JVM tests fail on unmocked Android APIs such as `android.util.Log` when in-flight code touches them;
+check the owning module's Robolectric or default-value configuration and run the module before
+committing.
+
+Red tests must not linger unowned: fix them immediately or record their owner and introducing change.
+CI green gates merges and releases, so an unowned red test poisons every later signal.
+
+Keep the test workspace clean: tests that write files use temporary directories and restore anything
+left at a fixed path during teardown; check `git status` before committing (ObjectBox JSON dumps have
+bitten before).
+
+Framework and platform pitfalls recur: MockK `every { }` property reads shadowed by same-name
+parameters, domain modules run the `test` task (not `testDebugUnitTest`), and Robolectric library
+modules need `isIncludeAndroidResources`. Pick the smallest validation target with the task name that
+matches the module type.
+
 ## Diagnosis and reporting
 
 Inspect existing logic and runtime evidence first. When the cause remains unclear, use focused tests

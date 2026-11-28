@@ -1,5 +1,5 @@
 <resources>
-    <string name="sandbox_screen_title">沙盒</string>
+    <string name="sandbox_screen_title">E2B</string>
     <string name="sandbox_e2b">E2B</string>
     <string name="sandbox_capabilities_description">支持在隔离沙盒中执行代码和命令、读写文件、浏览目录及上传下载文件。</string>
     <string name="sandbox_api_url">API 地址</string>

@@ -22,13 +22,13 @@
 - `RELEASE_KEY_ALIAS`：签名别名。
 - `RELEASE_KEY_PASSWORD`：私钥密码。
 
-在 main 的分支规则中要求 PR，禁止直接推送。CI 在开发分支推送和 PR 上运行。为 `v*` tag 配置禁止更新和删除的规则；tag 由发版人本地创建。这些 GitHub 设置需要仓库管理员配置，修改 YAML 不会自动启用。
+在 main 的分支规则中要求 PR，禁止直接推送。CI 在 PR 和合并进 main 后的 push 上运行；开发分支推送不触发 CI，已有 PR 的分支不会被验证两遍。为 `v*` tag 配置禁止更新和删除的规则；tag 由发版人本地创建。这些 GitHub 设置需要仓库管理员配置，修改 YAML 不会自动启用。
 
 ## 日常开发
 
 1. 从 main 建功能分支，使用 `feat`、`fix`、`perf` 等 Conventional Commits。使用 squash merge 时，PR 标题就是最终提交标题，应描述完整的用户变化。
 2. 本地运行受影响模块的编译与行为测试；涉及资源、DI、构建配置时组装 Debug App。UI 工作遵循 AGENTS.md 中先预览、后实现的要求。
-3. 推送开发分支时运行 CI，覆盖发布脚本测试、架构检查、JVM 单测、App Debug 打包、插件编译和 Lint。开发分支指除 `main`、`backup/**` 和 `dependabot/**` 外的分支；本地 commit 不会触发远程 CI。
+3. 推送开发分支仅用于共享代码，不触发 CI。提交 PR 后运行发布脚本测试、架构检查、JVM 单测、App Debug 打包、插件编译和 Lint；本地 commit 不会触发远程 CI。
 4. 提交 PR，说明改动与实际验证结果。指向 main 的 PR 会运行 `Build & Test` 检查。
 
 ## 版本提升与更新日志

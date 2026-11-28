@@ -3,10 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - '**'
-      - '!main'
-      - '!backup/**'
-      - '!dependabot/**'
+      - main
   pull_request:
     branches:
       - '**'

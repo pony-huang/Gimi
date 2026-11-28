@@ -664,6 +664,8 @@ class ChatViewModel @Inject constructor(
             _uploadedFilesRefreshing.value = false
             if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
                 emitNotice(ChatNotice.UploadedFilesRefreshFailed)
+            } else {
+                emitNotice(ChatNotice.UploadedFilesRefreshed)
             }
         }
     }
@@ -721,6 +723,8 @@ class ChatViewModel @Inject constructor(
                 if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
                     Log.w(TAG, "Vendor file delete failed: ${result.reason}")
                     emitNotice(ChatNotice.UploadedFileDeleteFailed)
+                } else {
+                    emitNotice(ChatNotice.UploadedFileDeleted)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled

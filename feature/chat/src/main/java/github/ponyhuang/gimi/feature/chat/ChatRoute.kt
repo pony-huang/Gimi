@@ -145,6 +145,10 @@ fun ChatRoute(
         stringResource(R.string.chat_uploaded_file_delete_failed)
     val chatNoticeUploadedFilesRefreshFailed =
         stringResource(R.string.chat_uploaded_files_refresh_failed)
+    val chatNoticeUploadedFilesRefreshed =
+        stringResource(R.string.chat_uploaded_files_refreshed)
+    val chatNoticeUploadedFileDeleted =
+        stringResource(R.string.chat_uploaded_file_deleted)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
     // 抽屉目标开关状态：手势提交（预测性返回、拖拽、遮罩点击）经 onOpenChange 回写，
@@ -249,6 +253,8 @@ fun ChatRoute(
             ChatNotice.A2uiDeviceChangeFailed -> stringResource(R.string.chat_a2ui_device_change_failed)
             ChatNotice.UploadedFileDeleteFailed -> chatNoticeUploadedFileDeleteFailed
             ChatNotice.UploadedFilesRefreshFailed -> chatNoticeUploadedFilesRefreshFailed
+            ChatNotice.UploadedFilesRefreshed -> chatNoticeUploadedFilesRefreshed
+            ChatNotice.UploadedFileDeleted -> chatNoticeUploadedFileDeleted
             is ChatNotice.McpServerSkipped -> context.getString(
                 R.string.chat_notice_mcp_server_skipped,
                 notice.serverName,

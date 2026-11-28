@@ -186,6 +186,7 @@
     <string name="chat_attachment_open_download_failed">Couldn\'t download the file to open</string>
     <string name="chat_uploaded_files_refresh">Refresh</string>
     <string name="chat_uploaded_files_refresh_failed">Couldn\'t refresh uploaded files. Try again later.</string>
+    <string name="chat_uploaded_files_refreshed">File list refreshed</string>
     <string name="chat_remote_image">Remote image %1$d</string>
     <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
     <string name="chat_recommendations_title">Recommended for you</string>
@@ -442,6 +443,7 @@
     <string name="chat_uploaded_files_empty">No uploaded files yet</string>
     <string name="chat_uploaded_file_delete">Delete uploaded file</string>
     <string name="chat_uploaded_file_delete_failed">Failed to delete the file. Please try again.</string>
+    <string name="chat_uploaded_file_deleted">File deleted</string>
 
     <string name="voice_input_paused">Microphone paused while editing</string>
     <string name="voice_input_open">Text input</string>

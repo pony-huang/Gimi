@@ -45,6 +45,8 @@ internal fun ChatbotRouteContent(
     val voiceInterrupted = stringResource(R.string.chatbot_voice_interrupted)
     val uploadedFilesRefreshFailed = stringResource(R.string.chat_uploaded_files_refresh_failed)
     val uploadedFileDeleteFailed = stringResource(R.string.chat_uploaded_file_delete_failed)
+    val uploadedFilesRefreshed = stringResource(R.string.chat_uploaded_files_refreshed)
+    val uploadedFileDeleted = stringResource(R.string.chat_uploaded_file_deleted)
     val noticeMessage = when (state.notice) {
         ChatbotNotice.CONFIGURE_MODEL -> configure
         ChatbotNotice.SEND_BUSY -> sendBusy
@@ -53,6 +55,8 @@ internal fun ChatbotRouteContent(
         ChatbotNotice.ALREADY_NEW_CONVERSATION -> alreadyNewConversation
         ChatbotNotice.UPLOADED_FILES_REFRESH_FAILED -> uploadedFilesRefreshFailed
         ChatbotNotice.UPLOADED_FILE_DELETE_FAILED -> uploadedFileDeleteFailed
+        ChatbotNotice.UPLOADED_FILES_REFRESHED -> uploadedFilesRefreshed
+        ChatbotNotice.UPLOADED_FILE_DELETED -> uploadedFileDeleted
         null -> null
     }
     LaunchedEffect(state.notice, noticeMessage, active) {

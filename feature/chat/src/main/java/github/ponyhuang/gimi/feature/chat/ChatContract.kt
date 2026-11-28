@@ -167,6 +167,12 @@ sealed interface ChatNotice {
     /** 「上传的文件」强制刷新失败；本地列表保持不动，用户可重试。 */
     data object UploadedFilesRefreshFailed : ChatNotice
 
+    /** 「上传的文件」强制刷新成功。 */
+    data object UploadedFilesRefreshed : ChatNotice
+
+    /** 已上传厂商文件删除成功。 */
+    data object UploadedFileDeleted : ChatNotice
+
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice
 

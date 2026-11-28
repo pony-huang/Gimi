@@ -78,6 +78,12 @@ enum class ChatbotNotice {
 
     /** 已上传厂商文件删除失败；本地条目保留，用户可重试。 */
     UPLOADED_FILE_DELETE_FAILED,
+
+    /** 「上传的文件」强制刷新成功。 */
+    UPLOADED_FILES_REFRESHED,
+
+    /** 已上传厂商文件删除成功。 */
+    UPLOADED_FILE_DELETED,
 }
 
 /** Chatbot 的用户意图，执行、上传和临时业务状态均由 ViewModel 持有。 */
@@ -634,6 +640,8 @@ class ChatbotViewModel @Inject constructor(
             _uploadedFilesRefreshing.value = false
             if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
                 notify(ChatbotNotice.UPLOADED_FILES_REFRESH_FAILED)
+            } else {
+                notify(ChatbotNotice.UPLOADED_FILES_REFRESHED)
             }
         }
     }
@@ -656,6 +664,8 @@ class ChatbotViewModel @Inject constructor(
             )
             if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
                 notify(ChatbotNotice.UPLOADED_FILE_DELETE_FAILED)
+            } else {
+                notify(ChatbotNotice.UPLOADED_FILE_DELETED)
             }
         }
     }

@@ -22,6 +22,24 @@ import org.junit.Test
  */
 class ChatA2uiCatalogValidationTest {
     @Test
+    fun entityCardListAcceptsTextBadgesAlongsideObjectBadges() = runTest {
+        val catalog = extendedChatA2uiCatalog(chatA2uiCatalog {})
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        val document = A2uiDocument("entities", listOf(
+            """{"version":"v0.9.1","createSurface":{"surfaceId":"entities","catalogId":"${catalog.id}"}}""",
+            """{"version":"v0.9.1","updateDataModel":{"surfaceId":"entities","path":"/","value":{"items":[{"title":"First","badge":"Featured"},{"title":"Second","badge":{"label":"Open","color":"success"}}]}}}""",
+            """{"version":"v0.9.1","updateComponents":{"surfaceId":"entities","components":[
+              {"id":"root","component":"Column","children":["list","direct"]},
+              {"id":"list","component":"List","children":{"componentId":"item","path":"/items"}},
+              {"id":"item","component":"EntityCard","title":{"path":"title"},"badge":{"path":"badge"}},
+              {"id":"direct","component":"EntityCard","title":"Third","badge":"New"}
+            ]}}""",
+        ))
+
+        AndroidxA2uiProtocol().validate(document, capabilities)
+    }
+
+    @Test
     fun extendedCatalogExportsCustomComponentsAlongsideTheBasicCatalog() {
         val basic = chatA2uiCatalog {}
         val extended = extendedChatA2uiCatalog(basic)

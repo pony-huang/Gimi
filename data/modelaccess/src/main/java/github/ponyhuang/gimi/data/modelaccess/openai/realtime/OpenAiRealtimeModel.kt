@@ -26,7 +26,7 @@ import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeResponseDisposition
 import github.ponyhuang.gimi.data.modelaccess.shared.RealtimeToolCallBuffer
 import github.ponyhuang.gimi.data.modelaccess.shared.parseFunctionArguments
 import github.ponyhuang.gimi.data.modelaccess.shared.realtimeResponseDisposition
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

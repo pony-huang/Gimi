@@ -81,6 +81,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.modelcatalog.model.assumedVision
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.feature.chat.realtime.RoleChipsRestingHeight
@@ -160,6 +161,9 @@ fun ChatScaffold(
     uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
     onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
     onUploadedFileDelete: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    /** 抽屉"上传的文件"强制刷新；点击才发厂商请求，对账写回注册表。 */
+    onRefreshUploadedFiles: () -> Unit = {},
+    isRefreshingUploadedFiles: Boolean = false,
     /** 草稿附件变化后回收不再被引用的上传状态（取消在途任务）；由宿主转发给 ViewModel。 */
     onUploadedFilePrune: (Collection<String>) -> Unit = {},
     attachFileRequests: Flow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = kotlinx.coroutines.flow.emptyFlow(),
@@ -193,12 +197,17 @@ fun ChatScaffold(
         state.availableLLMModelSettings,
         state.currentModelSelection,
     ) {
-        val selection = state.currentModelSelection ?: return@remember MultimodalCapabilities()
-        state.availableLLMModelSettings
-            .firstOrNull { it.id == selection.instanceId }
-            ?.findModel(selection)
-            ?.multimodal
+        val selection = state.currentModelSelection
+        val declared = selection
+            ?.let { current ->
+                state.availableLLMModelSettings
+                    .firstOrNull { it.id == current.instanceId }
+                    ?.findModel(current)
+                    ?.multimodal
+            }
             ?: MultimodalCapabilities()
+        // 目录未声明视觉能力时按「假定支持」放行拍照/照片入口（远端目录只返回模型 ID）。
+        declared.copy(vision = declared.assumedVision)
     }
     // 实例级"文件上传"开关推导出的 FILE_REFERENCE 能力决定上传链路与发送门控。
     val isFileUploadEnabled = attachmentCapabilities.documentInput?.ingestMode ==
@@ -478,6 +487,8 @@ fun ChatScaffold(
                                 uploadedFiles = uploadedFiles,
                                 onAttachUploadedFile = onAttachUploadedFile,
                                 onUploadedFileDelete = onUploadedFileDelete,
+                                onRefreshUploadedFiles = onRefreshUploadedFiles,
+                                isRefreshingUploadedFiles = isRefreshingUploadedFiles,
                                 attachmentUploadStates = state.draftUploadStates,
                                 isFileUploadEnabled = isFileUploadEnabled,
                                 showPermissionOption = chatMode != github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT,

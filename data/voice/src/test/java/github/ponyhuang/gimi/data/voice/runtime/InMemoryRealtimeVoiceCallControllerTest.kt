@@ -30,6 +30,7 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigDraft
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigField
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConfigLookup
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
+import github.ponyhuang.gimi.domain.voice.repository.VoiceFieldOverride
 import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalDefaults
 import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalPreference
 import github.ponyhuang.gimi.domain.voice.repository.VoiceGlobalDefaultsRepository
@@ -324,12 +325,15 @@ class InMemoryRealtimeVoiceCallControllerTest {
         }
         }
 
-    private fun overridesRepository(): VoiceOverrideRepository = object : VoiceOverrideRepository {
+    private fun overridesRepository(
+        overrides: ConversationVoiceOverrides? = null,
+    ): VoiceOverrideRepository = object : VoiceOverrideRepository {
         override val rebuildCount: StateFlow<Int> = MutableStateFlow(0)
     override suspend fun acknowledgeRebuilds() = Unit
         override fun observe(conversationId: String): Flow<ConversationVoiceOverrides> =
-            flowOf(ConversationVoiceOverrides(conversationId))
-        override fun current(conversationId: String) = ConversationVoiceOverrides(conversationId)
+            flowOf(current(conversationId))
+        override fun current(conversationId: String) = overrides?.takeIf { it.conversationId == conversationId }
+            ?: ConversationVoiceOverrides(conversationId)
         override suspend fun apply(draft: VoiceConfigDraft): VoiceApplyResult = VoiceApplyResult.Applied
         override suspend fun resetFields(conversationId: String, fields: Set<VoiceConfigField>) = Unit
         override suspend fun clear(conversationId: String) = Unit
@@ -399,6 +403,37 @@ class InMemoryRealtimeVoiceCallControllerTest {
         }
         coEvery { catalog.awaitReady() } returns Unit
         return catalog
+    }
+
+    @Test
+    fun cascadedCallUsesConversationSpeechModelsAndVoice() = runTest {
+        val deepSeek = ModelSelection("deepseek", "speech", "deepseek-tts")
+        val qwenTts = ModelSelection("qwen", "speech", "qwen-audio-3.1-tts-flash")
+        val qwenAsr = ModelSelection("qwen", "speech", "qwen-audio-3.1-asr-flash-message")
+        val configurations = mutableListOf<RealtimeVoiceConfiguration>()
+        val controller = InMemoryRealtimeVoiceCallController(
+            recordingRepository(configurations, ArrayDeque(listOf(FakeSession()))),
+            realtimeCatalog(null),
+            NoRealtimeSupport,
+            RecordingForeground(),
+            defaultsRepository(VoiceGlobalDefaults(cascadedSynthesisModel = deepSeek)),
+            overridesRepository(ConversationVoiceOverrides(
+                conversationId = "chat",
+                cascadedSynthesisModel = VoiceFieldOverride.Value(qwenTts),
+                cascadedRecognitionModel = VoiceFieldOverride.Value(qwenAsr),
+                cascadedVoice = VoiceFieldOverride.Value("baianran_v3.1"),
+            )),
+            lookup(),
+        )
+
+        controller.start("chat", null, "", VoiceConversationStyle.CHATBOT, VoicePipeline.CASCADED)
+        advanceUntilIdle()
+
+        assertEquals(qwenAsr, configurations.single().recognitionModel)
+        assertEquals(qwenTts, configurations.single().synthesisModel)
+        assertEquals("baianran_v3.1", configurations.single().synthesisVoice)
+        controller.end()
+        advanceUntilIdle()
     }
 
     @Test

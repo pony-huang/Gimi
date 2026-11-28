@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.modelaccess.qwen.speech
 import com.google.gson.JsonObject
 import github.ponyhuang.gimi.domain.voice.repository.VoiceException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceFailureKind
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 
 /**
  * 阿里云百炼的语音协议。
@@ -82,4 +83,5 @@ internal class DashScopeTaskException(
     VoiceFailureKind.Service,
     "语音服务任务失败（$errorCode）" +
         errorMessage.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
+    requestError = VoiceRequestError.fromProvider(errorCode, errorMessage),
 )

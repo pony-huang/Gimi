@@ -3,7 +3,6 @@ package github.ponyhuang.gimi.core.network
 import android.util.Log
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import java.io.IOException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -30,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class VoiceWsKernel(
     client: OkHttpClient,
     request: Request,
-    private val handshakeFailure: (statusCode: Int, cause: Throwable, detail: String?) -> Throwable,
+    private val handshakeFailure: (statusCode: Int, cause: Throwable, detail: String, body: String) -> Throwable,
 ) {
     // 无界通道：音频消费方（播放器）背压变慢时帧会在内存积压（24 kHz PCM 约 48 KB/s）。
     // 有界+丢弃会静默丢音频帧，比积压更难排查，故保持无界并依赖调用方及时消费。
@@ -40,16 +39,22 @@ class VoiceWsKernel(
     /** 事件通道；调用方消费完后直接退出循环即可，关闭会话会一并结束通道。 */
     fun frames(): ReceiveChannel<WsFrame> = frames
 
-    /** 发送一个控制事件；连接已断开抛 [IOException]，让失败映射归入网络类而非 Unknown。 */
+    /**
+     * 发送一个控制事件。
+     *
+     * 发送失败（连接已终局）不在此处抛错：真实原因——如握手 401/403 的类型化失败——
+     * 必然已经或即将经由 [frames] 送达，由消费方按分类抛出。若此处抢先抛 [IOException]，
+     * 会把认证失败掩盖成普通网络错误（高负载下握手被拒可快于发送协程的调度）。
+     */
     suspend fun sendControl(payload: JsonObject) {
-        if (!socket.send(payload.toString())) throw IOException("语音服务连接已断开")
+        socket.send(payload.toString())
     }
 
-    /** 发送一段二进制音频。 */
+    /** 发送一段二进制音频；发送失败的报告路径同 [sendControl]，交由 [frames] 报告真实原因。 */
     suspend fun sendAudio(bytes: ByteArray) {
         // OkHttp 的发送队列有上限；接近上限时先等一会儿，避免直接丢帧。
         while (socket.queueSize() > MAX_PENDING_AUDIO_BYTES) delay(SEND_BACKPRESSURE_DELAY_MS.milliseconds)
-        if (!socket.send(bytes.toByteString())) throw IOException("语音服务连接已断开")
+        socket.send(bytes.toByteString())
     }
 
     /**
@@ -97,9 +102,11 @@ class VoiceWsKernel(
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             val code = response?.code
             if (code != null) {
-                val detail = handshakeDetail(response)
+                val body = runCatching { response.peekBody(MAX_HANDSHAKE_BODY_BYTES).string().trim() }
+                    .getOrDefault("")
+                val detail = handshakeDetail(response, body)
                 Log.w(TAG, "语音服务握手被拒（HTTP $code）$detail", t)
-                frames.trySend(WsFrame.Failure(handshakeFailure(code, t, detail)))
+                frames.trySend(WsFrame.Failure(handshakeFailure(code, t, detail, body)))
             } else {
                 frames.trySend(WsFrame.Failure(t))
             }
@@ -110,14 +117,12 @@ class VoiceWsKernel(
          * 握手被拒时服务端返回的原始详情：响应头（脱敏）与响应体（截断）。
          * 厂商的错误码与 request-id 通常只在这里出现，是向服务方反馈问题的凭据。
          */
-        private fun handshakeDetail(response: Response): String {
+        private fun handshakeDetail(response: Response, body: String): String {
             val headers = response.headers.names()
                 .filter { it.lowercase() in LOGGED_RESPONSE_HEADERS }
                 .joinToString(", ") { "${it}: ${response.header(it)}" }
                 .ifEmpty { "-" }
-            val body = runCatching { response.peekBody(MAX_HANDSHAKE_BODY_BYTES).string().trim() }
-                .getOrNull()?.takeIf { it.isNotEmpty() } ?: "-"
-            return "headers=[$headers], body=$body"
+            return "headers=[$headers], body=${body.ifEmpty { "-" }}"
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {

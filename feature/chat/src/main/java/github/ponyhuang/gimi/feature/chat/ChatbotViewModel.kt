@@ -12,6 +12,8 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentProfile
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
@@ -70,6 +72,18 @@ enum class ChatbotNotice {
 
     /** 当前会话已经是新会话，无需重复创建。 */
     ALREADY_NEW_CONVERSATION,
+
+    /** 「上传的文件」强制刷新失败；本地列表保持不动，用户可重试。 */
+    UPLOADED_FILES_REFRESH_FAILED,
+
+    /** 已上传厂商文件删除失败；本地条目保留，用户可重试。 */
+    UPLOADED_FILE_DELETE_FAILED,
+
+    /** 「上传的文件」强制刷新成功。 */
+    UPLOADED_FILES_REFRESHED,
+
+    /** 已上传厂商文件删除成功。 */
+    UPLOADED_FILE_DELETED,
 }
 
 /** Chatbot 的用户意图，执行、上传和临时业务状态均由 ViewModel 持有。 */
@@ -117,6 +131,8 @@ class ChatbotViewModel @Inject constructor(
     private val speechSettings: SpeechSettingsRepository,
     private val fileRegistry: UploadedFileRegistry,
     private val fileGateway: VendorFileGateway,
+    private val vendorAttachmentResolver: VendorAttachmentResolver,
+    private val refreshUploadedFilesUseCase: github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase,
     private val attachmentsRepository: github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository,
     private val officialToolSupport: OfficialToolSupport,
 ) : ViewModel() {
@@ -140,6 +156,10 @@ class ChatbotViewModel @Inject constructor(
         // Chatbot 的文档入口随厂商矩阵开启；不支持上传的厂商没有文档草稿流入。
         isFileUploadEnabled = { selection -> templateIdOf(selection) in FILE_UPLOAD_TEMPLATE_IDS },
     )
+
+    /** 「上传的文件」强制刷新进行中；防重复请求并驱动抽屉刷新按钮转圈。 */
+    private val _uploadedFilesRefreshing = MutableStateFlow(false)
+    val uploadedFilesRefreshing: StateFlow<Boolean> = _uploadedFilesRefreshing.asStateFlow()
     /** 未提交的输入草稿：只在进程内存在，进程结束即丢。 */
     private val drafts = mutableMapOf<String, MessageData>()
     /** 最近一轮的进程内结局；重试成功后清除。 */
@@ -204,7 +224,14 @@ class ChatbotViewModel @Inject constructor(
                     .map { connection -> connection.copy(models = connection.models.map { model ->
                         model.copy(multimodal = model.multimodal.copy(
                             audioInput = null,
-                            documentInput = if (uploadSupported) model.multimodal.documentInput else null,
+                            // 上传能力随厂商矩阵开启时，ingestMode 强制 FILE_REFERENCE：Chatbot
+                            // 文档只走厂商 file 引用（本地路径没有工具可读），与上传编排共用
+                            // 厂商级门，抽屉"上传的文件"入口也随此显示（实例级上传开关不参与）。
+                            documentInput = when {
+                                !uploadSupported -> null
+                                else -> (model.multimodal.documentInput ?: DocumentInputCapability())
+                                    .copy(ingestMode = FileIngestMode.FILE_REFERENCE)
+                            },
                         ))
                     }) })
                     .withDerivedUploadCapabilities()
@@ -265,6 +292,10 @@ class ChatbotViewModel @Inject constructor(
         messages = conversations.loadMessages(id).orEmpty()
         loadedRevision = revision
         loaded = true
+        // 实例收集器的补选可能早于初始化完成（initialized 尚为 false）被跳过，此处兜底：
+        // 会话元数据缺模型（清库重建/历史会话）且目录已就绪时补选默认模型，否则
+        // Chatbot 的 FILE_REFERENCE 能力推导不出，抽屉"上传的文件"入口会消失。
+        assignInitialModel()
         publish()
     }
 
@@ -286,6 +317,8 @@ class ChatbotViewModel @Inject constructor(
         outcomes.remove(id)
         drafts[id] = MessageData()
         loaded = true
+        // 目录晚于会话创建到达时（新建首会话/冷启动竞态），此处补选默认模型。
+        assignInitialModel()
         publish()
     }
 
@@ -580,6 +613,61 @@ class ChatbotViewModel @Inject constructor(
     fun uploadDocumentDraft(draft: DraftAttachment) {
         val selected = selection ?: return
         fileUploads.upload(draft, selected)
+    }
+
+    /** 打开厂商引用文档附件：先查本地绑定（离线直开），绑定缺失或悬空时走厂商下载兜底。 */
+    suspend fun openVendorDocument(attachment: FileAttachment): VendorAttachmentResolution =
+        vendorAttachmentResolver.resolveVendorPayload(
+            attachment,
+            selection?.let { catalog.resolveConnection(it) },
+        )
+
+    /**
+     * 强制刷新「上传的文件」列表：仅由用户点击刷新按钮触发；listFiles 对账写回注册表，
+     * 成功后 Room Flow 自动驱动列表，失败弹一次性提示且列表保持不动。进行中的刷新
+     * 直接忽略，避免重复请求。
+     */
+    fun refreshUploadedFiles() {
+        val selected = selection ?: return
+        if (_uploadedFilesRefreshing.value) return
+        val resolved = catalog.resolveConnection(selected) ?: run {
+            notify(ChatbotNotice.UPLOADED_FILES_REFRESH_FAILED)
+            return
+        }
+        _uploadedFilesRefreshing.value = true
+        viewModelScope.launch {
+            val result = refreshUploadedFilesUseCase(resolved.templateId.orEmpty(), resolved)
+            _uploadedFilesRefreshing.value = false
+            if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
+                notify(ChatbotNotice.UPLOADED_FILES_REFRESH_FAILED)
+            } else {
+                notify(ChatbotNotice.UPLOADED_FILES_REFRESHED)
+            }
+        }
+    }
+
+    /** 删除已上传厂商文件：厂商侧删除成功后网关同步移除本地注册表记录；失败弹一次性提示。 */
+    fun deleteUploadedFile(entry: UploadedFileEntry) {
+        val resolved = selection?.let { catalog.resolveConnection(it) }
+        // 列表按当前厂商过滤；厂商不一致或无法解析连接时直接视为失败，不发请求。
+        if (resolved == null || resolved.templateId != entry.vendor) {
+            notify(ChatbotNotice.UPLOADED_FILE_DELETE_FAILED)
+            return
+        }
+        viewModelScope.launch {
+            val result = fileGateway.deleteFile(
+                entry.vendor,
+                resolved.protocol,
+                resolved.endpoint.trimEnd('/'),
+                resolved.apiKey,
+                entry.fileId,
+            )
+            if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
+                notify(ChatbotNotice.UPLOADED_FILE_DELETE_FAILED)
+            } else {
+                notify(ChatbotNotice.UPLOADED_FILE_DELETED)
+            }
+        }
     }
 
     fun transcribeVoice(pcm: ByteArray, mode: VoiceInputMode, draft: MessageData, onResult: (Result<VoiceDictationResult>) -> Unit) =

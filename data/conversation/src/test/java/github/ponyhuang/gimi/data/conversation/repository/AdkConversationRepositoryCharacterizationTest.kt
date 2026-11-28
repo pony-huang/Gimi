@@ -14,6 +14,7 @@ import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDao
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataEntity
 import github.ponyhuang.gimi.data.conversation.local.ConversationToolConfigurationCodec
+import github.ponyhuang.gimi.data.conversation.testing.FakeUploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -271,5 +272,6 @@ class AdkConversationRepositoryCharacterizationTest {
         sessionService = sessionService,
         metadataDao = metadataDao,
         context = context,
+        uploadedFileRegistry = FakeUploadedFileRegistry(),
     )
 }

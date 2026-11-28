@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 
 /** 构建一次会话执行；缓存及 SDK 对象由 data 层封装。 */
 interface ChatAgentRepository {
+    /** 执行来自用户点击的网易云红心请求，返回工具确认的结果。 */
+    suspend fun setA2uiNeteaseTrackLiked(sessionId: String, songId: String, liked: Boolean): Boolean = false
+
     /** 原位重试创建任务，只生成展示内容，不重新发送用户消息或业务工具。 */
     fun retryA2ui(
         sessionId: String,

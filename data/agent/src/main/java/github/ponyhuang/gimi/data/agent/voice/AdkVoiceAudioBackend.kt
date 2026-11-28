@@ -30,6 +30,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackend
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioEvent
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
@@ -155,7 +156,11 @@ class AdkVoiceAudioBackend @Inject constructor(
             val available = if (configuration.pipeline == VoicePipeline.SEMI_CASCADED) {
                 models.isSemiCascadedAvailable(configuration.modelSelection, configuration.synthesisModel)
             } else {
-                models.isAvailable(configuration.modelSelection)
+                models.isAvailable(
+                    configuration.modelSelection,
+                    recognitionModel = configuration.recognitionModel,
+                    synthesisModel = configuration.synthesisModel,
+                )
             }
             if (!available) return false
             conversation.acquire().takeIf { it.isNotEmpty() }?.let { restoredHistory = it }
@@ -164,7 +169,7 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         override fun transcribe(pcm16: ByteArray): Flow<RecognitionEvent> = flow {
             check(!closed)
-            emitAll(recognition.transcribeStreaming(pcm16))
+            emitAll(recognition.transcribeStreaming(pcm16, selection = configuration.recognitionModel))
         }
 
         override fun respond(text: String, previousSpokenText: String, attachments: List<FileAttachment>): Flow<VoiceAudioEvent> = flow {
@@ -189,6 +194,8 @@ class AdkVoiceAudioBackend @Inject constructor(
                     models.create(
                         configuration.modelSelection,
                         synthesisVoice = configuration.synthesisVoice,
+                        recognitionModel = configuration.recognitionModel,
+                        synthesisModel = configuration.synthesisModel,
                     )
                 }
                 // Chatbot 可选用户预设替换人设层，未选时回退内置语音人设；输出底线与
@@ -224,9 +231,10 @@ class AdkVoiceAudioBackend @Inject constructor(
                     var hasModelText = false
                     connection.receive().takeWhile { response ->
                         if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
-                            throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation,
-                                message = "Live voice model request failed: " +
-                                    "${response.errorCode} ${response.errorMessage}")
+                            throw VoiceAudioBackendException(
+                                RealtimeVoiceFailure.Generation,
+                                requestError = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage),
+                            )
                         }
                         if (response.interrupted) {
                             interrupted = true

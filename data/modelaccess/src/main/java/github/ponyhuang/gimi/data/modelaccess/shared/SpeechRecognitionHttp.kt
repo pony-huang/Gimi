@@ -1,7 +1,5 @@
 package github.ponyhuang.gimi.data.modelaccess.shared
 
-import github.ponyhuang.gimi.domain.voice.repository.VoiceAuthenticationException
-import github.ponyhuang.gimi.domain.voice.repository.VoiceServiceException
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -21,15 +19,14 @@ internal suspend fun Call.awaitSpeechRecognitionBody(includeErrorBody: Boolean =
         override fun onResponse(call: Call, response: Response) {
             try {
                 val text = response.use {
-                    val body = it.body?.string() ?: throw IOException("Empty speech recognition response")
+                    val body = it.body?.string()
                     if (!it.isSuccessful) {
                         val message =
                             "Speech recognition HTTP ${it.code}" + if (includeErrorBody) ": $body" else ""
                         // 401/403 是密钥问题，与服务端业务错误是两类不同的用户问题。
-                        if (it.code == 401 || it.code == 403) throw VoiceAuthenticationException(message)
-                        throw VoiceServiceException(message)
+                        throw voiceHttpFailure(it.code, body.orEmpty(), message)
                     }
-                    body
+                    body ?: throw IOException("Empty speech recognition response")
                 }
                 if (continuation.isActive) continuation.resume(text)
             } catch (error: IOException) {

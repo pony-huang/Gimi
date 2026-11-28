@@ -108,9 +108,58 @@ private fun VoiceChatPreview() {
             inputText = "帮我想一个不赶时间的周末。", spokenText = "可以，把这个周末留一点空白。",
             speakingText = "周六先睡到自然醒，再去附近走走。",
             responseText = "可以，把这个周末留一点空白。周六先睡到自然醒，再去附近走走。找一家安静的小店。"),
-            modelName = "DeepSeek V4", style = VoiceConversationStyle.ASSISTANT,
-            conversationTitle = "周末放松计划", sttModelName = "MiniMax", ttsModelName = "MiMo"),
+            modelName = "DeepSeek V4", modelTemplateId = "deepseek",
+            style = VoiceConversationStyle.ASSISTANT,
+            conversationTitle = "周末放松计划",
+            sttModelName = "MiniMax Speech-02", sttModelTemplateId = "minimax",
+            ttsModelName = "MiMo TTS", ttsModelTemplateId = "mimo",
+            voiceName = "童童"),
             started = true, onStartCall = {}, onToggleMute = {}, onEnd = {})
+    }
+}
+
+/** 底部配置微胶囊组：级联（3模型+音色）、半级联（2模型+音色）、实时（1模型+音色）及超长文案省略预览。 */
+@Preview(name = "Micro pills pipelines light", widthDp = 390, locale = "zh-rCN")
+@Preview(name = "Micro pills pipelines dark", widthDp = 390, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceConfigMicroPillsPreview() {
+    GimiTheme {
+        val scene = voiceScene(MaterialTheme.colorScheme)
+        Column(
+            modifier = Modifier.fillMaxWidth().voiceSceneBackground(scene).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            VoiceConfigMicroPills(
+                uiState = RealtimeVoiceUiState(
+                    pipeline = VoicePipeline.CASCADED,
+                    modelName = "deepseek-v4-ultra-long-preview-name",
+                    modelTemplateId = "deepseek",
+                    sttModelName = "Speech-02-HD-Pro",
+                    sttModelTemplateId = "minimax",
+                    ttsModelName = "MiMo-TTS-v2-Expressive",
+                    ttsModelTemplateId = "mimo",
+                    voiceName = "童童（超长自定义复刻音色名称示例）",
+                ),
+            )
+            VoiceConfigMicroPills(
+                uiState = RealtimeVoiceUiState(
+                    pipeline = VoicePipeline.SEMI_CASCADED,
+                    modelName = "Qwen3 Omni",
+                    modelTemplateId = "qwen",
+                    ttsModelName = "MiMo TTS",
+                    ttsModelTemplateId = "mimo",
+                    voiceName = "童童",
+                ),
+            )
+            VoiceConfigMicroPills(
+                uiState = RealtimeVoiceUiState(
+                    pipeline = VoicePipeline.NATIVE_REALTIME,
+                    modelName = "qwen3-omni-flash-realtime-2026-preview",
+                    modelTemplateId = "qwen",
+                    voiceName = "Cherry",
+                ),
+            )
+        }
     }
 }
 
@@ -191,14 +240,14 @@ private fun VoiceMutedPreview() {
         muted = true), modelName = "DeepSeek V4"), started = true, onStartCall = {}, onToggleMute = {}, onEnd = {}) }
 }
 
-/** 胶囊编辑与附件状态；小屏和深浅色使用生产布局及纯展示参数。 */
-@Preview(name = "Capsule editing light", widthDp = 360, heightDp = 640, locale = "zh-rCN")
-@Preview(name = "Capsule editing dark", widthDp = 360, heightDp = 640, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+/** 胶囊编辑与附件状态；包含软键盘弹出后的紧凑可视高度（heightDp = 520）及深浅色生产布局预览。 */
+@Preview(name = "Capsule editing light (IME compact)", widthDp = 390, heightDp = 520, locale = "zh-rCN")
+@Preview(name = "Capsule editing dark (IME compact)", widthDp = 390, heightDp = 520, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceCapsuleEditingPreview() = VoiceCapsulePreview(attachments = false)
 
-@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 720, locale = "zh-rCN")
-@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 720, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Capsule attachments light", widthDp = 400, heightDp = 560, locale = "zh-rCN")
+@Preview(name = "Capsule attachments dark", widthDp = 400, heightDp = 560, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceCapsuleAttachmentsPreview() = VoiceCapsulePreview(attachments = true)
 
@@ -215,6 +264,8 @@ private fun VoiceCapsulePreview(attachments: Boolean) {
         RealtimeVoiceScreen(
             uiState = RealtimeVoiceUiState(
                 active = true,
+                conversationTitle = "简历修改建议",
+                modelName = "deepseek-flash",
                 voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, inputPaused = true),
                 composer = VoiceComposerUiState(editing = true, draft = draft),
             ),

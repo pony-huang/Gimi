@@ -47,6 +47,10 @@ data class ChatUiState(
     /** 当前会话的渲染模型及首次出现位置，surface 更新不会追加重复卡片。 */
     val a2uiSurfaces: Map<String, androidx.a2ui.model.processor.A2uiSurfaceModel> = emptyMap(),
     val a2uiOwners: Map<String, String> = emptyMap(),
+    val a2uiNeteaseLikes: Map<String, Boolean> = emptyMap(),
+    val a2uiPendingNeteaseLikes: Set<String> = emptySet(),
+    val a2uiChangingVolume: Boolean = false,
+    val a2uiChangingFlashlight: Boolean = false,
     val listItems: List<ChatListItem> = emptyList(),
     val expandedActivityGroupIds: Set<String> = emptySet(),
     val sessionId: String = "",

@@ -43,6 +43,7 @@ internal class ChatA2uiCoordinator(
         val stagedUpdates = mutableMapOf<String, Job>()
         val liveStarts = mutableMapOf<String, TimeSource.Monotonic.ValueTimeMark>()
         val documents = mutableMapOf<String, A2uiDocument>()
+        var finalSurfaceIds = emptySet<String>()
         var owners: Map<String, String> = emptyMap()
         var surfaces: Map<String, A2uiSurfaceModel> = emptyMap()
 
@@ -109,6 +110,9 @@ internal class ChatA2uiCoordinator(
             } }
         }
         val parser = A2uiMessageParser()
+        session.finalSurfaceIds = messages.asSequence().flatMap { it.functionResponses.asSequence() }
+            .filter { it.a2uiTask?.status.let { status -> status == null || status == A2uiGenerationStatus.COMPLETED } }
+            .mapNotNull { it.a2uiDocument?.surfaceId }.toSet()
         (session.documents.keys - active.keys).forEach { id ->
             session.stagedUpdates.remove(id)?.cancel()
             session.liveStarts.remove(id)
@@ -117,7 +121,10 @@ internal class ChatA2uiCoordinator(
         }
         active.forEach { (id, document) ->
             val previous = session.documents[id]
-            if (previous == document) return@forEach
+            if (previous == document) {
+                if (id in session.finalSurfaceIds && id !in session.stagedUpdates) A2uiTiming.finalUpdateSubmitted(id)
+                return@forEach
+            }
             val wasStaged = session.stagedUpdates.remove(id)?.also { it.cancel() } != null
             session.documents[id] = document
 
@@ -135,9 +142,10 @@ internal class ChatA2uiCoordinator(
                     if (previous != null) session.processor.processInput(parser, deleteMessage(id))
                     document.messages.forEach { session.processor.processInput(parser, it) }
                 }
+                if (id in session.finalSurfaceIds) A2uiTiming.finalUpdateSubmitted(id)
             }
 
-            if (previous == null && progressive) {
+            if (previous == null && progressive && !document.immediate) {
                 session.liveStarts[id] = TimeSource.Monotonic.markNow()
                 val structure = a2uiStructureMessage(document)
                 if (structure != null) {
@@ -146,6 +154,7 @@ internal class ChatA2uiCoordinator(
                     session.stagedUpdates[id] = scope.launch {
                         delay(A2uiStructureDisplayTime)
                         session.processor.processInput(parser, document.messages[2])
+                        if (id in session.finalSurfaceIds) A2uiTiming.finalUpdateSubmitted(id)
                         session.stagedUpdates.remove(id)
                     }
                     return@forEach

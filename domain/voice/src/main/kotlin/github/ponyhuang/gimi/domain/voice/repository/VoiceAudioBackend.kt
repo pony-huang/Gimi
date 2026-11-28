@@ -53,7 +53,10 @@ sealed interface RealtimeVoiceEvent {
     data object TurnCompleted : RealtimeVoiceEvent
 
     /** 会话不可恢复地失败（重连次数耗尽或鉴权失败）；编排层进入失败态。 */
-    data class Failed(val failure: RealtimeVoiceFailure) : RealtimeVoiceEvent
+    data class Failed(
+        val failure: RealtimeVoiceFailure,
+        val requestError: VoiceRequestError? = null,
+    ) : RealtimeVoiceEvent
 }
 
 /**
@@ -133,4 +136,5 @@ class VoiceAudioBackendException(
     val failure: RealtimeVoiceFailure,
     message: String? = null,
     cause: Throwable? = null,
+    val requestError: VoiceRequestError? = null,
 ) : Exception(message, cause)

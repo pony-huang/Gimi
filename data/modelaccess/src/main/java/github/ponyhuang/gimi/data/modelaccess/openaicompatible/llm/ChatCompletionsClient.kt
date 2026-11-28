@@ -311,10 +311,12 @@ private class StatusException(status: Int, headers: Headers, body: String) : Exc
       else -> status == 408 || status == 409 || status == 429 || status >= 500
     }
   val retryAfter = retryAfter(headers)
+  private val providerCode = errorType(body)
   val error =
     ChatCompletionsApiException(
-      "Chat Completions API error: HTTP $status" + errorType(body)?.let { " ($it)" }.orEmpty(),
+      "Chat Completions API error: HTTP $status" + providerCode?.let { " ($it)" }.orEmpty(),
       statusCode = status,
+      providerCode = providerCode,
     )
 }
 

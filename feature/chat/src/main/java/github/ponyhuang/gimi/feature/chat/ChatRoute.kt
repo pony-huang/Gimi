@@ -1,11 +1,16 @@
 package github.ponyhuang.gimi.feature.chat
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -17,12 +22,19 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiMusicActions
+import github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiDeviceActions
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalA2uiDeviceActions
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalChatA2uiMusicActions
+import github.ponyhuang.gimi.domain.a2ui.A2uiFlashlightState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
@@ -39,7 +51,11 @@ import github.ponyhuang.gimi.feature.chat.realtime.RealtimeVoiceHost
 import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ChatMode
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.core.net.toUri
 
 /**
@@ -98,8 +114,17 @@ fun ChatRoute(
     }
     val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()
     val uploadedFiles by viewModel.uploadedFiles.collectAsStateWithLifecycle()
+    val uploadedFilesRefreshing by viewModel.uploadedFilesRefreshing.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var flashlightPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    val flashlightPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        flashlightPermissionDenied = !granted && context.findComponentActivity()?.let {
+            !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+        } == true
+        viewModel.refreshA2uiFlashlight()
+    }
     val chatNoticeConfigureChatModel = stringResource(R.string.chat_notice_configure_chat_model)
     val chatNoticeAlreadyNewConversation = stringResource(R.string.chat_notice_already_new_conversation)
     val chatNoticeModelSwitchBlocked = stringResource(R.string.chat_notice_model_switch_blocked)
@@ -118,6 +143,12 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_document_total_size_limit)
     val chatNoticeUploadedFileDeleteFailed =
         stringResource(R.string.chat_uploaded_file_delete_failed)
+    val chatNoticeUploadedFilesRefreshFailed =
+        stringResource(R.string.chat_uploaded_files_refresh_failed)
+    val chatNoticeUploadedFilesRefreshed =
+        stringResource(R.string.chat_uploaded_files_refreshed)
+    val chatNoticeUploadedFileDeleted =
+        stringResource(R.string.chat_uploaded_file_deleted)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
     // 抽屉目标开关状态：手势提交（预测性返回、拖拽、遮罩点击）经 onOpenChange 回写，
@@ -133,6 +164,7 @@ fun ChatRoute(
     var voicePageVisible by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(viewModel) {
+        viewModel.refreshA2uiFlashlight()
         viewModel.onAction(ChatAction.ResumeChat)
         onPauseOrDispose {}
     }
@@ -217,7 +249,12 @@ fun ChatRoute(
                 notice.displayName,
             )
             ChatNotice.DocumentTotalSizeLimitExceeded -> chatNoticeDocumentTotalSizeLimit
+            ChatNotice.A2uiMusicLikeFailed -> stringResource(R.string.chat_a2ui_music_like_failed)
+            ChatNotice.A2uiDeviceChangeFailed -> stringResource(R.string.chat_a2ui_device_change_failed)
             ChatNotice.UploadedFileDeleteFailed -> chatNoticeUploadedFileDeleteFailed
+            ChatNotice.UploadedFilesRefreshFailed -> chatNoticeUploadedFilesRefreshFailed
+            ChatNotice.UploadedFilesRefreshed -> chatNoticeUploadedFilesRefreshed
+            ChatNotice.UploadedFileDeleted -> chatNoticeUploadedFileDeleted
             is ChatNotice.McpServerSkipped -> context.getString(
                 R.string.chat_notice_mcp_server_skipped,
                 notice.serverName,
@@ -379,108 +416,150 @@ fun ChatRoute(
                                 active = chatMode == ChatMode.CHATBOT,
                             )
                         } else {
-                            ChatScaffold(
-                                state = uiState,
-                                recommendations = recommendations,
-                                onRecommendationClick = { prompt ->
-                                    viewModel.send(prompt, emptyList())
-                                },
-                                partChannelProvider = viewModel::partChannelFor,
-                                onSend = viewModel::send,
-                                onStop = { viewModel.onAction(ChatAction.StopStreaming) },
-                                onTranscribeVoice = viewModel::transcribeVoice,
-                                onCancelVoiceTranscription = { viewModel.onAction(ChatAction.CancelVoiceTranscription) },
-                                onToggleSpeechPlayback = { messageId, markdown ->
-                                    viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
-                                },
-                                onOpenDocument = { attachment ->
-                                    openDocumentAttachment(context, attachment)
-                                },
-                                onToggleTimeline = { groupId ->
-                                    viewModel.onAction(ChatAction.ToggleTimeline(groupId))
-                                },
-                                onToolConfirmation = { confirmed ->
-                                    viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
-                                },
-                                onToolConfirmationAlwaysAllow = {
-                                    viewModel.onAction(
-                                        ChatAction.RespondToToolConfirmation(
-                                            confirmed = true,
-                                            alwaysAllow = true,
-                                        ),
-                                    )
-                                },
-                                onRespondToInputRequest = { callId, value ->
-                                    viewModel.onAction(ChatAction.RespondToInputRequest(callId, value))
-                                },
-                                onFullAccessChange = { enabled ->
-                                    viewModel.onAction(ChatAction.SetFullAccess(enabled))
-                                },
-                                onSelectModel = { selection ->
-                                    viewModel.onAction(ChatAction.SelectModel(selection))
-                                },
-                                onModelSwitchBlocked = {
-                                    Toast.makeText(
-                                        context,
-                                        chatNoticeModelSwitchBlocked,
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                },
-                                onOpenDrawer = { drawerOpen = true },
-                                onConfigureModels = onConfigureModels,
-                                onNewConversation = {
-                                    viewModel.onAction(ChatAction.NewConversation)
-                                },
-                                onThinkingEnabledChange = { enabled ->
-                                    viewModel.onAction(ChatAction.SetThinkingEnabled(enabled))
-                                },
-                                onReasoningEffortChange = { effort ->
-                                    viewModel.onAction(ChatAction.SetReasoningEffort(effort))
-                                },
-                                onMcpServerEnabledChange = { serverId, enabled ->
-                                    viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
-                                },
-                                onOfficialToolOpened = { toolId ->
-                                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
-                                },
-                                onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
-                                    val descriptors = viewModel.uiState.value.officialToolDescriptors
-                                    val supportedIds = descriptors
-                                        .firstOrNull { it.id == toolId }
-                                        ?.functions
-                                        ?.mapTo(hashSetOf()) { it.id }
-                                        .orEmpty()
-                                    viewModel.onAction(
-                                        ChatAction.SetOfficialFunctionEnabled(
-                                            toolId = toolId,
-                                            functionId = functionId,
-                                            enabled = enabled,
-                                            supportedFunctionIds = supportedIds,
-                                        ),
-                                    )
-                                },
-                                onOfficialToolFunctionsRetry = { toolId ->
-                                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
-                                },
-                                sharedMediaUris = sharedMediaUris.takeIf {
-                                    currentSessionId.isNotBlank() && !uiState.isInitializing
-                                }.orEmpty(),
-                                onSharedMediaConsumed = onSharedMediaConsumed,
-                                onRetryAttachmentUpload = viewModel::uploadDocumentDraft,
-                                onDocumentDraftImported = viewModel::uploadDocumentDraft,
-                                attachFileRequests = viewModel.attachFileRequests,
-                                uploadedFiles = uploadedFiles,
-                                onAttachUploadedFile = viewModel::requestAttachVendorFile,
-                                onUploadedFileDelete = { viewModel.onAction(ChatAction.DeleteUploadedFile(it)) },
-                                onUploadedFilePrune = viewModel::clearDocumentUploads,
-                                onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
-                                onRetryFailedTurn = {
-                                    viewModel.onAction(ChatAction.RetryFailedTurn)
-                                },
-                                chatMode = ChatMode.ASSISTANT,
-                                onChatModeChange = { chatMode = it },
-                                headerVisible = false,
-                            )
+                            val musicActions = if (chatMode == ChatMode.ASSISTANT && currentSessionId.isNotBlank()) {
+                                ChatA2uiMusicActions(
+                                    sessionId = currentSessionId,
+                                    renderer = viewModel.a2uiRendererFunctions,
+                                    liked = uiState.a2uiNeteaseLikes,
+                                    pendingLikes = uiState.a2uiPendingNeteaseLikes,
+                                    setLiked = { id, liked -> viewModel.setA2uiNeteaseLiked(currentSessionId, id, liked) },
+                                    canRecommend = !uiState.isInitializing && !uiState.isAgentRunning,
+                                )
+                            } else null
+                            val deviceActions = musicActions?.let {
+                                ChatA2uiDeviceActions(
+                                    volume = viewModel.a2uiVolume,
+                                    flashlight = viewModel.a2uiFlashlight,
+                                    changingVolume = uiState.a2uiChangingVolume,
+                                    changingFlashlight = uiState.a2uiChangingFlashlight,
+                                    permissionNeedsSettings = flashlightPermissionDenied,
+                                    setVolume = { level -> viewModel.setA2uiVolume(currentSessionId, level) },
+                                    setFlashlight = { enabled -> viewModel.setA2uiFlashlight(currentSessionId, enabled) },
+                                    requestFlashlightPermission = {
+                                        if (viewModel.a2uiFlashlight.value == A2uiFlashlightState.PermissionRequired) {
+                                            if (flashlightPermissionDenied) {
+                                                context.startActivity(Intent(
+                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                    Uri.fromParts("package", context.packageName, null),
+                                                ))
+                                            } else {
+                                                flashlightPermission.launch(Manifest.permission.CAMERA)
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                            CompositionLocalProvider(
+                                LocalChatA2uiMusicActions provides musicActions,
+                                LocalA2uiDeviceActions provides deviceActions,
+                            ) {
+                                ChatScaffold(
+                                    state = uiState,
+                                    recommendations = recommendations,
+                                    onRecommendationClick = { prompt ->
+                                        viewModel.send(prompt, emptyList())
+                                    },
+                                    partChannelProvider = viewModel::partChannelFor,
+                                    onSend = viewModel::send,
+                                    onStop = { viewModel.onAction(ChatAction.StopStreaming) },
+                                    onTranscribeVoice = viewModel::transcribeVoice,
+                                    onCancelVoiceTranscription = { viewModel.onAction(ChatAction.CancelVoiceTranscription) },
+                                    onToggleSpeechPlayback = { messageId, markdown ->
+                                        viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
+                                    },
+                                    onOpenDocument = { attachment ->
+                                        scope.openChatDocument(context, attachment) {
+                                            viewModel.openVendorDocument(attachment)
+                                        }
+                                    },
+                                    onToggleTimeline = { groupId ->
+                                        viewModel.onAction(ChatAction.ToggleTimeline(groupId))
+                                    },
+                                    onToolConfirmation = { confirmed ->
+                                        viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
+                                    },
+                                    onToolConfirmationAlwaysAllow = {
+                                        viewModel.onAction(
+                                            ChatAction.RespondToToolConfirmation(
+                                                confirmed = true,
+                                                alwaysAllow = true,
+                                            ),
+                                        )
+                                    },
+                                    onRespondToInputRequest = { callId, value ->
+                                        viewModel.onAction(ChatAction.RespondToInputRequest(callId, value))
+                                    },
+                                    onFullAccessChange = { enabled ->
+                                        viewModel.onAction(ChatAction.SetFullAccess(enabled))
+                                    },
+                                    onSelectModel = { selection ->
+                                        viewModel.onAction(ChatAction.SelectModel(selection))
+                                    },
+                                    onModelSwitchBlocked = {
+                                        Toast.makeText(
+                                            context,
+                                            chatNoticeModelSwitchBlocked,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    },
+                                    onOpenDrawer = { drawerOpen = true },
+                                    onConfigureModels = onConfigureModels,
+                                    onNewConversation = {
+                                        viewModel.onAction(ChatAction.NewConversation)
+                                    },
+                                    onThinkingEnabledChange = { enabled ->
+                                        viewModel.onAction(ChatAction.SetThinkingEnabled(enabled))
+                                    },
+                                    onReasoningEffortChange = { effort ->
+                                        viewModel.onAction(ChatAction.SetReasoningEffort(effort))
+                                    },
+                                    onMcpServerEnabledChange = { serverId, enabled ->
+                                        viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
+                                    },
+                                    onOfficialToolOpened = { toolId ->
+                                        viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                                    },
+                                    onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
+                                        val descriptors = viewModel.uiState.value.officialToolDescriptors
+                                        val supportedIds = descriptors
+                                            .firstOrNull { it.id == toolId }
+                                            ?.functions
+                                            ?.mapTo(hashSetOf()) { it.id }
+                                            .orEmpty()
+                                        viewModel.onAction(
+                                            ChatAction.SetOfficialFunctionEnabled(
+                                                toolId = toolId,
+                                                functionId = functionId,
+                                                enabled = enabled,
+                                                supportedFunctionIds = supportedIds,
+                                            ),
+                                        )
+                                    },
+                                    onOfficialToolFunctionsRetry = { toolId ->
+                                        viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                                    },
+                                    sharedMediaUris = sharedMediaUris.takeIf {
+                                        currentSessionId.isNotBlank() && !uiState.isInitializing
+                                    }.orEmpty(),
+                                    onSharedMediaConsumed = onSharedMediaConsumed,
+                                    onRetryAttachmentUpload = viewModel::uploadDocumentDraft,
+                                    onDocumentDraftImported = viewModel::uploadDocumentDraft,
+                                    attachFileRequests = viewModel.attachFileRequests,
+                                    uploadedFiles = uploadedFiles,
+                                    onAttachUploadedFile = viewModel::requestAttachVendorFile,
+                                    onUploadedFileDelete = { viewModel.onAction(ChatAction.DeleteUploadedFile(it)) },
+                                    onUploadedFilePrune = viewModel::clearDocumentUploads,
+                                    onRefreshUploadedFiles = viewModel::refreshUploadedFiles,
+                                    isRefreshingUploadedFiles = uploadedFilesRefreshing,
+                                    onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
+                                    onRetryFailedTurn = {
+                                        viewModel.onAction(ChatAction.RetryFailedTurn)
+                                    },
+                                    chatMode = ChatMode.ASSISTANT,
+                                    onChatModeChange = { chatMode = it },
+                                    headerVisible = false,
+                                )
+                            }
                         }
                     }
                 }
@@ -532,5 +611,42 @@ internal fun openDocumentAttachment(context: Context, attachment: FileAttachment
             context.getString(R.string.chat_attachment_open_failed),
             Toast.LENGTH_SHORT,
         ).show()
+    }
+}
+
+/**
+ * 打开文档消息附件的统一入口（助手 / Chatbot / 实时语音三个 surface 共用）。
+ *
+ * 本地载荷（归档副本或 inline 字节）直接走 [openDocumentAttachment]；厂商 file 引用
+ * 附件经 [resolve] 先查注册表绑定、缺失时走厂商下载兜底，成功后复用同一打开路径，
+ * 失败按原因提示：厂商协议不支持下载保留既有文案，其余失败提示下载失败。音频附件
+ * 的播放分支在组件内自行处理，不经本入口。
+ */
+internal fun CoroutineScope.openChatDocument(
+    context: Context,
+    attachment: FileAttachment,
+    resolve: suspend () -> VendorAttachmentResolution,
+) {
+    val hasLocalPayload = attachment.inlineData != null ||
+        attachment.payloadReference?.let(::File)?.isFile == true
+    if (hasLocalPayload) {
+        openDocumentAttachment(context, attachment)
+        return
+    }
+    launch {
+        when (val result = resolve()) {
+            is VendorAttachmentResolution.Resolved -> openDocumentAttachment(context, result.attachment)
+            is VendorAttachmentResolution.Failed -> Toast.makeText(
+                context,
+                context.getString(
+                    if (result.reason == VendorFileFailureReason.UNSUPPORTED_VENDOR) {
+                        R.string.chat_attachment_open_unsupported
+                    } else {
+                        R.string.chat_attachment_open_download_failed
+                    },
+                ),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 }

@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,9 +18,17 @@ import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileContentResult
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
+import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.graphics.scale
@@ -27,7 +36,9 @@ import androidx.core.graphics.scale
 class AndroidChatAttachmentRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     storageRegistry: StorageRegistry,
-) : ChatAttachmentRepository {
+    private val uploadedFileRegistry: UploadedFileRegistry,
+    private val fileGateway: VendorFileGateway,
+) : ChatAttachmentRepository, VendorAttachmentResolver {
     private val resolver = context.contentResolver
     private val attachmentRoot = storageRegistry.resolve(
         ConversationStorageIds.ATTACHMENTS,
@@ -75,6 +86,14 @@ class AndroidChatAttachmentRepository @Inject constructor(
                     }.let { result ->
                         // 本地归档 + 已上传的草稿：归档路径与厂商引用并存，发送侧以厂商引用优先。
                         if (attachment.isVendorUploaded) {
+                            // 回写注册表绑定：历史还原与"点击打开附件"据此先找到本地归档副本，
+                            // 找不到（用户删了工作区文件）再走厂商下载兜底。此处是三个聊天
+                            // surface 发送路径的唯一归档收口，绑定在这里一次性落库。
+                            uploadedFileRegistry.bindLocalFile(
+                                vendor = requireNotNull(attachment.fileVendor) { "Vendor-uploaded draft without vendor" },
+                                fileId = requireNotNull(attachment.fileId) { "Vendor-uploaded draft without file id" },
+                                localPath = requireNotNull(result.payloadReference) { "Archived attachment without payload reference" },
+                            )
                             result.copy(fileId = attachment.fileId, fileVendor = attachment.fileVendor)
                         } else {
                             result
@@ -100,6 +119,33 @@ class AndroidChatAttachmentRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             // 仅清理遗留的按会话归档目录（旧版本数据）；工作区文件永不随会话删除。
             conversationSessionDirectory(attachmentRoot, sessionId).deleteRecursively()
+        }
+    }
+
+    override suspend fun resolveVendorPayload(
+        attachment: FileAttachment,
+        connection: ResolvedServiceConnection?,
+    ): VendorAttachmentResolution = withContext(Dispatchers.IO) {
+        try {
+            resolveVendorAttachmentPayload(
+                attachment = attachment,
+                connection = connection,
+                workspaceRoot = workspaceRoot,
+                registry = uploadedFileRegistry,
+                gateway = fileGateway,
+                extension = extensionFor(attachment.displayName, attachment.mimeType),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            // 打开附件是用户点击的轻操作，任何异常都不允许击穿 Route 协程作用域致崩溃。
+            Log.w(TAG, "resolveVendorPayload failed: ${failure::class.simpleName}: ${failure.message}")
+            VendorAttachmentResolution.Failed(VendorFileFailureReason.VENDOR_ERROR)
+        }
+    }.also { result ->
+        // 下载失败原因只存在于结果对象里，落一条告警便于真机日志定位。
+        if (result is VendorAttachmentResolution.Failed) {
+            Log.w(TAG, "resolveVendorPayload: download failed reason=${result.reason} vendor=${attachment.fileVendor} fileId=${attachment.fileId}")
         }
     }
 
@@ -253,6 +299,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "ChatAttachment"
         const val MAX_DIMENSION_PX = 1280
         const val MAX_BYTES = 512 * 1024
         const val INITIAL_JPEG_QUALITY = 85
@@ -320,4 +367,87 @@ internal fun archiveDraftAttachment(
         mimeType = attachment.mimeType,
         displayName = attachment.displayName,
     )
+}
+
+/**
+ * 为厂商引用附件解析可打开的本地载荷：先查注册表绑定（离线直开），绑定缺失或悬空
+ * 再走厂商下载兜底，下载成功后把副本归档进共享工作区并回写绑定。
+ *
+ * 抽成顶层纯 JVM 函数以便单测；[VendorAttachmentResolver] 的实现方法只负责线程切换、
+ * 扩展名解析与异常兜底。[extension] 由调用方按显示名与 MIME 解析并校验。
+ */
+internal suspend fun resolveVendorAttachmentPayload(
+    attachment: FileAttachment,
+    connection: ResolvedServiceConnection?,
+    workspaceRoot: File,
+    registry: UploadedFileRegistry,
+    gateway: VendorFileGateway,
+    extension: String?,
+): VendorAttachmentResolution {
+    val vendor = attachment.fileVendor
+        ?: return VendorAttachmentResolution.Failed(VendorFileFailureReason.VENDOR_ERROR)
+    val fileId = attachment.fileId
+        ?: return VendorAttachmentResolution.Failed(VendorFileFailureReason.VENDOR_ERROR)
+    // 先查注册表绑定：绑定路径仍在（未被用户从工作区删除）则离线直开，不走网络。
+    val boundPath = registry.localPathFor(vendor, fileId)
+    if (boundPath != null && File(boundPath).isFile) {
+        return VendorAttachmentResolution.Resolved(
+            attachment.copy(payloadReference = boundPath, sizeBytes = File(boundPath).length()),
+        )
+    }
+    val resolvedConnection = connection
+        ?: return VendorAttachmentResolution.Failed(VendorFileFailureReason.VENDOR_ERROR)
+    return when (val result = gateway.getContent(
+        vendor = vendor,
+        protocol = resolvedConnection.protocol,
+        endpoint = resolvedConnection.endpoint.trimEnd('/'),
+        apiKey = resolvedConnection.apiKey,
+        fileId = fileId,
+    )) {
+        is VendorFileContentResult.Success -> {
+            val archived = archiveDownloadedVendorFile(result, attachment.displayName, workspaceRoot, extension)
+            if (archived == null) {
+                // 下载副本落盘失败属于本地 IO 异常，与厂商侧失败共用同一兜底文案。
+                VendorAttachmentResolution.Failed(VendorFileFailureReason.VENDOR_ERROR)
+            } else {
+                // 下载副本归档进共享工作区并回写绑定：下次打开离线秒开，不再走网络。
+                registry.bindLocalFile(vendor, fileId, archived.absolutePath)
+                VendorAttachmentResolution.Resolved(
+                    attachment.copy(payloadReference = archived.absolutePath, sizeBytes = archived.length()),
+                )
+            }
+        }
+        is VendorFileContentResult.Failure -> VendorAttachmentResolution.Failed(result.reason)
+    }
+}
+
+/**
+ * 把厂商下载的临时文件归档进共享工作区，命名与发送归档一致。
+ *
+ * 网关临时文件由调用方负责释放：无论归档成败都删除，避免 cache 遗留；拷贝失败时
+ * 连同半写的目标文件一并清理，返回 null 交由调用方归一为失败结果。
+ */
+internal fun archiveDownloadedVendorFile(
+    downloaded: VendorFileContentResult.Success,
+    displayName: String,
+    workspaceRoot: File,
+    extension: String?,
+): File? {
+    val source = File(downloaded.localPath)
+    if (!source.isFile) return null
+    val target = runCatching {
+        workspaceRoot.mkdirs()
+        resolveWorkspaceArchiveTarget(
+            workspaceRoot = workspaceRoot,
+            baseName = archiveBaseName(displayName),
+            extension = extension,
+        )
+    }.getOrNull() ?: return null
+    val copied = runCatching { source.copyTo(target, overwrite = false) }.isSuccess
+    source.delete()
+    if (!copied) {
+        target.delete()
+        return null
+    }
+    return target
 }

@@ -10,6 +10,8 @@ import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
@@ -34,6 +36,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailureNotice
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
@@ -50,7 +53,9 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceApplyResult
 import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
+import github.ponyhuang.gimi.domain.voice.repository.effectiveSemiCascadedSynthesisModel
 import github.ponyhuang.gimi.domain.voice.repository.isOverridden
+import github.ponyhuang.gimi.domain.voice.repository.orElse
 import github.ponyhuang.gimi.feature.chat.AttachmentSelectionResult
 import github.ponyhuang.gimi.feature.chat.ChatFileUploadCoordinator
 import github.ponyhuang.gimi.feature.chat.ChatSubmissionResult
@@ -63,6 +68,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -205,7 +211,11 @@ data class RealtimeVoiceUiState(
     val modelTemplateId: String = "",
     val chatModelTemplateId: String = "",
     val ttsModelName: String = "",
+    val ttsModelTemplateId: String = "",
     val sttModelName: String = "",
+    val sttModelTemplateId: String = "",
+    /** 当前生效链路的音色显示名；空串表示回落到默认音色文案。 */
+    val voiceName: String = "",
     /** 从连接开始到通话清理完成期间锁定设置。 */
     val settingsLocked: Boolean = false,
     /** 通话正在释放音频与会话资源。 */
@@ -243,6 +253,8 @@ class RealtimeVoiceViewModel @Inject constructor(
     private val attachmentRepository: ChatAttachmentRepository,
     private val fileGateway: VendorFileGateway,
     private val uploadedFileRegistry: UploadedFileRegistry,
+    private val vendorAttachmentResolver: VendorAttachmentResolver,
+    private val refreshUploadedFilesUseCase: github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase,
     private val validateAttachments: ValidateChatAttachmentsUseCase,
 ) : ViewModel() {
     private var navigationJob: Job? = null
@@ -279,6 +291,14 @@ class RealtimeVoiceViewModel @Inject constructor(
 
     private val settingsFlow = observeSettings()
     private val composer = MutableStateFlow(VoiceComposerUiState())
+    private var consumedVoiceFailure: RealtimeVoiceFailureNotice? = null
+
+    /** 同一次失败跨重组或重新进入 Route 时只提示一次。 */
+    fun consumeVoiceFailure(notice: RealtimeVoiceFailureNotice): Boolean {
+        if (consumedVoiceFailure === notice) return false
+        consumedVoiceFailure = notice
+        return true
+    }
 
     /** 草稿合成音色选项与加载标记；与合成模型解耦以便按模型重新取表。 */
     private val composerSynthesisVoiceOptions = MutableStateFlow<List<TtsVoice>>(emptyList())
@@ -292,6 +312,10 @@ class RealtimeVoiceViewModel @Inject constructor(
         resolveConnection = { selection -> latestSettings?.instances?.resolveConnection(selection) },
         isFileUploadEnabled = { composer.value.fileUploadEnabled },
     )
+
+    /** 「上传的文件」强制刷新进行中；防重复请求并驱动抽屉刷新按钮转圈。 */
+    private val _uploadedFilesRefreshing = MutableStateFlow(false)
+    val uploadedFilesRefreshing: StateFlow<Boolean> = _uploadedFilesRefreshing.asStateFlow()
 
     /** 已提交对话覆盖；会话绑定变化时切换观察目标。 */
     private val committedOverridesFlow: StateFlow<ConversationVoiceOverrides> =
@@ -478,6 +502,60 @@ class RealtimeVoiceViewModel @Inject constructor(
         }
     }
 
+    /** 打开厂商引用文档附件：先查本地绑定（离线直开），绑定缺失或悬空时走厂商下载兜底。 */
+    suspend fun openVendorDocument(attachment: FileAttachment): VendorAttachmentResolution =
+        vendorAttachmentResolver.resolveVendorPayload(
+            attachment,
+            inputSelection()?.let { selection ->
+                latestSettings?.instances?.resolveConnection(selection)
+            },
+        )
+
+    /**
+     * 强制刷新「上传的文件」列表：仅由用户点击刷新按钮触发；listFiles 对账写回注册表，
+     * 成功后 Room Flow 自动驱动列表，失败经输入栏一次性提示。进行中的刷新直接忽略。
+     */
+    fun refreshUploadedFiles() {
+        if (_uploadedFilesRefreshing.value) return
+        val selection = inputSelection()
+        val resolved = selection?.let { latestSettings?.instances?.resolveConnection(it) }
+        if (resolved == null) {
+            notifyInput(VoiceComposerError.UploadedFilesRefresh)
+            return
+        }
+        _uploadedFilesRefreshing.value = true
+        viewModelScope.launch {
+            val result = refreshUploadedFilesUseCase(resolved.templateId.orEmpty(), resolved)
+            _uploadedFilesRefreshing.value = false
+            if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
+                notifyInput(VoiceComposerError.UploadedFilesRefresh)
+            }
+        }
+    }
+
+    /** 删除已上传厂商文件：厂商侧删除成功后网关同步移除本地注册表记录；失败经输入栏提示。 */
+    fun deleteUploadedFile(entry: UploadedFileEntry) {
+        val resolved = inputSelection()?.let { selection ->
+            latestSettings?.instances?.resolveConnection(selection)
+        }
+        if (resolved == null || resolved.templateId != entry.vendor) {
+            notifyInput(VoiceComposerError.UploadedFileDelete)
+            return
+        }
+        viewModelScope.launch {
+            val result = fileGateway.deleteFile(
+                entry.vendor,
+                resolved.protocol,
+                resolved.endpoint.trimEnd('/'),
+                resolved.apiKey,
+                entry.fileId,
+            )
+            if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
+                notifyInput(VoiceComposerError.UploadedFileDelete)
+            }
+        }
+    }
+
     /** 编辑状态只控制临时输入门，不改变用户静音选择。 */
     fun editInput() {
         val call = controller.state.value
@@ -617,18 +695,44 @@ class RealtimeVoiceViewModel @Inject constructor(
             val availability = pipelineAvailability(settingsSnapshot.effective, modelSettings, chatSelection)
             val committedConfig = VoiceConfigResolver.resolve(defaultsRepository.defaults.value, committedOverrides, lookup)
             val settingsUi = voiceSettingsState(settingsSnapshot)
+            val activePipeline = if (callSnapshot.active) call.pipeline else committedConfig.pipeline
             val primarySelection = if (committedConfig.pipeline == VoicePipeline.NATIVE_REALTIME) {
                 settingsUi.realtimeRows.selectionRow(committedConfig.realtimeModel)?.selection()
             } else {
                 chatSelection
             }
             val displayedSelection = if (callSnapshot.active) call.modelSelection else primarySelection
+            val sttSelection = committedConfig.cascadedRecognitionModel
+                ?.takeIf { VoiceConfigField.CASCADED_RECOGNITION_MODEL !in committedConfig.missingRequired }
+            val ttsSelection = when (activePipeline) {
+                VoicePipeline.SEMI_CASCADED -> committedConfig.semiCascadedSynthesisModel
+                    ?.takeIf { VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL !in committedConfig.missingRequired }
+                VoicePipeline.CASCADED -> committedConfig.cascadedSynthesisModel
+                    ?.takeIf { VoiceConfigField.CASCADED_SYNTHESIS_MODEL !in committedConfig.missingRequired }
+                VoicePipeline.NATIVE_REALTIME -> null
+            }
+            val resolvedSttName = modelSettings.voiceModelName(sttSelection)
+            val resolvedTtsName = modelSettings.voiceModelName(ttsSelection)
+            val resolvedVoiceId = when (activePipeline) {
+                VoicePipeline.CASCADED -> committedConfig.cascadedVoice.voiceId
+                VoicePipeline.SEMI_CASCADED -> committedConfig.semiCascadedVoice.voiceId
+                VoicePipeline.NATIVE_REALTIME -> committedConfig.realtimeVoice.voiceId
+                    ?: settingsUi.realtimeDefaultVoice
+            }.orEmpty()
+            val activeVoiceOptions = if (activePipeline == VoicePipeline.NATIVE_REALTIME) {
+                settingsUi.realtimeVoiceOptions
+            } else {
+                settingsUi.synthesisVoiceOptions
+            }
+            val resolvedVoiceName = resolvedVoiceId.takeIf { it.isNotBlank() }?.let { id ->
+                activeVoiceOptions.firstOrNull { it.id == id }?.name ?: id
+            }.orEmpty()
             RealtimeVoiceUiState(
                 voice = call.voice,
                 composer = composerState,
                 active = callSnapshot.active,
                 style = style,
-                pipeline = if (callSnapshot.active) call.pipeline else committedConfig.pipeline,
+                pipeline = activePipeline,
                 switching = call.switching || call.ending,
                 cascadedAvailable = availability.cascaded,
                 semiCascadedAvailable = availability.semiCascaded,
@@ -638,8 +742,11 @@ class RealtimeVoiceViewModel @Inject constructor(
                 modelTemplateId = modelSettings.instances.resolveConnection(displayedSelection)?.templateId.orEmpty(),
                 chatModelTemplateId = modelSettings.instances.resolveConnection(chatSelection)?.templateId.orEmpty(),
                 chatModelName = modelSettings.voiceModelName(chatSelection),
-                ttsModelName = call.ttsModelName,
-                sttModelName = call.sttModelName,
+                ttsModelName = if (callSnapshot.active) call.ttsModelName.ifBlank { resolvedTtsName } else resolvedTtsName,
+                ttsModelTemplateId = modelSettings.instances.resolveConnection(ttsSelection)?.templateId.orEmpty(),
+                sttModelName = if (callSnapshot.active) call.sttModelName.ifBlank { resolvedSttName } else resolvedSttName,
+                sttModelTemplateId = modelSettings.instances.resolveConnection(sttSelection)?.templateId.orEmpty(),
+                voiceName = resolvedVoiceName,
                 settingsLocked = call.configurationLocked,
                 ending = call.ending,
                 settingsSaving = saving,
@@ -694,6 +801,10 @@ class RealtimeVoiceViewModel @Inject constructor(
     /**
      * 选择链路模型；null 表示恢复继承（移除对话覆盖）。
      * 若目标链路仍缺必需模型，则和其余选择一起等到补齐再保存。
+     *
+     * 合成模型变化时同步清掉该链路的音色覆盖：音色与合成模型强绑定，旧音色跨
+     * 厂商或跨代际沿用必被服务端拒绝；清空回到继承，由音色解析回落厂商默认。
+     * 音色集不封闭（复刻音色不在内置表），不能靠目录校验兜底，必须在写入时斩断。
      */
     fun selectFieldModel(field: VoiceConfigField, selection: ModelSelection?) {
         val override = if (selection == null) VoiceFieldOverride.Inherit else VoiceFieldOverride.Value(selection)
@@ -701,12 +812,23 @@ class RealtimeVoiceViewModel @Inject constructor(
             when (field) {
                 VoiceConfigField.CASCADED_RECOGNITION_MODEL ->
                     overrides.copy(cascadedRecognitionModel = override)
-                VoiceConfigField.CASCADED_SYNTHESIS_MODEL ->
-                    overrides.copy(cascadedSynthesisModel = override)
+                VoiceConfigField.CASCADED_SYNTHESIS_MODEL -> {
+                    val unchanged = selection == overrides.cascadedSynthesisModel
+                        .orElse(defaultsRepository.defaults.value.cascadedSynthesisModel)
+                    if (unchanged) overrides.copy(cascadedSynthesisModel = override)
+                    else overrides.copy(cascadedSynthesisModel = override, cascadedVoice = VoiceFieldOverride.Inherit)
+                }
                 VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL ->
                     overrides.copy(semiCascadedUnderstandingModel = override)
-                VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL ->
-                    overrides.copy(semiCascadedSynthesisModel = override)
+                VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL -> {
+                    val unchanged = selection == overrides.semiCascadedSynthesisModel
+                        .orElse(defaultsRepository.defaults.value.effectiveSemiCascadedSynthesisModel)
+                    if (unchanged) overrides.copy(semiCascadedSynthesisModel = override)
+                    else overrides.copy(
+                        semiCascadedSynthesisModel = override,
+                        semiCascadedVoice = VoiceFieldOverride.Inherit,
+                    )
+                }
                 VoiceConfigField.REALTIME_MODEL -> overrides.copy(realtimeModel = override)
                 else -> overrides
             }

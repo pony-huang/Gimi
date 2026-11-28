@@ -318,6 +318,8 @@ class ModelServiceConfigurationPersistenceTest {
         )!!
         assertEquals(ApiProtocol.Anthropic, resolved.protocol)
         assertEquals("https://api.deepseek.com/anthropic", resolved.modelBaseUrl)
+        // 目录未声明视觉能力时按「假定支持」放行：supportsImages 不随目录缺元数据变 false。
+        assertTrue(resolved.supportsImages)
         // Room 里升级前的双协议模板行也必须被内置约束覆盖
         assertEquals(
             listOf(ApiProtocol.Anthropic),
@@ -413,6 +415,66 @@ class ModelServiceConfigurationPersistenceTest {
         assertFalse(chat.supports(ApiProtocol.OpenaiChatcompletions))
         // 既有候选目录不因模板定义对齐而丢失
         assertEquals(listOf("deepseek-reasoner"), chat.catalog.map { it.id })
+    }
+
+    @Test
+    fun legacyPersistedMultimodalDefaultsAreClearedOnRestore() = runBlocking {
+        readyRepository()
+        val legacyMultimodal = github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities(
+            vision = github.ponyhuang.gimi.domain.modelcatalog.model.VisionCapability(),
+            audioInput = github.ponyhuang.gimi.domain.modelcatalog.model.AudioInputCapability(),
+            documentInput = github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability(),
+        )
+        val legacyInstance = StoredInstance(
+            id = "svc-legacy-multimodal",
+            name = "DeepSeek",
+            templateId = "deepseek",
+            isEnabled = true,
+            isOfficialToolsEnabled = true,
+            isFileUploadEnabled = false,
+            sharedApiKey = "deepseek-key",
+            connections = listOf(
+                StoredConnection(
+                    id = "conn-chat",
+                    capability = "Conversation",
+                    protocol = "Anthropic",
+                    endpoint = "https://api.deepseek.com/anthropic",
+                    models = listOf(
+                        StoredModel(
+                            modelId = "deepseek-flash",
+                            modelName = "deepseek-flash",
+                            multimodal = legacyMultimodal,
+                        ),
+                    ),
+                ),
+                StoredConnection(
+                    id = "conn-asr",
+                    capability = "Recognition",
+                    protocol = "OpenaiChatcompletions",
+                    endpoint = "https://api.deepseek.com",
+                    models = listOf(
+                        StoredModel(
+                            modelId = "deepseek-asr",
+                            modelName = "deepseek-asr",
+                            capabilities = setOf(ModelCapability.STT),
+                            multimodal = legacyMultimodal,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        preferences.edit().putString(
+            "encrypted_configuration",
+            "cipher:" + modelCatalogJson.encodeToString(StoredConfiguration(listOf(legacyInstance))),
+        ).commit()
+
+        val restored = readyRepository()
+        val instance = restored.currentInstance("svc-legacy-multimodal")!!
+        val chatModel = instance.conversationConnection!!.models.single()
+        assertNull(chatModel.multimodal.vision)
+        assertNull(chatModel.multimodal.audioInput)
+        val asrModel = instance.connection(ServiceCapability.Recognition)!!.models.single()
+        assertFalse(asrModel.multimodal.isMultimodal)
     }
 
     @Test

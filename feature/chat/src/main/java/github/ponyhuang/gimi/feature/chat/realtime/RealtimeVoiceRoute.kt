@@ -17,6 +17,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -33,7 +34,7 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.feature.chat.ChatComposer
 import github.ponyhuang.gimi.feature.chat.R
-import github.ponyhuang.gimi.feature.chat.openDocumentAttachment
+import github.ponyhuang.gimi.feature.chat.openChatDocument
 
 /**
  * 权限和 Android 副作用只在入口处理；无状态页面不接触模型副作用。
@@ -84,6 +85,8 @@ fun RealtimeVoiceRoute(
         if (active) viewModel.prepare(conversationId, selection, conversationTitle, VoiceConversationStyle.CHATBOT)
     }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val uploadedFilesRefreshing by viewModel.uploadedFilesRefreshing.collectAsStateWithLifecycle()
     val routeActive by rememberUpdatedState(active)
     LaunchedEffect(viewModel) {
         viewModel.inputNotices.collect { (revision, error) ->
@@ -96,6 +99,8 @@ fun RealtimeVoiceRoute(
                         VoiceComposerError.Unsupported -> R.string.voice_input_unsupported
                         VoiceComposerError.Attachment -> R.string.voice_input_attachment_error
                         VoiceComposerError.Submit -> R.string.voice_input_submit_error
+                        VoiceComposerError.UploadedFilesRefresh -> R.string.chat_uploaded_files_refresh_failed
+                        VoiceComposerError.UploadedFileDelete -> R.string.chat_uploaded_file_delete_failed
                     }
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
@@ -103,7 +108,23 @@ fun RealtimeVoiceRoute(
             }
         }
     }
-    LaunchedEffect(state.voice.failure) {
+    LaunchedEffect(state.voice.failure, state.voice.failureNotice) {
+        val notice = state.voice.failureNotice
+        if (notice != null && !viewModel.consumeVoiceFailure(notice)) return@LaunchedEffect
+        if (!active) return@LaunchedEffect
+        val error = notice?.requestError
+        if (error != null) {
+            val message = listOfNotNull(
+                error.httpStatus?.let { context.getString(R.string.voice_request_http_status, it) },
+                error.code,
+                error.httpStatus?.let {
+                    context.getString(if (it < 500) R.string.voice_request_client_error else R.string.voice_request_server_error)
+                },
+                error.message,
+            ).joinToString(" · ")
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            return@LaunchedEffect
+        }
         val message = when (state.voice.failure) {
             RealtimeVoiceFailure.Configuration -> R.string.voice_configuration_error
             RealtimeVoiceFailure.Microphone -> R.string.voice_microphone_error
@@ -115,7 +136,7 @@ fun RealtimeVoiceRoute(
             RealtimeVoiceFailure.ConversationBusy -> R.string.voice_conversation_busy
             null -> null
         }
-        if (message != null && active) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
     LaunchedEffect(state.voice.reconnectNotice) {
         if (state.voice.reconnectNotice && active) Toast.makeText(context, R.string.voice_reconnect_notice, Toast.LENGTH_SHORT).show()
@@ -247,7 +268,11 @@ fun RealtimeVoiceRoute(
         onEnd = hangUp,
         onBack = backToChat,
         onEditInput = viewModel::editInput,
-        onOpenDocument = { attachment -> openDocumentAttachment(context, attachment) },
+        onOpenDocument = { attachment ->
+            scope.openChatDocument(context, attachment) {
+                viewModel.openVendorDocument(attachment)
+            }
+        },
         transitionProgress = transitionProgress,
         isVisible = isVisible,
         composerContent = {
@@ -271,6 +296,9 @@ fun RealtimeVoiceRoute(
                 onDocumentDraftImported = viewModel::uploadDocument,
                 uploadedFiles = composer.uploadedFiles,
                 onAttachUploadedFile = viewModel::attachUploadedFile,
+                onUploadedFileDelete = viewModel::deleteUploadedFile,
+                onRefreshUploadedFiles = viewModel::refreshUploadedFiles,
+                isRefreshingUploadedFiles = uploadedFilesRefreshing,
                 retainExpanded = true, embedded = true,
                 inputContent = { params -> VoiceComposerInput(params, sendEnabled, viewModel::closeInput) },
             )

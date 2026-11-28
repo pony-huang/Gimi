@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
@@ -64,6 +65,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalChatA2uiMusicActions
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalChatA2uiSurfaceId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -340,7 +347,11 @@ internal fun MusicPlayerCard(
     }
 
     val likedOverrides = remember { mutableStateMapOf<Int, Boolean>() }
-    val isLiked = likedOverrides[safeIndex] ?: currentTrack.liked
+    val musicActions = LocalChatA2uiMusicActions.current
+    val surfaceId = LocalChatA2uiSurfaceId.current
+    val directLike = musicActions?.takeIf { values.text("provider").equals("netease", ignoreCase = true) }
+    val likePending = directLike?.pendingLikes?.contains(currentTrack.songId) == true
+    val isLiked = directLike?.liked?.get(currentTrack.songId) ?: likedOverrides[safeIndex] ?: currentTrack.liked
 
     var showQueueSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -409,6 +420,29 @@ internal fun MusicPlayerCard(
     }
     var playerDurationMs by remember(player, safeIndex, currentTrack.durationSeconds) {
         mutableLongStateOf(currentTrack.durationSeconds * 1000L)
+    }
+
+    if (player != null && musicActions != null && surfaceId != null) {
+        val lifecycle = LocalLifecycleOwner.current.lifecycle
+        val renderer = musicActions.renderer
+        val sessionId = musicActions.sessionId
+        DisposableEffect(renderer, sessionId, surfaceId, player, lifecycle) {
+            var attached = true
+            val detach = renderer.registerMusicPlayer(sessionId, surfaceId) { position ->
+                withContext(Dispatchers.Main.immediate) {
+                    // 排队期间可能已离开卡片或换曲，不能操作已释放的播放实例。
+                    if (!attached || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
+                        !player.isCurrentMediaItemSeekable || position > player.duration
+                    ) return@withContext false
+                    player.seekTo(position)
+                    true
+                }
+            }
+            onDispose {
+                attached = false
+                detach()
+            }
+        }
     }
 
     if (player != null) {
@@ -569,6 +603,10 @@ internal fun MusicPlayerCard(
 
     fun handleToggleLike() {
         val nextLiked = !isLiked
+        if (directLike != null) {
+            directLike.setLiked(currentTrack.songId, nextLiked)
+            return
+        }
         likedOverrides[safeIndex] = nextLiked
         onUpdateLikedBinding(nextLiked)
         if (currentTrack.songId.isNotBlank()) {
@@ -648,8 +686,26 @@ internal fun MusicPlayerCard(
                         )
                     }
 
+                    if (musicActions != null || isPreview) {
+                        SmallCircleIconButton(
+                            onClick = {
+                                onSendEvent("recommend_similar_music", buildTrackEventContext(currentTrack))
+                            },
+                            enabled = musicActions?.canRecommend ?: isPreview,
+                            contentDescription = stringResource(R.string.chat_a2ui_music_recommend),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.88f),
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    }
+
                     SmallCircleIconButton(
                         onClick = ::handleToggleLike,
+                        enabled = !likePending && (directLike == null || currentTrack.songId.isNotBlank()),
                         containerColor = if (isLiked) Color(0xFFFF3B5C).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f),
                         contentDescription = stringResource(
                             if (isLiked) R.string.chat_a2ui_music_unlike else R.string.chat_a2ui_music_like,
@@ -999,10 +1055,12 @@ private fun SmallCircleIconButton(
     onClick: () -> Unit,
     contentDescription: String,
     containerColor: Color = Color.White.copy(alpha = 0.10f),
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = CircleShape,
         color = containerColor,
         contentColor = Color.White,

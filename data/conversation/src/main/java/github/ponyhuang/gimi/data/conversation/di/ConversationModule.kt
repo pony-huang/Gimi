@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.domain.conversation.export.ConversationExportReposi
 import github.ponyhuang.gimi.data.conversation.local.UploadedFileDao
 import github.ponyhuang.gimi.data.conversation.repository.DefaultUploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
@@ -83,6 +84,12 @@ object ConversationModule {
 
     @Provides
     @Singleton
+    fun provideVendorAttachmentResolver(
+        implementation: AndroidChatAttachmentRepository,
+    ): VendorAttachmentResolver = implementation
+
+    @Provides
+    @Singleton
     fun provideToolApprovalRepository(
         implementation: ToolApprovalPreferences,
     ): ToolApprovalRepository = implementation
@@ -101,7 +108,9 @@ object ConversationModule {
         context,
         ConversationMetadataDatabase::class.java,
         ConversationMetadataDatabase.DATABASE_NAME,
-    ).fallbackToDestructiveMigration(dropAllTables = true)
+    ).addMigrations(ConversationMetadataDatabase.MIGRATION_7_8)
+        // 7 → 8 有无损迁移；只有更早版本或无匹配路径的升级才回退清库。
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
     @Provides
@@ -111,6 +120,7 @@ object ConversationModule {
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
+        uploadedFileRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
         subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository,
         voiceOverrides: VoiceOverrideRepository,
     ): ConversationRepository = AdkConversationRepository(
@@ -119,6 +129,7 @@ object ConversationModule {
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
+        uploadedFileRegistry = uploadedFileRegistry,
         subtasks = subtasks,
         voiceOverrides = voiceOverrides,
     )
@@ -130,6 +141,7 @@ object ConversationModule {
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
+        uploadedFileRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
         voiceOverrides: VoiceOverrideRepository,
     ): ConversationRepository = AdkConversationRepository(
         appName = AgentSessionIdentity.APP_NAME,
@@ -137,6 +149,7 @@ object ConversationModule {
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
+        uploadedFileRegistry = uploadedFileRegistry,
         subtasks = null,
         voiceOverrides = voiceOverrides,
     )

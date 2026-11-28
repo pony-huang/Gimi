@@ -1,10 +1,18 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.a2ui.A2uiDeviceControls
+import github.ponyhuang.gimi.domain.a2ui.A2uiFlashlightState
+import github.ponyhuang.gimi.domain.a2ui.A2uiMediaVolume
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.onStart
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -88,6 +96,8 @@ class ChatViewModel @Inject constructor(
     private val attachments: ChatAttachmentRepository,
     private val fileUploadGateway: github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway,
     private val fileUploadRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
+    private val vendorAttachmentResolver: github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver,
+    private val refreshUploadedFilesUseCase: github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase,
     private val prepareChatSend: PrepareChatSendUseCase,
     private val validateChatAttachments: ValidateChatAttachmentsUseCase,
     officialFunctionCatalog: OfficialToolFunctionCatalog,
@@ -96,10 +106,57 @@ class ChatViewModel @Inject constructor(
     private val appUpdateRepository: AppUpdateRepository,
     private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
     private val chatAgent: github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository,
+    internal val a2uiRendererFunctions: github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions =
+        github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions(),
+    private val a2uiDeviceControls: A2uiDeviceControls? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val flashlightRefresh = MutableStateFlow(0L)
+    internal val a2uiVolume = (a2uiDeviceControls?.observeVolume() ?: flowOf<A2uiMediaVolume?>(null))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal val a2uiFlashlight = flashlightRefresh.flatMapLatest {
+        a2uiDeviceControls?.observeFlashlight()?.onStart { emit(A2uiFlashlightState.Loading) }
+            ?: flowOf(A2uiFlashlightState.Disabled)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), A2uiFlashlightState.Loading)
+
+    internal fun refreshA2uiFlashlight() {
+        flashlightRefresh.update { it + 1 }
+    }
+
+    internal fun setA2uiVolume(sessionId: String, level: Int) {
+        val controls = a2uiDeviceControls ?: return
+        updateA2uiDevice(sessionId, volume = true) { controls.setVolume(level) }
+    }
+
+    internal fun setA2uiFlashlight(sessionId: String, enabled: Boolean) {
+        val controls = a2uiDeviceControls ?: return
+        updateA2uiDevice(sessionId, volume = false) { controls.setFlashlight(enabled) }
+    }
+
+    private fun updateA2uiDevice(sessionId: String, volume: Boolean, apply: suspend () -> Boolean) {
+        val state = _uiState.value
+        if (sessionId.isBlank() || state.sessionId != sessionId || state.isInitializing) return
+        if (if (volume) state.a2uiChangingVolume else state.a2uiChangingFlashlight) return
+        _uiState.update {
+            if (volume) it.copy(a2uiChangingVolume = true) else it.copy(a2uiChangingFlashlight = true)
+        }
+        viewModelScope.launch {
+            try {
+                if (!apply()) _uiState.update {
+                    if (it.sessionId == sessionId) it.copy(notice = ChatNotice.A2uiDeviceChangeFailed) else it
+                }
+            } finally {
+                _uiState.update {
+                    if (volume) it.copy(a2uiChangingVolume = false) else it.copy(a2uiChangingFlashlight = false)
+                }
+            }
+        }
+    }
 
     private val fileUploads = ChatFileUploadCoordinator(
         scope = viewModelScope,
@@ -118,6 +175,10 @@ class ChatViewModel @Inject constructor(
         transcribe = speechRecognitionRepository::transcribe,
         onModeChange = { mode -> _uiState.update { it.copy(voiceTranscriptionMode = mode) } },
     )
+
+    /** 「上传的文件」强制刷新进行中；防重复请求并驱动抽屉刷新按钮转圈。 */
+    private val _uploadedFilesRefreshing = MutableStateFlow(false)
+    val uploadedFilesRefreshing: StateFlow<Boolean> = _uploadedFilesRefreshing.asStateFlow()
 
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
 
@@ -139,6 +200,28 @@ class ChatViewModel @Inject constructor(
                 } else state }
             },
         )
+    }
+
+    internal fun setA2uiNeteaseLiked(sessionId: String, songId: String, liked: Boolean) {
+        val state = _uiState.value
+        if (sessionId.isBlank() || state.sessionId != sessionId || state.isInitializing ||
+            songId in state.a2uiPendingNeteaseLikes
+        ) return
+        _uiState.update { it.copy(a2uiPendingNeteaseLikes = it.a2uiPendingNeteaseLikes + songId) }
+        viewModelScope.launch {
+            try {
+                val changed = chatAgent.setA2uiNeteaseTrackLiked(sessionId, songId, liked)
+                _uiState.update {
+                    when {
+                        changed -> it.copy(a2uiNeteaseLikes = it.a2uiNeteaseLikes + (songId to liked))
+                        it.sessionId == sessionId -> it.copy(notice = ChatNotice.A2uiMusicLikeFailed)
+                        else -> it
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(a2uiPendingNeteaseLikes = it.a2uiPendingNeteaseLikes - songId) }
+            }
+        }
     }
 
     private fun submitA2uiInteraction(sessionId: String, interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction) {
@@ -556,6 +639,37 @@ class ChatViewModel @Inject constructor(
         fileUploads.upload(draft, selection)
     }
 
+    /** 打开厂商引用文档附件：先查本地绑定（离线直开），绑定缺失或悬空时走厂商下载兜底。 */
+    suspend fun openVendorDocument(attachment: FileAttachment): VendorAttachmentResolution =
+        vendorAttachmentResolver.resolveVendorPayload(
+            attachment,
+            _uiState.value.currentModelSelection?.let { selection -> modelServices.resolveConnection(selection) },
+        )
+
+    /**
+     * 强制刷新「上传的文件」列表：仅由用户点击刷新按钮触发；listFiles 对账写回注册表，
+     * 成功后 Room Flow 自动驱动列表，失败弹一次性提示且列表保持不动。进行中的刷新
+     * 直接忽略，避免重复请求。
+     */
+    fun refreshUploadedFiles() {
+        val selection = _uiState.value.currentModelSelection ?: return
+        if (_uploadedFilesRefreshing.value) return
+        val resolved = modelServices.resolveConnection(selection) ?: run {
+            emitNotice(ChatNotice.UploadedFilesRefreshFailed)
+            return
+        }
+        _uploadedFilesRefreshing.value = true
+        viewModelScope.launch {
+            val result = refreshUploadedFilesUseCase(resolved.templateId.orEmpty(), resolved)
+            _uploadedFilesRefreshing.value = false
+            if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
+                emitNotice(ChatNotice.UploadedFilesRefreshFailed)
+            } else {
+                emitNotice(ChatNotice.UploadedFilesRefreshed)
+            }
+        }
+    }
+
     /** 清理上传状态：附件移除或发送完成后调用。 */
     fun clearDocumentUploads(references: Collection<String>) {
         fileUploads.clear(references)
@@ -609,6 +723,8 @@ class ChatViewModel @Inject constructor(
                 if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
                     Log.w(TAG, "Vendor file delete failed: ${result.reason}")
                     emitNotice(ChatNotice.UploadedFileDeleteFailed)
+                } else {
+                    emitNotice(ChatNotice.UploadedFileDeleted)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -720,6 +836,11 @@ class ChatViewModel @Inject constructor(
         runtime.attention = SessionResultAttention.NONE
         val navigationAtSend = sessionNavigationCoordinator.navigationVersion
         var preparedTurn: ChatTurn? = null
+        if (runCatching { Log.isLoggable("GimiA2uiTiming", Log.DEBUG) }.getOrDefault(false)) {
+            github.ponyhuang.gimi.domain.a2ui.A2uiTiming.submitted(sessionId) { entry ->
+                Log.d("GimiA2uiTiming", entry)
+            }
+        }
         val job = runLifecycleCoordinator.launchRun(runtime, onFailure = { failure ->
             preparedTurn?.let { turnRecoveryCoordinator.recordFailure(sessionId, it) }
         }) { runToken ->

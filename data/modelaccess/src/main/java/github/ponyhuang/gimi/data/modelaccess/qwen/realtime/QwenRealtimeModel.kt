@@ -21,7 +21,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeInstructionSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

@@ -57,6 +57,14 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 - **Async create**: `A2uiCreateScope` returns `pending` immediately and generates on a side scope; after the runner flow ends, results are archived as events — cancellation persists CANCELLED via `NonCancellable`, failures persist FAILED (so the retry entry stays).
 - **Retry**: only for FAILED/CANCELLED tasks; reruns generation from the archived `changes` with no parent run and no business tools.
 
+## Direct creation and latency
+
+- **First useful content** is the first visible card content a user can act on or read as a result. For a device control, it means the live state is visible and the control is usable. A loading placeholder has its own timestamp.
+- `generate_a2ui` can create a card directly from `template_id=device_controls` or from `components` and optional `data` JSON strings. Both paths use the normal A2UI 0.9.1 validation and history paths, make zero UI model requests, and submit the entire valid tree to the renderer immediately.
+- An invalid direct composition returns a validation error and a single-use `repair_id` for the same surface and turn. A failed correction falls back to the existing UI generation path when `changes` and supported `component_names` are available. The existing generation validation and retry limits apply. Invalid drafts never become card documents.
+- Enable local timing with `adb shell setprop log.tag.GimiA2uiTiming DEBUG`. Elapsed times are relative to chat submission and include tool entry, UI model requests and first output, format correction, placeholder and surface frames, and final update delivery. A visible, actionable device control additionally records `first_useful_device_frame`. The log includes only stages, durations and a short surface correlation suffix.
+- Use the measurements before piloting incremental updates on weather cards. A useful first weather result contains a location and confirmed current temperature.
+
 ## Validation chain (data/a2ui)
 
 `AndroidxA2uiProtocol.validate`, in order: non-blank surfaceId → official message parser → shared surfaceId → delete revisions carry exactly one delete message → otherwise exactly `createSurface`/`updateDataModel`(root `/`)/`updateComponents` → catalogId match (no negotiation — one catalog) → 1..256 unique component ids with `root` → graph integrity (children exist, no cycles) → full schema validation through the official `A2uiCoreMessageProcessor` under a 5 s timeout. **Timeouts are normalized to `IllegalArgumentException`** so they feed the sub-agent's correction loop instead of silently cancelling the caller's scope. `replay(records)` folds revisions/submissions into final documents (a submission overwrites the data-model root so restored history keeps last submitted form values).
@@ -66,6 +74,19 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 - **Catalog**: `chatA2uiCatalog` provides AndroidX Material 3 Basic Catalog with app media, URL handling and a bounded List viewport. `chatA2uiCustomCatalog` owns the twelve Gimi cards and controls (including `MusicPlayerCard` for both NetEase Cloud Music and Spotify, featuring a NetEase-red base theme with dynamic cover-extracted ambient palette, in-card Media3 streaming or Spotify Connect remote control, queue popup sheet, favorite events, and `orpheus://` / `spotify:` client deep-link fallback). Chat exports the versioned union for generation and validation, and registers both the union and the official catalog for rendering. Each surface continues to use one A2UI 0.9.1 catalog ID. Use Agenda for timed schedules and Timeline for milestones. Switch writes to a bound data-model path; applying a business change still requires a Button submission.
 - **Coordinator**: one session-scoped official `A2uiMessageProcessor`; submissions gated by `canSubmit` (agent not running). `sync` diffs replayed records: data-only changes patch just `updateDataModel` (deleting a displayed surface crashes Compose on required bindings); additive component revisions update the existing surface when retained ids and types match; other structural changes delete and re-push. Outbound client events become `A2uiInteraction` chat turns (not persisted to history as drafts). Historical surfaces that reference a different catalog ID are skipped by the renderer.
 - **Host UI**: stateless surface host in `ChatA2uiContent` keyed by surface id, plus `A2uiTaskStatus` placeholder cards (spinner/failed/cancelled + retry). Surfaces are filtered by owning message in `ChatScreen`/`MessageBubble`. The surface inherits the chat Material theme. Newly received multi-component cards can show their structure first and then receive the full validated component tree through the official processor. Historical surfaces render directly.
+
+## Music card function calls
+
+- **A2UI interaction** (`A2uiInteraction`): A surface event that carries the user's action and context into a new Agent turn. The music recommendation button emits `recommend_similar_music` through this path.
+- **Direct function call**: An explicitly registered operation with arguments and a result. The call itself needs no new model turn. A NetEase heart click calls the enabled plugin's favorite tool and changes the heart after success. Agent tool `seek_a2ui_music_player` targets one mounted, seekable player in the calling session and surface.
+- The two direct calls use Gimi's in-process wiring with the existing AndroidX 0.9.1 renderer. A future v1.0 transport can reuse the operation contracts. Rendering and replay never execute these calls.
+
+## Live device controls
+
+- `MediaVolumeSlider` and `FlashlightSwitch` read live device state from the host. Neither accepts a generated value. Rendering a new or historical surface only subscribes to state.
+- Releasing the volume slider applies one authorized write and reads the resulting media volume. Visible sliders also track changes from hardware controls or Agent tool calls.
+- Toggling the flashlight checks tool authorization and camera permission. The switch reflects the system torch callback, including changes initiated outside Gimi. The permission button requests camera access without applying a pending toggle.
+- Normal Agent tool calls retain their existing confirmation flow. A separate ordinary Button event can submit a request for the Agent to choose a setting.
 
 ## Cross-cutting rules
 

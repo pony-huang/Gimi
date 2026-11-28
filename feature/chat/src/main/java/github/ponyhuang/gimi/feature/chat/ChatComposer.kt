@@ -140,6 +140,9 @@ public fun ChatComposer(
     uploadedFiles: List<UploadedFileEntry> = emptyList(),
     onAttachUploadedFile: (UploadedFileEntry) -> Unit = {},
     onUploadedFileDelete: (UploadedFileEntry) -> Unit = {},
+    /** 抽屉"上传的文件"强制刷新；点击才发厂商请求，对账写回注册表。 */
+    onRefreshUploadedFiles: () -> Unit = {},
+    isRefreshingUploadedFiles: Boolean = false,
     attachmentUploadStates: Map<String, DraftUploadState> = emptyMap(),
     /** 当前选择是否启用厂商文件上传；决定文档草稿是否需要预热上传与发送门控。 */
     isFileUploadEnabled: Boolean = false,
@@ -546,6 +549,8 @@ public fun ChatComposer(
             uploadedFiles = uploadedFiles,
             uploadedFilesEnabled = isFileUploadEnabled,
             onUploadedFileDelete = onUploadedFileDelete,
+            onRefreshUploadedFiles = onRefreshUploadedFiles,
+            isRefreshingUploadedFiles = isRefreshingUploadedFiles,
             onAttachUploadedFile = { entry ->
                 onAttachUploadedFile(entry)
                 showAttachmentOptions = false

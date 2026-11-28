@@ -15,12 +15,14 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeFunctionCallSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeUplink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceEvent
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
@@ -31,6 +33,36 @@ import org.junit.Test
 /** 原生 Realtime 门面的连接生命周期边界：打断收尾、断线提交重放与重连历史刷新。 */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class NativeRealtimeDuplexSessionTest {
+
+    @Test
+    fun providerRejectionRetainsItsCodeInTheTerminalEvent() = runTest {
+        val connection = mockk<LiveConnection>(relaxed = true) {
+            every { receive() } returns kotlinx.coroutines.flow.flow {
+                emit(LlmResponse(errorCode = "data_inspection_failed", errorMessage = "Input was rejected."))
+                awaitCancellation()
+            }
+        }
+        val model = mockk<Model> {
+            coEvery { connect(any<LlmRequest>()) } returns connection
+        }
+        val models = mockk<VoiceLiveModelFactory> {
+            coEvery { create(any(), any()) } returns model
+        }
+        val session = NativeRealtimeDuplexSession(
+            models = models,
+            selection = null,
+            instructions = "test",
+            uplinkProvider = { RealtimeUplink(sampleRateHz = 16_000, resampled = false) },
+        )
+        try {
+            val failure = session.events().first { it is RealtimeVoiceEvent.Failed } as RealtimeVoiceEvent.Failed
+            assertEquals(VoiceRequestError.fromProvider("data_inspection_failed", "Input was rejected."), failure.requestError)
+            assertEquals("data_inspection_failed", failure.requestError?.code)
+            assertEquals("Input was rejected.", failure.requestError?.message)
+        } finally {
+            session.close()
+        }
+    }
 
     @Test
     fun interruptCancelsPendingToolRoundBeforeTriggeringSecondResponse() = runTest {

@@ -250,7 +250,12 @@ interface VoiceConfigLookup {
     fun rememberedVoice(pipeline: VoicePipeline, selection: ModelSelection): String?
 }
 
-internal val VoiceGlobalDefaults.effectiveSemiCascadedSynthesisModel: ModelSelection?
+/**
+ * 半级联的有效合成模型：未单独配置时回落级联合成模型。
+ * 与 [VoiceConfigResolver.resolve] 的半级联取值语义一致，供调用方在写入路径上
+ * 比较「有效合成模型是否变化」（变化即应清音色覆盖）。
+ */
+val VoiceGlobalDefaults.effectiveSemiCascadedSynthesisModel: ModelSelection?
     get() = semiCascadedSynthesisModel ?: cascadedSynthesisModel
 
 /**

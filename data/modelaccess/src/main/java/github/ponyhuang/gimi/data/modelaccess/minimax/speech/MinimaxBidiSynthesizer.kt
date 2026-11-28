@@ -9,7 +9,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.StreamingSpeechSynthesizer
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisSegment
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisSessionRequest
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred

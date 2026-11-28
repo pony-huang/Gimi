@@ -27,8 +27,10 @@ import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTools
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.assumedVision
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
@@ -234,7 +236,9 @@ class RealtimeAssistantTools @Inject constructor(
                 modelId = view.modelId,
                 // 语音连接的端点可能是 wss 接入端点，不能直接当 http(s) 端点写进工具元数据。
                 fullBaseUrl = realtimeModelBaseUrl(view.endpoint),
-                supportsImages = view.model.multimodal.supportsImages,
+                // 视觉未声明时按「假定支持」放行，与聊天分派（resolveChatModel）口径一致。
+                supportsImages = view.model.multimodal.assumedVision.ingestMode !=
+                    FileIngestMode.NOT_SUPPORTED,
             )
         } ?: fallback
     }

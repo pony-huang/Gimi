@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.domain.conversation.repository
 
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
@@ -8,15 +10,18 @@ import kotlinx.serialization.json.JsonObject
  * 一条已上传到厂商文件服务的注册记录。
  *
  * 注册表在 chip 上传成功时立即记录（无论草稿随后是否发送），供聊天抽屉的"上传的文件"
- * 列表按厂商查询复用。fileId 是厂商服务器侧的唯一真源：本地不存文件字节、不缓存
- * file_id 映射、不做内容去重——同内容在多个会话各传一次。
+ * 列表按厂商查询复用。fileId 是厂商服务器侧的唯一真源：本地不存文件字节、不做内容
+ * 去重——同内容在多个会话各传一次。注册表同时维护 [fileId] 与本地归档副本的绑定
+ * （[localPath]）：发送归档与下载兜底成功时回写，供历史还原与"点击打开附件"先找
+ * 本地、找不到再走厂商下载。
  *
  * @property fileId 厂商 Files API 签发的引用 ID。
  * @property vendor 厂商模板 ID（如 `deepseek`）；列表按当前会话厂商过滤。
- * @property displayName 上传时的文件名；厂商文件不可下载，名字是唯一可展示内容。
+ * @property displayName 上传时的文件名；无本地副本时名字是唯一可展示内容。
  * @property mimeType 上传时的 MIME 类型；抽屉回填 chip 据此恢复类别与图标。
  * @property bytes 厂商响应的文件大小。
  * @property createdAtEpochSeconds 厂商响应的创建时间（Unix 秒）。
+ * @property localPath 绑定的本地归档副本绝对路径；null 表示尚无绑定或绑定已失效。
  */
 data class UploadedFileEntry(
     val fileId: String,
@@ -25,15 +30,24 @@ data class UploadedFileEntry(
     val mimeType: String,
     val bytes: Long,
     val createdAtEpochSeconds: Long,
+    val localPath: String? = null,
 )
 
-/** 已上传文件的本地注册表；抽屉复用列表的数据源。 */
+/**
+ * 已上传文件的本地注册表；抽屉复用列表的数据源，兼管 fileId 与本地归档副本的绑定。
+ */
 interface UploadedFileRegistry {
     /** 上传成功即记录；同一 fileId 重复记录按幂等处理。 */
     suspend fun record(entry: UploadedFileEntry)
 
     /** 按厂商查询全部记录，创建时间倒序。 */
     fun entriesFor(vendor: String): Flow<List<UploadedFileEntry>>
+
+    /** 查询 [fileId] 绑定的本地归档副本路径；无记录或无绑定时返回 null。 */
+    suspend fun localPathFor(vendor: String, fileId: String): String?
+
+    /** 回写 [fileId] 与本地归档副本的绑定；记录不存在时静默幂等。 */
+    suspend fun bindLocalFile(vendor: String, fileId: String, localPath: String)
 
     /** 厂商侧文件被删除后移除本地记录；不存在时静默幂等。 */
     suspend fun remove(vendor: String, fileId: String)
@@ -190,4 +204,37 @@ interface VendorFileGateway {
         apiKey: String,
         fileId: String,
     ): VendorFileContentResult
+}
+
+/**
+ * 为厂商引用附件解析"可打开的本地载荷"的结果。
+ */
+sealed interface VendorAttachmentResolution {
+    /** 解析成功；[attachment] 携带可读的 [FileAttachment.payloadReference] 本地副本。 */
+    data class Resolved(val attachment: FileAttachment) : VendorAttachmentResolution
+
+    /** 解析失败；[reason] 区分厂商不支持下载与网络等临时失败，供 UI 选择文案。 */
+    data class Failed(val reason: VendorFileFailureReason) : VendorAttachmentResolution
+}
+
+/**
+ * 为厂商引用附件（只有 fileId、无本地副本）寻找或重建可打开的本地载荷。
+ *
+ * 解析顺序即打开策略：先查注册表的本地归档绑定（离线秒开），绑定缺失或悬空时走
+ * 厂商下载兜底，下载成功后把副本归档进共享工作区并回写绑定，下次打开不再走网络。
+ * 文档附件的点击打开链路使用本契约；音频播放保持提示语义，不接下载兜底。
+ */
+interface VendorAttachmentResolver {
+    /**
+     * 解析 [attachment] 指向的本地载荷。
+     *
+     * @param attachment 厂商引用附件（[FileAttachment.fileId] 非空）；其他形态附件
+     *   自带本地载荷，不应进入本契约。
+     * @param connection 当前实例的对话连接（协议/端点/凭据）；null 表示连接不可用，
+     *   只能依赖既有绑定，返回 [VendorAttachmentResolution.Failed]。
+     */
+    suspend fun resolveVendorPayload(
+        attachment: FileAttachment,
+        connection: ResolvedServiceConnection?,
+    ): VendorAttachmentResolution
 }

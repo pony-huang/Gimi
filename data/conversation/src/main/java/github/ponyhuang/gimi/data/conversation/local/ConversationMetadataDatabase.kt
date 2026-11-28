@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -95,7 +97,7 @@ interface ConversationMetadataDao {
     }
 }
 
-/** 一条已上传到厂商文件服务的注册记录；fileId 是厂商侧真源，本地只存展示元数据。 */
+/** 一条已上传到厂商文件服务的注册记录；fileId 是厂商侧真源，本地另存归档绑定供打开兜底。 */
 @Entity(
     tableName = "uploaded_files",
     indices = [
@@ -110,6 +112,8 @@ data class UploadedFileEntity(
     val mimeType: String,
     val bytes: Long,
     val createdAtEpochSeconds: Long,
+    /** 绑定的本地归档副本路径；发送归档或下载兜底成功时回写，null 表示尚无绑定。 */
+    val localPath: String? = null,
 )
 
 @Dao
@@ -120,6 +124,14 @@ interface UploadedFileDao {
     @Query("SELECT * FROM uploaded_files WHERE vendor = :vendor ORDER BY createdAtEpochSeconds DESC")
     fun observeForVendor(vendor: String): Flow<List<UploadedFileEntity>>
 
+    /** 查询 fileId 绑定的本地归档副本路径；无记录或无绑定时返回 null。 */
+    @Query("SELECT localPath FROM uploaded_files WHERE fileId = :fileId AND vendor = :vendor")
+    suspend fun localPath(fileId: String, vendor: String): String?
+
+    /** 回写本地归档绑定；记录不存在时无行可改，静默幂等。 */
+    @Query("UPDATE uploaded_files SET localPath = :localPath WHERE fileId = :fileId AND vendor = :vendor")
+    suspend fun bindLocalPath(fileId: String, vendor: String, localPath: String)
+
     /** 厂商侧文件被删除后移除本地记录；不存在时静默幂等。 */
     @Query("DELETE FROM uploaded_files WHERE fileId = :fileId AND vendor = :vendor")
     suspend fun delete(fileId: String, vendor: String)
@@ -127,7 +139,7 @@ interface UploadedFileDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class, UploadedFileEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {
@@ -136,5 +148,18 @@ abstract class ConversationMetadataDatabase : RoomDatabase() {
     abstract fun uploadedFileDao(): UploadedFileDao
     companion object {
         const val DATABASE_NAME = "conversation-metadata.db"
+
+        /**
+         * 7 → 8：为 uploaded_files 增加可空的本地归档绑定列。
+         *
+         * 非破坏性迁移保留既有会话元数据与已上传文件记录——这些是用户数据，新增一列
+         * 没有理由清空整库。列名与 [UploadedFileEntity.localPath] 一致；SQLite 的
+         * ADD COLUMN ... TEXT 默认 NULL，与 Kotlin 侧默认值 null 对齐。
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE uploaded_files ADD COLUMN localPath TEXT")
+            }
+        }
     }
 }

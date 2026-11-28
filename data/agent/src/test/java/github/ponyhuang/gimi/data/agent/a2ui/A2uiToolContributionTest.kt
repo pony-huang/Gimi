@@ -35,6 +35,7 @@ class A2uiToolContributionTest {
             models = mockk(relaxed = true),
             protocol = mockk(relaxed = true),
             settings = settings,
+            renderer = github.ponyhuang.gimi.domain.a2ui.A2uiRendererFunctions(),
         )
         val spec = AgentBuildSpec(pluginRuntime = PluginRuntimeSnapshot(0L, emptyList()))
 
@@ -43,7 +44,7 @@ class A2uiToolContributionTest {
 
         settings.setA2uiEnabled(true)
 
-        assertEquals(1, contribution.tools(spec).size)
+        assertEquals(setOf("generate_a2ui", "seek_a2ui_music_player"), contribution.tools(spec).map { it.name }.toSet())
         assertNotEquals(disabledRevision, contribution.revision())
     }
 

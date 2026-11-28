@@ -39,6 +39,21 @@ internal class A2uiCreateScope(
     private val entries = java.util.concurrent.CopyOnWriteArrayList<Entry>()
     fun snapshot(): List<Entry> = entries.toList()
 
+    /** 未通过校验的请求只在本轮保留回退所需的描述和组件范围。 */
+    class Repair(val surfaceId: String, val changes: String?, val componentNames: List<*>?)
+
+    private val repairs = mutableMapOf<String, Repair>()
+
+    @Synchronized
+    fun offerRepair(repair: Repair): String? {
+        if (repairs.size >= 16) return null
+        return java.util.UUID.randomUUID().toString().also { repairs[it] = repair }
+    }
+
+    /** 同一轮、同一张卡的修正凭证只能使用一次。 */
+    @Synchronized
+    fun consumeRepair(token: String): Repair? = repairs.remove(token)
+
     fun markPendingSent(surfaceId: String) {
         entries.firstOrNull { it.task.surfaceId == surfaceId }?.pendingSent?.complete(Unit)
     }

@@ -21,6 +21,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -152,6 +153,12 @@ class VoiceAgentConversation @Inject constructor(
             try {
                 events.collect { event ->
                     if (event.author == A2uiGenerationTaskCodec.AUTHOR) return@collect
+                    if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
+                        throw VoiceAudioBackendException(
+                            RealtimeVoiceFailure.Generation,
+                            requestError = VoiceRequestError.fromProvider(event.errorCode, event.errorMessage),
+                        )
+                    }
                     // 工具响应意味着下一轮模型输出开始，partial 状态按轮重置。
                     if (event.functionResponses().isNotEmpty()) hasPartial = false
                     if (event.author != AgentSessionIdentity.USER_AUTHOR) {
@@ -174,7 +181,8 @@ class VoiceAgentConversation @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                // 语音界面只展示失败分类；这里留下完整异常线索供真机排查。
+                if (failure is VoiceAudioBackendException) throw failure
+                // 非协议异常仅保留失败分类。
                 android.util.Log.w(TAG, "Voice agent turn failed", failure)
                 throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = failure)
             }

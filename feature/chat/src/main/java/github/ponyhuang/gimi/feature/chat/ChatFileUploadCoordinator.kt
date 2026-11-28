@@ -139,6 +139,11 @@ class ChatFileUploadCoordinator(
                             mimeType = draft.mimeType,
                             bytes = result.bytes,
                             createdAtEpochSeconds = result.createdAtEpochSeconds,
+                            // 上传时草稿在 cache 目录，不是持久归档副本，不能写作本地绑定：cache
+                            // 会被系统回收甚至被新草稿复用，悬空的绑定轻则失效、重则打开错文件。
+                            // localPath 只在两处回写真实的工作区路径：发送时 archiveDraftAttachment
+                            // 归档收口（AndroidChatAttachmentRepository.read），或打开时下载兜底成功
+                            // （resolveVendorPayload）。此处留空与厂商列表刷新写入的 null 一致。
                         ),
                     )
                     _states.update {

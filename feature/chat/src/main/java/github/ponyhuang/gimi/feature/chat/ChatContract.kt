@@ -123,6 +123,12 @@ sealed interface ChatEffect {
  * [Message] 携带上游（语音播放、附件校验等）给出的动态文本。
  */
 sealed interface ChatNotice {
+    /** 网易云收藏操作未获成功确认，界面保留原状态。 */
+    data object A2uiMusicLikeFailed : ChatNotice
+
+    /** 系统未确认设备控件请求的状态。 */
+    data object A2uiDeviceChangeFailed : ChatNotice
+
     data object ConfigureChatModel : ChatNotice
     /** 当前会话已经是新会话，无需重复创建。 */
     data object AlreadyNewConversation : ChatNotice
@@ -157,6 +163,15 @@ sealed interface ChatNotice {
 
     /** 已上传厂商文件删除失败；本地条目保留，用户可重试。 */
     data object UploadedFileDeleteFailed : ChatNotice
+
+    /** 「上传的文件」强制刷新失败；本地列表保持不动，用户可重试。 */
+    data object UploadedFilesRefreshFailed : ChatNotice
+
+    /** 「上传的文件」强制刷新成功。 */
+    data object UploadedFilesRefreshed : ChatNotice
+
+    /** 已上传厂商文件删除成功。 */
+    data object UploadedFileDeleted : ChatNotice
 
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice

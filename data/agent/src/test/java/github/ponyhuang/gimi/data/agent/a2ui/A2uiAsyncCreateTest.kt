@@ -31,6 +31,58 @@ class A2uiAsyncCreateTest {
     }
 
     @Test
+    fun fixedAndComposedCardsReachChatWithoutRequestingTheUiModel() = runTest {
+        val inputs = listOf(
+            mapOf("intent" to "create", "template_id" to "device_controls"),
+            mapOf(
+                "intent" to "create",
+                "components" to """[{"id":"root","component":"Column","children":["volume","torch","button"]},{"id":"volume","component":"MediaVolumeSlider"},{"id":"torch","component":"FlashlightSwitch"},{"id":"button","component":"Button","child":"label","action":{"event":{"name":"meeting_volume"}}},{"id":"label","component":"Text","text":"Meeting volume"}]""",
+            ),
+        )
+        for (input in inputs) {
+            val execution = execution(InMemorySessionService(), createArgs = input) { error("Unexpected UI model request") }
+            val documents = execution.send("show controls", emptyList()).toList()
+                .flatMap { it.functionResponses }.mapNotNull { it.a2uiDocument }
+            assertEquals(1, documents.size)
+            assertTrue(documents.single().messages.last().contains("FlashlightSwitch"))
+            if ("components" in input) assertTrue(documents.single().messages.last().contains("meeting_volume"))
+        }
+    }
+
+    @Test
+    fun invalidCompositionCanBeCorrectedOnceWithoutCallingTheUiModel() = runTest {
+        val execution = execution(
+            InMemorySessionService(),
+            createArgs = mapOf("intent" to "create", "components" to "{}"),
+            repairArgs = mapOf("intent" to "create",
+                "components" to """[{"id":"root","component":"Text","text":"Corrected"}]"""),
+        ) { error("Unexpected UI model request") }
+
+        val documents = execution.send("show card", emptyList()).toList()
+            .flatMap { it.functionResponses }.mapNotNull { it.a2uiDocument }
+        assertEquals(1, documents.size)
+        assertTrue(documents.single().immediate)
+        assertTrue(documents.single().messages.last().contains("Corrected"))
+    }
+
+    @Test
+    fun exhaustedCompositionRepairFallsBackOnceAndRejectsReusingTheToken() = runTest {
+        var requests = 0
+        val execution = execution(
+            InMemorySessionService(),
+            createArgs = mapOf("intent" to "create", "components" to "{}", "changes" to "image URL",
+                "component_names" to listOf("Image")),
+            repairArgs = mapOf("intent" to "create", "components" to "{}"),
+            replayRepair = true,
+        ) { requests++ }
+
+        val completed = execution.send("show card", emptyList()).toList()
+            .flatMap { it.functionResponses }.count { it.a2uiTask?.status == A2uiGenerationStatus.COMPLETED }
+        assertEquals(1, requests)
+        assertEquals(1, completed)
+    }
+
+    @Test
     fun parentAnswerPrecedesGenerationAndResultIsArchived() = runTest(timeout = 15.seconds) {
         val answerSeen = CompletableDeferred<Unit>()
         val sessions = InMemorySessionService()
@@ -183,6 +235,9 @@ class A2uiAsyncCreateTest {
         mutation: String? = null,
         afterPreview: (suspend () -> Unit)? = null,
         beforeParentAnswer: suspend () -> Unit = {},
+        createArgs: Map<String, Any?> = mapOf("intent" to "create", "changes" to "image URL", "component_names" to listOf("Image")),
+        repairArgs: Map<String, Any?>? = null,
+        replayRepair: Boolean = false,
         before: suspend () -> Unit,
     ): github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution {
         var calls = 0
@@ -213,10 +268,14 @@ class A2uiAsyncCreateTest {
             override fun generateContent(request: LlmRequest, stream: Boolean) = flow {
                 val step = calls++
                 val parts = if (step == 0) listOf(
-                    Part(functionCall = FunctionCall(id = "create", name = "generate_a2ui", args = mapOf(
-                        "intent" to "create", "changes" to "image URL", "component_names" to listOf("Image"),
-                    ))),
-                ) else if (step == 1 && mutation != null) {
+                    Part(functionCall = FunctionCall(id = "create", name = "generate_a2ui", args = createArgs)),
+                ) else if (repairArgs != null && (step == 1 || step == 2 && replayRepair)) {
+                    val token = request.contents.flatMap { it.parts }.mapNotNull { it.functionResponse }
+                        .map { (it.response["result"] as? Map<*, *>) ?: it.response }
+                        .firstNotNullOf { it["repair_id"] as? String }
+                    listOf(Part(functionCall = FunctionCall(id = "repair-$step", name = "generate_a2ui",
+                        args = repairArgs + ("repair_id" to token))))
+                } else if (step == 1 && mutation != null) {
                     val response = request.contents.flatMap { it.parts }.mapNotNull { it.functionResponse }.last().response
                     val payload = (response["result"] as? Map<*, *>) ?: response
                     listOf(Part(functionCall = FunctionCall(id = "mutate", name = "generate_a2ui", args = mapOf(
@@ -240,6 +299,7 @@ class A2uiAsyncCreateTest {
         }, sessionService = sessions, artifactService = null, memoryService = null, toolAccessRepository = access)
         sessions.createSession(key)
         return AdkChatAgentRepository(runner).createExecution("chat", ModelSelection("service", "group", "fixture"),
-            a2uiCapabilities = A2uiCapabilities("catalog", "{}"))
+            a2uiCapabilities = A2uiCapabilities("catalog",
+                """{"components":{"Column":{},"Text":{},"Button":{},"Image":{},"MediaVolumeSlider":{},"FlashlightSwitch":{}}}"""))
     }
 }

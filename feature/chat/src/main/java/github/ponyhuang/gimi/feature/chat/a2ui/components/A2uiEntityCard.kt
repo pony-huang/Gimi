@@ -71,7 +71,7 @@ internal data class EntityAction(
 internal object ChatEntityCard : A2uiComponent {
     override val name = "EntityCard"
     override val description =
-        "Structured entity card with title, subtitle, image, badge, rating, meta, and up to 3 action buttons."
+        "Structured entity card with title, subtitle, image, badge (text or {label,color}), rating, meta, and up to 3 action buttons."
 
     private val titleProp = A2uiProperty.dynamicString(key = "title", required = true)
     private val subtitleProp = A2uiProperty.dynamicString(key = "subtitle")
@@ -84,12 +84,13 @@ internal object ChatEntityCard : A2uiComponent {
     private val hrefProp = A2uiProperty.dynamicString(key = "href")
     private val layoutProp = A2uiProperty.dynamicString(key = "layout")
 
-    private val badgeProp = A2uiProperty.dynamicCustom<Map<*, *>>(
+    private val badgeProp = A2uiProperty.dynamicCustom<EntityBadge>(
         key = "badge",
         schema = A2uiAnySchema(
             keywords = listOf(
                 A2uiSchemaKeyword.OneOf(
                     listOf(
+                        A2uiStringSchema.INSTANCE,
                         A2uiObjectSchema(
                             properties = mapOf(
                                 "label" to A2uiStringSchema.INSTANCE,
@@ -104,7 +105,17 @@ internal object ChatEntityCard : A2uiComponent {
                 ),
             ),
         ),
-        safeCast = { it as? Map<*, *> },
+        // 动态列表的行数据也可用简单文字；拒绝它会让共用此模板 ID 的条目都进入错误态。
+        safeCast = { badge ->
+            when (badge) {
+                is String -> EntityBadge(label = badge)
+                is Map<*, *> -> EntityBadge(
+                    label = badge["label"] as? String ?: "",
+                    color = badge["color"] as? String ?: "",
+                )
+                else -> null
+            }
+        },
     )
 
     private val actionsProp = A2uiProperty.dynamicCustom<List<*>>(
@@ -181,11 +192,8 @@ internal object ChatEntityCard : A2uiComponent {
         val href = properties.bind(hrefProp).orEmpty()
         val layout = properties.bind(layoutProp).orEmpty()
 
-        val badgeMap = properties.bind(badgeProp as DynamicA2uiProperty<Map<*, *>>)
-        val badge = badgeMap?.let {
-            val label = it["label"] as? String ?: ""
-            if (label.isBlank()) null else EntityBadge(label = label, color = it["color"] as? String ?: "")
-        }
+        val badge = properties.bind(badgeProp as DynamicA2uiProperty<EntityBadge>)
+            ?.takeIf { it.label.isNotBlank() }
 
         val actionList = (properties.bind(actionsProp as DynamicA2uiProperty<List<*>>)).orEmpty()
             .mapNotNull { raw ->

@@ -37,6 +37,8 @@ interface TtsVoiceRepository {
 interface SpeechRecognitionRepository {
     val availability: Flow<Boolean>
 
+    fun isAvailable(selection: ModelSelection? = null): Boolean
+
     /**
      * 转写一段录音。
      *
@@ -54,12 +56,14 @@ interface SpeechRecognitionRepository {
      * 服务未接入流式识别时只产出最终结果，因此调用方可以统一按流消费，
      * 不必因为厂商差异改写识别分支。
      *
+     * @param selection 会话的识别模型；null 表示使用全局识别模型。
      * @param pcm16 单声道 PCM16 音频。
      * @param context 可选的对话上下文，用于提升专有名词识别准确率；为空表示不携带上下文。
      */
     fun transcribeStreaming(
         pcm16: ByteArray,
         context: List<SpeechContextMessage> = emptyList(),
+        selection: ModelSelection? = null,
     ): Flow<RecognitionEvent>
 }
 

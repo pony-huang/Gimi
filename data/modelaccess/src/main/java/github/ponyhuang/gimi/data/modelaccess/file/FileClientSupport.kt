@@ -75,8 +75,19 @@ internal object FileClientSupport {
         return DEFAULT_PURPOSE
     }
 
+    /**
+     * 厂商是否支持下载文件内容。DeepSeek Files API 只有上传/列出/元数据/删除四个端点，
+     * 没有 content 下载端点——对它发下载请求必然 404，网关据此不发请求直接归
+     * UNSUPPORTED_VENDOR，让打开链路弹准确的"厂商文件不支持下载"而非"下载失败"。
+     * 其余厂商默认按协议客户端尝试（OpenAI/Claude 协议均有 content 端点）。
+     */
+    fun supportsContentDownload(vendor: String): Boolean = vendor !in NO_CONTENT_DOWNLOAD_VENDORS
+
     private const val DEEPSEEK_VENDOR = "deepseek"
     private const val DEFAULT_PURPOSE = "user_data"
+
+    /** 已确认不提供 content 下载端点的厂商清单；新增厂商实测后维护。 */
+    private val NO_CONTENT_DOWNLOAD_VENDORS = setOf(DEEPSEEK_VENDOR)
 
     /**
      * DeepSeek 识别类 purpose 只收 PDF/Word/PPT（及图片）；纯文本/表格/电子书走

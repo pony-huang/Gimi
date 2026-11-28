@@ -183,6 +183,10 @@
     <string name="chat_attachment_close_preview">Close image preview</string>
     <string name="chat_attachment_file_missing">File missing</string>
     <string name="chat_attachment_open_unsupported">Vendor files can\'t be downloaded to open</string>
+    <string name="chat_attachment_open_download_failed">Couldn\'t download the file to open</string>
+    <string name="chat_uploaded_files_refresh">Refresh</string>
+    <string name="chat_uploaded_files_refresh_failed">Couldn\'t refresh uploaded files. Try again later.</string>
+    <string name="chat_uploaded_files_refreshed">File list refreshed</string>
     <string name="chat_remote_image">Remote image %1$d</string>
     <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
     <string name="chat_recommendations_title">Recommended for you</string>
@@ -311,7 +315,7 @@
     <string name="voice_thinking">Thinking</string>
     <string name="voice_speaking">Speaking</string>
     <string name="voice_muted">Microphone muted</string>
-    <string name="voice_failed">Voice chat failed</string>
+    <string name="voice_failed">Voice request failed</string>
     <string name="voice_retry">Retry</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute">Mute</string>
@@ -327,7 +331,9 @@
     <string name="voice_audio_error">Voice processing could not start. Check device echo cancellation and noise suppression support.</string>
     <string name="voice_microphone_error">Microphone unavailable. Check recording permission and other microphone users.</string>
     <string name="voice_recognition_error">Transcription failed. Check your connection and recognition model, then retry.</string>
-    <string name="voice_generation_error">The model request failed. Check your connection and chat model, then retry.</string>
+    <string name="voice_request_client_error">Provider rejected the request</string>
+    <string name="voice_request_server_error">Provider could not process the request</string>
+    <string name="voice_generation_error">The model request failed. Try again.</string>
     <string name="voice_synthesis_error">Speech output failed. Check your connection and synthesis model, then retry.</string>
     <string name="voice_open_call">Open voice conversation</string>
     <string name="voice_connecting">Connecting</string>
@@ -347,6 +353,12 @@
     <string name="voice_pipeline_cascaded">Cascaded</string>
     <string name="voice_pipeline_semi_cascaded">Semi-cascaded</string>
     <string name="voice_pipeline_native_realtime">Realtime</string>
+    <string name="voice_pill_role_chat">Chat</string>
+    <string name="voice_pill_role_understanding">Omni</string>
+    <string name="voice_pill_role_recognition">STT</string>
+    <string name="voice_pill_role_synthesis">TTS</string>
+    <string name="voice_pill_role_realtime">Realtime</string>
+    <string name="voice_pill_role_voice">Voice</string>
     <string name="voice_pipeline_cascaded_detail">Recognize first, then respond with a synthesis model; requires recognition and synthesis models</string>
     <string name="voice_pipeline_semi_detail">Audio goes straight into the understanding model; answers are read by the synthesis model</string>
     <string name="voice_pipeline_native_detail">Vendor full-duplex realtime session with audio in and out</string>
@@ -433,6 +445,7 @@
     <string name="chat_uploaded_files_empty">No uploaded files yet</string>
     <string name="chat_uploaded_file_delete">Delete uploaded file</string>
     <string name="chat_uploaded_file_delete_failed">Failed to delete the file. Please try again.</string>
+    <string name="chat_uploaded_file_deleted">File deleted</string>
 
     <string name="voice_input_paused">Microphone paused while editing</string>
     <string name="voice_input_open">Text input</string>
@@ -472,4 +485,15 @@
     <string name="chat_model_always_search">Always online</string>
     <string name="chat_web_citations_open_failed">Could not open source link</string>
     <string name="chat_web_citations_overflow">+%1$d</string>
+    <string name="chat_a2ui_music_recommend">Recommend similar music</string>
+    <string name="chat_a2ui_music_like_failed">Could not change your NetEase favorite. Check the plugin and your sign-in.</string>
+    <string name="chat_a2ui_device_volume">Media volume</string>
+    <string name="chat_a2ui_device_percent">%1$d%%</string>
+    <string name="chat_a2ui_device_flashlight">Flashlight</string>
+    <string name="chat_a2ui_device_reading">Reading device state…</string>
+    <string name="chat_a2ui_device_unavailable">Device control is unavailable</string>
+    <string name="chat_a2ui_device_camera_required">Camera permission is required to control the flashlight</string>
+    <string name="chat_a2ui_device_camera_grant">Grant camera permission</string>
+    <string name="chat_a2ui_device_camera_settings">Open app permission settings</string>
+    <string name="chat_a2ui_device_change_failed">The device did not confirm this change</string>
 </resources>

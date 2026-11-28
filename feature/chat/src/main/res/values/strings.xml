@@ -193,6 +193,10 @@
     <string name="chat_attachment_close_preview">关闭图片预览</string>
     <string name="chat_attachment_file_missing">文件已丢失</string>
     <string name="chat_attachment_open_unsupported">厂商文件不支持下载，无法打开</string>
+    <string name="chat_attachment_open_download_failed">文件下载失败，无法打开</string>
+    <string name="chat_uploaded_files_refresh">刷新</string>
+    <string name="chat_uploaded_files_refresh_failed">刷新失败，请稍后重试</string>
+    <string name="chat_uploaded_files_refreshed">文件列表已刷新</string>
     <string name="chat_remote_image">远程图片 %1$d</string>
     <string name="chat_remote_image_swipe_hint">左右滑动查看图片</string>
     <string name="chat_recommendations_title">为你推荐</string>
@@ -321,7 +325,7 @@
     <string name="voice_thinking">正在生成</string>
     <string name="voice_speaking">正在播报</string>
     <string name="voice_muted">麦克风已静音</string>
-    <string name="voice_failed">暂时没有连上</string>
+    <string name="voice_failed">本次语音请求失败</string>
     <string name="voice_retry">重试</string>
     <string name="voice_unmute">取消静音</string>
     <string name="voice_mute">静音</string>
@@ -337,7 +341,10 @@
     <string name="voice_audio_error">此设备未能启用语音处理，请检查回声消除和降噪支持</string>
     <string name="voice_microphone_error">无法使用麦克风，请检查录音权限及设备占用</string>
     <string name="voice_recognition_error">语音识别失败，请检查网络和识别模型后重试</string>
-    <string name="voice_generation_error">模型回复失败，请检查网络和聊天模型后重试</string>
+    <string name="voice_request_http_status" translatable="false">HTTP %1$d</string>
+    <string name="voice_request_client_error">服务商拒绝请求</string>
+    <string name="voice_request_server_error">服务商处理请求失败</string>
+    <string name="voice_generation_error">模型回复失败，请重试</string>
     <string name="voice_synthesis_error">语音合成或播放失败，请检查网络和合成模型后重试</string>
     <string name="voice_open_call">打开语音对话</string>
     <string name="voice_connecting">正在连接</string>
@@ -357,6 +364,12 @@
     <string name="voice_pipeline_cascaded">级联</string>
     <string name="voice_pipeline_semi_cascaded">半级联</string>
     <string name="voice_pipeline_native_realtime">实时</string>
+    <string name="voice_pill_role_chat">对话</string>
+    <string name="voice_pill_role_understanding">理解</string>
+    <string name="voice_pill_role_recognition">识别</string>
+    <string name="voice_pill_role_synthesis">合成</string>
+    <string name="voice_pill_role_realtime">实时</string>
+    <string name="voice_pill_role_voice">音色</string>
     <string name="voice_pipeline_cascaded_detail">先识别再理解，回答由合成模型朗读，需配置识别与合成模型</string>
     <string name="voice_pipeline_semi_detail">音频直接进入理解模型，回答由合成模型朗读</string>
     <string name="voice_pipeline_native_detail">厂商全双工实时会话，音频直进直出</string>
@@ -443,6 +456,7 @@
     <string name="chat_uploaded_files_empty">暂无上传的文件</string>
     <string name="chat_uploaded_file_delete">删除已上传文件</string>
     <string name="chat_uploaded_file_delete_failed">删除文件失败，请重试</string>
+    <string name="chat_uploaded_file_deleted">文件已删除</string>
 
     <string name="voice_input_paused">输入中，收音已暂停</string>
     <string name="voice_input_open">文字输入</string>
@@ -482,4 +496,15 @@
     <string name="chat_model_always_search">始终联网</string>
     <string name="chat_web_citations_open_failed">无法打开来源链接</string>
     <string name="chat_web_citations_overflow">+%1$d</string>
+    <string name="chat_a2ui_music_recommend">推荐类似音乐</string>
+    <string name="chat_a2ui_music_like_failed">网易云收藏操作未成功，请检查插件及账号登录状态</string>
+    <string name="chat_a2ui_device_volume">媒体音量</string>
+    <string name="chat_a2ui_device_percent">%1$d%%</string>
+    <string name="chat_a2ui_device_flashlight">手电筒</string>
+    <string name="chat_a2ui_device_reading">正在读取设备状态…</string>
+    <string name="chat_a2ui_device_unavailable">设备控制当前不可用</string>
+    <string name="chat_a2ui_device_camera_required">控制手电筒需要相机权限</string>
+    <string name="chat_a2ui_device_camera_grant">授予相机权限</string>
+    <string name="chat_a2ui_device_camera_settings">打开应用权限设置</string>
+    <string name="chat_a2ui_device_change_failed">系统未确认此次设备设置变更</string>
 </resources>

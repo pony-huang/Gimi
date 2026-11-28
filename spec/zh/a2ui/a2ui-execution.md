@@ -57,6 +57,14 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 - **异步创建**：`A2uiCreateScope` 立即返回 `pending`，生成在旁路 scope 进行。预览和最终状态就绪后按卡片分别投递，即使主回复还在生成。runner 流结束后最终结果归档为事件——取消经 `NonCancellable` 持久化为 CANCELLED，失败持久化为 FAILED（保留重试入口）。
 - **重试**：仅限 FAILED/CANCELLED 任务；从归档的 `changes` 重跑生成，无父运行、无业务工具。
 
+## 直出与延迟
+
+- **首个有用内容**是用户首次看到可操作的控件或可直接阅读的结果。对设备控件来说，实际状态已显示且控件可操作时才计入。加载占位单独计时。
+- `generate_a2ui` 可通过 `template_id=device_controls` 直出，也可接收 `components` 和可选 `data` JSON 字符串。两条路径沿用 A2UI 0.9.1 校验和历史链路，UI 子模型请求数均为零，通过校验后立即向渲染器提交完整组件树。
+- 直接组合校验失败时，返回校验错误和单次有效的 `repair_id`，限定在同一轮的同一张卡。修正仍失败时，如果有 `changes` 和受支持的 `component_names`，回退到现有 UI 生成链路并沿用其校验和重试上限。无效草稿不会成为卡片文档。
+- 用 `adb shell setprop log.tag.GimiA2uiTiming DEBUG` 启用本地计时。耗时从聊天提交开始，覆盖进入工具、UI 模型请求和首个输出、格式纠错、占位与卡片帧、最终更新交付。可见且可操作的设备控件另记 `first_useful_device_frame`。日志只含阶段、耗时和用于关联的 surface 短后缀。
+- 先取得基线，再以天气卡试点增量更新。天气卡的首个有用结果包含地点和已确认的当前温度。
+
 ## 校验链路（data/a2ui）
 
 `AndroidxA2uiProtocol.validate` 依次：surfaceId 非空 → 官方消息解析器 → 各消息 surfaceId 一致 → 删除修订只含一条删除消息 → 否则恰好 `createSurface`/`updateDataModel`（根 `/`）/`updateComponents` → catalogId 匹配（无协商——单一 catalog）→ 1..256 个唯一组件 id 且有 `root` → 图完整性（子引用存在、无环）→ 经官方 `A2uiCoreMessageProcessor` 做 5 秒超时保护的全量 schema 校验。**超时被归一化为 `IllegalArgumentException`**，让它进入子代理的纠错循环而不是静默取消调用方 scope。`replay(records)` 把修订/提交折叠成最终文档（提交覆写 data-model 根，恢复的历史保留最后提交的表单值）。
@@ -66,6 +74,19 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 - **Catalog**：`chatA2uiCatalog` 提供 AndroidX Material 3 Basic Catalog，接入媒体、链接处理和有界的 List 视口。`chatA2uiCustomCatalog` 独立持有 12 个 Gimi 卡片和控件（含同时兼容网易云音乐与 Spotify 的 `MusicPlayerCard`，以网易红为基础默认主题色并支持专辑封面动态取色、Media3 卡片内流式播放与 Spotify Connect 远程控制、歌单列表弹窗、红心收藏事件及 `orpheus://` / `spotify:` 客户端跳转回退）。聊天宿主向生成和校验导出版本化联合目录，同时注册联合目录和官方目录用于渲染。每个 surface 仍使用一个 A2UI 0.9.1 目录 ID。有明确起止时间的日程使用 Agenda，状态进展使用 Timeline。Switch 只写入绑定的数据模型，提交业务变更仍需 Button 事件。
 - **协调器**：每会话一个官方 `A2uiMessageProcessor`；提交经 `canSubmit` 门控（agent 未在运行）。`sync` 对重放记录做差异：仅数据变化只补丁 `updateDataModel`（删除仍在显示的 surface 会因必需绑定缺失导致 Compose 崩溃）；保留相同 id 和类型的增量组件更新原 surface，其余结构变更删除后重推。出站客户端事件变成 `A2uiInteraction` 聊天回合（草稿不进历史）。目录 ID 不匹配的历史 surface 会跳过渲染。
 - **宿主 UI**：`ChatA2uiContent` 无状态，按 surface id 渲染，另有 `A2uiTaskStatus` 占位卡（转圈/失败/取消 + 重试）。surface 在 `ChatScreen`/`MessageBubble` 按所属消息过滤。surface 继承聊天的 Material 主题。 新收到的多组件卡片可先渲染结构，再经官方处理器补齐已校验的组件树。历史卡片直接渲染。
+
+## 音乐卡片函数调用
+
+- **A2UI 交互**（`A2uiInteraction`）：来自聊天界面的事件，携带用户动作及其上下文，发起新的 Agent 回合。音乐推荐按钮通过这条路径发送 `recommend_similar_music`。
+- **直接函数调用**：使用明确参数请求执行已注册的操作，并取得执行结果，调用本身无需开启新的模型回合。点击网易云红心会调用已启用插件的收藏工具，成功后更新红心。Agent 工具 `seek_a2ui_music_player` 只操作调用会话和 surface 中唯一已挂载且可跳转的播放器。
+- 两种直接调用通过 Gimi 的进程内接线与现有 AndroidX 0.9.1 渲染器配合。未来接入 v1.0 传输时可复用操作契约。界面渲染及历史重放均不会执行这些调用。
+
+## 实时设备控件
+
+- `MediaVolumeSlider` 和 `FlashlightSwitch` 从宿主读取实时设备状态。两者都不接收生成的设备值。渲染新卡片或历史卡片只会订阅状态。
+- 松开音量滑块时执行一次经过授权的写入，并回读媒体音量。可见的滑块也会同步系统音量键和 Agent 工具调用带来的变化。
+- 切换手电筒时检查工具授权和相机权限。开关跟随系统手电筒回调，包括在 Gimi 外部发生的变化。权限按钮只申请相机权限，授权完成后等待用户再次操作。
+- Agent 发起的工具调用沿用现有确认流程。可使用独立的普通 Button 事件，把需要 Agent 选择设置的请求提交给它。
 
 ## 横切规则
 

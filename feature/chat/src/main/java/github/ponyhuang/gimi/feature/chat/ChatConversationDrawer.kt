@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -362,7 +361,7 @@ private fun HistoryDrawerContent(
                 // 模型服务/插件/本地环境一组（跳转类入口），个性化独立成卡，自动播报
                 // 开关卡沉到常用功能最底部——开关类设置与跳转类入口视觉分层；两档 tab 共用同一套入口。
                 DrawerFunctionEntry(
-                    icon = Icons.Default.SmartToy,
+                    icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_model_service),
                     label = stringResource(R.string.chatbot_model_services),
                     isFirst = true,
                     isLast = false,

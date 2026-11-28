@@ -1,5 +1,5 @@
 <resources>
-    <string name="sandbox_screen_title">Sandbox</string>
+    <string name="sandbox_screen_title">E2B</string>
     <string name="sandbox_e2b">E2B</string>
     <string name="sandbox_capabilities_description">Run code and commands, read and write files, browse directories, and upload and download files in an isolated sandbox.</string>
     <string name="sandbox_api_url">API URL</string>

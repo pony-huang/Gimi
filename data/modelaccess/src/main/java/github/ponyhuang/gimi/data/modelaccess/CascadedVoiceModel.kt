@@ -14,7 +14,9 @@ import com.google.adk.kt.types.Modality
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.ChatCompletionsApiException
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
@@ -22,6 +24,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlinx.coroutines.CancellationException
@@ -51,8 +54,10 @@ class CascadedVoiceModel(
     private val llmModel: Model,
     private val recognition: SpeechRecognitionRepository,
     private val synthesis: SpeechSynthesisRepository,
-    /** 合成音色的会话级覆盖；null 表示沿用全局合成音色或厂商默认。 */
+    /** 合成音色的会话级覆盖；null 表示使用所选合成模型适用的全局音色或厂商默认。 */
     private val synthesisVoice: String? = null,
+    private val recognitionModel: ModelSelection? = null,
+    private val synthesisModel: ModelSelection? = null,
 ) : Model {
     override val name: String = "cascaded:${llmModel.name}"
 
@@ -234,7 +239,7 @@ class CascadedVoiceModel(
             }
             val answer = StringBuilder()
             // 服务支持会话式合成时用它：文本随模型增量投递，首包不必等整句。
-            val session = synthesis.openSession(synthesisVoice)
+            val session = synthesis.openSession(synthesisVoice, synthesisModel)
             var completed = false
             try {
                 if (session != null) {
@@ -290,7 +295,12 @@ class CascadedVoiceModel(
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = cause)
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        cause = cause,
+                        requestError = (cause as? ChatCompletionsApiException)
+                            ?.let { VoiceRequestError.fromProvider(code = it.providerCode, httpStatus = it.statusCode) },
+                    )
                 }
                 try {
                     // 让服务端把缓冲里的文本合成并下发完毕，此后本轮音频才算完整。
@@ -341,7 +351,7 @@ class CascadedVoiceModel(
                     send(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
                         Transcription(text = sentence, finished = false) else null,
                         customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
-                    flow { synthesis.synthesize(sentence, synthesisVoice).collect { emit(it) } }.catch { cause ->
+                    flow { synthesis.synthesize(sentence, synthesisVoice, synthesisModel).collect { emit(it) } }.catch { cause ->
                         if (cause is CancellationException) throw cause
                         throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                     }.collect { bytes ->
@@ -375,7 +385,7 @@ class CascadedVoiceModel(
         private suspend fun transcribe(pcm16: ByteArray, send: suspend (LlmResponse) -> Unit): String {
             val wantsTranscript = request.liveConnectConfig.inputAudioTranscription != null
             var final = ""
-            recognition.transcribeStreaming(pcm16).collect { event ->
+            recognition.transcribeStreaming(pcm16, selection = recognitionModel).collect { event ->
                 when (event) {
                     is RecognitionEvent.Partial -> if (wantsTranscript) {
                         send(LlmResponse(inputTranscription = Transcription(text = event.text.trim(), finished = false)))
@@ -414,8 +424,11 @@ class CascadedVoiceModel(
             ))
             llmModel.generateContent(textRequest, stream = true).collect { response ->
                 // 带上厂商错误码与原文：Chatbot 路径外层不留完整异常，真机只能靠这条消息定位。
-                check(response.errorCode == null && response.errorMessage.isNullOrBlank()) {
-                    "Voice model request failed: ${response.errorCode} ${response.errorMessage}"
+                if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        requestError = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage),
+                    )
                 }
                 val body = response.content?.parts.orEmpty().filter { it.thought != true }
                     .mapNotNull { it.text }.joinToString("")

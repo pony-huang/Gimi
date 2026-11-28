@@ -36,7 +36,14 @@ class ServiceCatalogUploadCapabilitiesTest {
 
     @Test
     fun nonUploadTemplatesKeepTheirDeclaredCapabilities() {
-        val instance = uploadInstance(templateId = "kimi", isFileUploadEnabled = false)
+        val inlineDocumentModel = model.copy(
+            multimodal = MultimodalCapabilities(documentInput = DocumentInputCapability()),
+        )
+        val instance = uploadInstance(
+            templateId = "kimi",
+            isFileUploadEnabled = false,
+            baseModel = inlineDocumentModel,
+        )
         assertSame(instance, instance.withDerivedUploadCapabilities())
         assertTrue(
             instance.connections.first().models.first().multimodal.documentInput!!.ingestMode ==
@@ -52,9 +59,48 @@ class ServiceCatalogUploadCapabilitiesTest {
         assertSame(enabled, enabled.withDerivedUploadCapabilities())
     }
 
+    @Test
+    fun nonConversationConnectionsDoNotDeriveDocumentCapability() {
+        val instance = ModelServiceInstance(
+            id = "instance-deepseek",
+            name = "DeepSeek",
+            templateId = "deepseek",
+            isEnabled = true,
+            isOfficialToolsEnabled = false,
+            isFileUploadEnabled = true,
+            sharedApiKey = "key",
+            connections = listOf(
+                ServiceConnection(
+                    id = "conn-conversation-1",
+                    capability = ServiceCapability.Conversation,
+                    protocol = ApiProtocol.Anthropic,
+                    endpoint = "https://api.deepseek.com/anthropic",
+                    models = listOf(model),
+                ),
+                ServiceConnection(
+                    id = "conn-recognition-1",
+                    capability = ServiceCapability.Recognition,
+                    protocol = ApiProtocol.OpenaiChatcompletions,
+                    endpoint = "https://api.deepseek.com",
+                    models = listOf(Model("deepseek-asr", "deepseek-asr", capabilities = setOf(ModelCapability.STT))),
+                ),
+            ),
+        ).withDerivedUploadCapabilities()
+
+        assertEquals(
+            FileIngestMode.FILE_REFERENCE,
+            instance.connection(ServiceCapability.Conversation)!!.models.single().multimodal.documentInput?.ingestMode,
+        )
+        assertEquals(
+            null,
+            instance.connection(ServiceCapability.Recognition)!!.models.single().multimodal.documentInput,
+        )
+    }
+
     private fun uploadInstance(
         templateId: String = "deepseek",
         isFileUploadEnabled: Boolean,
+        baseModel: Model = model,
     ) = ModelServiceInstance(
         id = "instance-$templateId",
         name = templateId,
@@ -69,7 +115,7 @@ class ServiceCatalogUploadCapabilitiesTest {
                 capability = ServiceCapability.Conversation,
                 protocol = ApiProtocol.OpenaiChatcompletions,
                 endpoint = "https://example.com",
-                models = listOf(model, model.copy(id = "model-2")),
+                models = listOf(baseModel, baseModel.copy(id = "model-2")),
             ),
         ),
     )

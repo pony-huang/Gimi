@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.assumedVision
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.CredentialSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.DeletionImpact
@@ -350,7 +351,10 @@ class ModelServiceConfigurationStore @Inject constructor(
                 modelId = effective.modelId,
                 apiKey = effective.apiKey,
                 modelBaseUrl = effective.endpoint.trimEnd('/'),
-                supportsImages = effective.model.multimodal.supportsImages,
+                // 视觉能力未声明时按「假定支持」放行：目录拿不到模态元数据，
+                // 不能因此关掉运行时 mobile_use 等图像门控；声明了才按声明收紧。
+                supportsImages = effective.model.multimodal.assumedVision.ingestMode !=
+                    FileIngestMode.NOT_SUPPORTED,
                 documentIngestMode = derivedDocumentIngestMode(effective),
             )
         }

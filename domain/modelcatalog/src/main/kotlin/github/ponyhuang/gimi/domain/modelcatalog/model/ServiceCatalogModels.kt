@@ -119,20 +119,25 @@ fun ModelServiceInstance.withDerivedUploadCapabilities(): ModelServiceInstance {
     if (templateId !in FILE_UPLOAD_TEMPLATE_IDS) return this
     val documentInput = if (isFileUploadEnabled) fileUploadDocumentCapability else pathTextDocumentCapability
     val changed = connections.any { connection ->
-        connection.models.any { it.multimodal.documentInput != documentInput }
+        connection.capability == ServiceCapability.Conversation &&
+            connection.models.any { it.multimodal.documentInput != documentInput }
     }
     if (!changed) return this
     return copy(
         connections = connections.map { connection ->
-            connection.copy(
-                models = connection.models.map { model ->
-                    if (model.multimodal.documentInput == documentInput) {
-                        model
-                    } else {
-                        model.copy(multimodal = model.multimodal.copy(documentInput = documentInput))
-                    }
-                },
-            )
+            if (connection.capability != ServiceCapability.Conversation) {
+                connection
+            } else {
+                connection.copy(
+                    models = connection.models.map { model ->
+                        if (model.multimodal.documentInput == documentInput) {
+                            model
+                        } else {
+                            model.copy(multimodal = model.multimodal.copy(documentInput = documentInput))
+                        }
+                    },
+                )
+            }
         },
     )
 }

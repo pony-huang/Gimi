@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
@@ -65,7 +64,7 @@ fun SettingsScreen(
                     SettingsNavigationItems(
                         items = listOf(
                             SettingsNavigationItem(
-                                icon = Icons.Default.SmartToy,
+                                icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_model_service),
                                 title = stringResource(R.string.settings_model_service_title),
                                 subtitle = stringResource(R.string.settings_model_service_subtitle),
                                 action = SettingsAction.OpenModelService,

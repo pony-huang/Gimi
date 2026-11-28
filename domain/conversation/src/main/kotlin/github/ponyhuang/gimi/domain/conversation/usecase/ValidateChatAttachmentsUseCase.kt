@@ -5,6 +5,7 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceInstance
+import github.ponyhuang.gimi.domain.modelcatalog.model.assumedVision
 import javax.inject.Inject
 
 /** 附件不能进入当前发送请求的原因，不持有界面文案。 */
@@ -50,7 +51,8 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
             return ChatAttachmentValidationFailure.VendorMismatch(mismatched.displayName)
         }
         val (supportedMimeTypes, perFileLimit, skipsInlineTotalLimit) = when (drafts.first().category) {
-            AttachmentCategory.IMAGE -> model.multimodal.vision?.let {
+            // 视觉能力未声明时按默认内联图像假定放行，不因目录缺元数据拒绝图片。
+            AttachmentCategory.IMAGE -> model.multimodal.assumedVision.let {
                 Triple(it.supportedMimeTypes, it.maxInlineBytes, false)
             }
             AttachmentCategory.AUDIO -> model.multimodal.audioInput?.let {

@@ -18,8 +18,10 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUploadResult
+import github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
@@ -344,7 +346,9 @@ class ChatbotViewModelTest {
                 vm.uiState.value.chat.draftUploadStates["/tmp/draft.docx"],
             )
             // 上传成功即进注册表（与是否发送无关）：抽屉"上传的文件"列表据此展示；
-            // 缺这条记录会导致 Chatbot 上传的文件在任何界面都查不到。
+            // 缺这条记录会导致 Chatbot 上传的文件在任何界面都查不到。chip 阶段不绑定
+            // localPath：上传时草稿还在 cache 目录，是会被系统回收甚至复用的临时副本，
+            // 写入即悬空绑定。绑定只由发送归档收口或打开时下载兜底回写真实工作区路径。
             assertEquals(
                 listOf(
                     UploadedFileEntry(
@@ -649,7 +653,8 @@ class ChatbotViewModelTest {
         coEvery { fileGateway.upload(any(), any(), any(), any(), any()) } returns
             VendorFileUploadResult.Uploaded(fileId = "uploaded-file", bytes = 10, createdAtEpochSeconds = 1)
         return ChatbotViewModel(
-            store, agent, catalog, gate, recognition, playback, settings, registry, fileGateway, attachments,
+            store, agent, catalog, gate, recognition, playback, settings, registry, fileGateway,
+            mockk<VendorAttachmentResolver>(), RefreshUploadedFilesUseCase(fileGateway, registry), attachments,
             OfficialToolSupport(),
         )
     }

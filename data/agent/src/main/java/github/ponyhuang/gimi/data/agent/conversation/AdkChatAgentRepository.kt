@@ -40,7 +40,11 @@ class AdkChatAgentRepository @Inject constructor(
     private val runner: AgentChatRunner,
     private val subtasks: SubtaskRunRepository? = null,
     private val a2uiRetry: github.ponyhuang.gimi.data.agent.a2ui.A2uiCreateRetry? = null,
+    private val a2uiNeteaseFavorite: A2uiNeteaseFavorite? = null,
 ) : ChatAgentRepository {
+    override suspend fun setA2uiNeteaseTrackLiked(sessionId: String, songId: String, liked: Boolean): Boolean =
+        a2uiNeteaseFavorite?.setLiked(sessionId, songId, liked) == true
+
     override fun retryA2ui(
         sessionId: String, selection: ModelSelection, callId: String,
         capabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities,

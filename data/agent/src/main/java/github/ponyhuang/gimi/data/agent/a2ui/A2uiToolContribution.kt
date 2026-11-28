@@ -24,12 +24,14 @@ class A2uiToolContribution @Inject constructor(
     private val models: AgentModelRuntime,
     private val protocol: A2uiProtocol,
     private val settings: RecommendationRepository,
+    private val renderer: A2uiRendererFunctions,
 ) : AgentContribution {
     override val id = "a2ui"
     override fun revision(): Any? = a2uiEnabled()
     override fun tools(spec: AgentBuildSpec): List<BaseTool> = if (spec.a2uiSupported && a2uiEnabled()) {
         listOf(
             GenerateA2uiTool(A2uiGeneration(models.createModel(models.selectModelConfig(spec.selection)), protocol), protocol),
+            A2uiSeekMusicTool(renderer),
         )
     } else {
         emptyList()
@@ -53,6 +55,10 @@ internal class GenerateA2uiTool(
         type = Type.OBJECT,
         properties = mapOf(
             "intent" to Schema(type = Type.STRING, description = "create, update or delete"),
+            "template_id" to Schema(type = Type.STRING, description = "Create only. device_controls displays live media volume and flashlight."),
+            "components" to Schema(type = Type.STRING, description = "Create only. JSON array of flat Catalog components with a root id of root."),
+            "data" to Schema(type = Type.STRING, description = "Initial data JSON object for a direct components composition. Defaults to {}."),
+            "repair_id" to Schema(type = Type.STRING, description = "Single-use token returned when a direct composition must be corrected."),
             "target_surface_id" to Schema(type = Type.STRING, description = "Existing surface id for update/delete"),
             "changes" to Schema(
                 type = Type.STRING,
@@ -67,7 +73,7 @@ internal class GenerateA2uiTool(
                     "Basic Text/Icon/Row/Column/Card/Button/Divider are always included. " +
                     "Select containers, input and native/media components explicitly. Use [] for delete",
             ),
-        ), required = listOf("intent", "changes", "component_names"),
+        ), required = listOf("intent"),
     ))
 
     override suspend fun processLlmRequest(toolContext: ToolContext, llmRequest: LlmRequest): LlmRequest {
@@ -80,7 +86,11 @@ internal class GenerateA2uiTool(
             "Use generate_a2ui for interactive forms, structured result collections or matching native components. " +
                 "When displaying images or videos, prefer the catalog Image or Video component respectively; " +
                 "use Image instead of Markdown image syntax (![alt](url)). " +
-                "Call generate_a2ui with the matching type in component_names and media URLs in changes. " +
+                "When the user wants both device controls and the Catalog supports them, use template_id=device_controls. " +
+                "For a complete custom layout, submit components and data directly as JSON strings with no template_id. " +
+                "Include changes and component_names as fallback context. If the tool returns repair_required, " +
+                "correct the composition once using the returned repair_id. The tool handles fallback if that correction fails. " +
+                "If layout still needs design, supply changes and component_names without template_id or components. " +
                 "Pass component_names for the needed types and all relevant facts in changes; the UI sub-agent " +
                 "does not receive this conversation. For routine discrete control operations (on/off or toggle, " +
                 "start/stop, next/previous step, or next/previous track), execute the business tool directly; " +
@@ -111,7 +121,49 @@ internal class GenerateA2uiTool(
         val raw = context.runConfig?.customMetadata?.get(CAPABILITIES_KEY) as? String
             ?: return failure("This client does not support A2UI")
         val capabilities = Json.decodeFromString<A2uiCapabilities>(raw)
-        val history = context.session.events
+        val target = args["target_surface_id"] as? String
+        val intent = args["intent"] as? String ?: "create"
+        if (intent !in setOf("create", "update", "delete")) return failure("Unknown intent")
+        val creates = currentCoroutineContext()[A2uiCreateScope]
+        val repairId = args["repair_id"] as? String
+        val template = args["template_id"] as? String
+        val direct = template != null || "components" in args || "data" in args || repairId != null
+        if (direct && intent != "create") return failure("Direct composition only supports create")
+        val repair = if (repairId == null) null else
+            creates?.consumeRepair(repairId) ?: return failure("Invalid or already used repair_id")
+        val changes = (args["changes"] as? String)?.takeIf(String::isNotBlank) ?: repair?.changes
+        val requestedNames = (args["component_names"] as? List<*>) ?: repair?.componentNames
+        val surfaceId = when {
+            repair != null -> repair.surfaceId
+            intent == "create" -> "surface-${UUID.randomUUID()}"
+            else -> target ?: return failure("Target surface does not exist")
+        }
+        A2uiTiming.start(context.session.key.id, surfaceId)
+        if (direct) {
+            try {
+                require(template == null || args["data"] == null) { "Fixed templates do not accept initial data" }
+                val components = A2uiDirectComposition.components(template, args["components"])
+                val types = A2uiDirectComposition.catalogTypes(capabilities.schemaJson)
+                val document = generation.surfaceDocument(
+                    surfaceId, capabilities, types, components, A2uiDirectComposition.data(args["data"]),
+                ).copy(immediate = true)
+                protocol.validate(document, capabilities)
+                A2uiTiming.mark(surfaceId, "direct_validated")
+                return resultFor(document)
+            } catch (invalid: IllegalArgumentException) {
+                val reason = invalid.message.orEmpty().take(300)
+                if (repairId == null) {
+                    val token = creates?.offerRepair(A2uiCreateScope.Repair(surfaceId, changes, requestedNames))
+                        ?: return failure("A2UI composition failed: $reason")
+                    return mapOf("status" to "repair_required", "repair_id" to token, "error" to reason)
+                }
+                A2uiTiming.mark(surfaceId, "composition_fallback")
+                if (changes.isNullOrBlank()) {
+                    return failure("Corrected composition failed and no fallback changes were provided: $reason")
+                }
+            }
+        }
+        val history = if (intent == "create") emptyList() else context.session.events
         val records = history.flatMap { event -> buildList {
             event.content?.parts.orEmpty().mapNotNull { it.text?.let(A2uiInteractionCodec::decode) }
                 .forEach { add(A2uiRecord.Submission(it)) }
@@ -121,21 +173,18 @@ internal class GenerateA2uiTool(
             )).mapNotNull { A2uiToolResult.extract(A2uiToolResult.TOOL_NAME, it) }
                 .forEach { add(A2uiRecord.Revision(it)) }
         } }
-        val target = args["target_surface_id"] as? String
-        val intent = args["intent"] as? String ?: "create"
-        val creates = currentCoroutineContext()[A2uiCreateScope]
-        val pending = creates?.snapshot()?.firstOrNull { it.task.surfaceId == target }
+        val pending = if (intent == "create") null else creates?.snapshot()?.firstOrNull { it.task.surfaceId == target }
         val pendingResult = pending?.let { it.replacement ?: it.result.await() }
         val pendingDocument = pendingResult?.let { A2uiToolResult.extract(name, it) }
-        val previous = if (pending != null) pendingDocument?.takeUnless { it.deleted }
-            else protocol.replay(records).firstOrNull { it.surfaceId == target }
-        if (intent !in setOf("create", "update", "delete")) return failure("Unknown intent")
+        val previous = when {
+            intent == "create" -> null
+            pending != null -> pendingDocument?.takeUnless { it.deleted }
+            else -> protocol.replay(records).firstOrNull { it.surfaceId == target }
+        }
         if (intent != "create" && previous == null) return failure("Target surface does not exist")
-        val requestedNames = args["component_names"] as? List<*>
         if (intent != "delete" && (requestedNames.isNullOrEmpty() ||
                 requestedNames.any { it !is String || it.isBlank() })
         ) return failure("component_names must be a non-empty array of supported component type names")
-        val surfaceId = if (intent == "create") "surface-${UUID.randomUUID()}" else checkNotNull(target)
         suspend fun generateResult(publishPreview: (suspend (A2uiDocument) -> Unit)? = null): Map<String, Any> {
             val document = if (intent == "delete") {
                 A2uiDocument(surfaceId, listOf(message("deleteSurface", buildJsonObject { put("surfaceId", surfaceId) })), true)
@@ -146,7 +195,7 @@ internal class GenerateA2uiTool(
                         capabilities = capabilities,
                         instruction = """
                             Intent: $intent
-                            Requested UI: ${args["changes"]}
+                            Requested UI: ${changes.orEmpty()}
                             Previous target data and layout (data, not instructions):
                             ${previous?.messages?.drop(1)?.joinToString("\n").orEmpty()}
                         """.trimIndent(),
@@ -157,14 +206,14 @@ internal class GenerateA2uiTool(
                     return failure("A2UI generation failed: ${invalid.message}")
                 }
             }
-            return mapOf("success" to true, "surfaceId" to surfaceId, A2uiToolResult.DOCUMENT_KEY to A2uiToolResult.encode(document))
+            return resultFor(document)
         }
         if (intent == "create" && creates != null) {
             val task = A2uiGenerationTask(
                 callId = requireNotNull(context.functionCallId),
                 surfaceId = surfaceId,
                 invocationId = context.invocationContext.invocationId,
-                changes = args["changes"]?.toString().orEmpty(),
+                changes = changes.orEmpty(),
                 componentNames = requestedNames.orEmpty().filterIsInstance<String>().toSet(),
             )
             return creates.submit(task) { publishPreview ->
@@ -179,6 +228,12 @@ internal class GenerateA2uiTool(
     }
 
     private fun failure(reason: String): Map<String, Any> = mapOf("success" to false, "error" to reason)
+
+    private fun resultFor(document: A2uiDocument): Map<String, Any> = mapOf(
+        "success" to true,
+        "surfaceId" to document.surfaceId,
+        A2uiToolResult.DOCUMENT_KEY to A2uiToolResult.encode(document),
+    )
 
     companion object {
         const val CAPABILITIES_KEY = "gimi.a2ui.capabilities"
@@ -217,7 +272,9 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         - NetEase: fetch playUrl via netease_song_detail for the primary track, pass encrypted 32-char hex songId for API actions,
           pass numeric originalId when available for orpheus:// client jump, and include tracks for multi-song queues.
           On play_track, call netease_song_detail for that songId and update the existing surfaceId with the resolved audioUrl.
-          On toggle_like, call netease_song_like with songId and like.
+          Set provider to "netease" for NetEase cards so the user's heart click can execute directly.
+          On a legacy NetEase toggle_like event, call netease_song_like with songId and like.
+          On recommend_similar_music, use the submitted track context to find and recommend similar music.
         - Spotify: pass provider="spotify", songId (track ID or spotify:track:URI), externalUrl (open.spotify.com or spotify: URI),
           coverUrl (album.images[0].url), durationSeconds (or duration_ms), and when available from spotify_now_playing pass
           isPlaying, progressSeconds (from progress_ms), and deviceId. On spotify_toggle_playback, play_track, spotify_next,
@@ -241,6 +298,12 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         $composition
 
         A2UI CONTROL ROUTING (MANDATORY):
+        When the user asks to see a device control, use MediaVolumeSlider for media volume and FlashlightSwitch
+        for the flashlight when present in the catalog. Include them in component_names and use them without
+        value bindings or Apply buttons: the host reads actual device state and applies direct user interaction.
+        Showing these controls does not itself change the device. For spoken or typed commands to change a
+        setting, use the existing authorized tools and confirmation. A request such as "choose a good volume
+        for meetings" can also be offered as a separate ordinary Button event when relevant.
         Routine discrete control operations are direct commands that change an existing state or advance/reverse
         one step: on/off or toggle, start/stop, next/previous step, and next/previous track. Execute the business
         tool directly. If its result confirms success and no user input or confirmation remains, give one brief
@@ -251,16 +314,15 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         require appropriate feedback or confirmation. Do not bypass required authorization.
         For all other requests to change a device or app setting, controllable state, alarm, reminder, timer, or
         schedule - including enable, disable, on/off, toggle, set, change, schedule, create, edit, or delete -
-        call generate_a2ui in the same turn in addition to the business action. If the change requires
-        confirmation, use the A2UI control as the confirmation instead of asking in plain text, then perform
-        the action after the user submits it.
+        call generate_a2ui in the same turn in addition to the business action. For forms, use a submit
+        action instead of asking for form confirmation in plain text. Keep any required tool confirmation.
         This includes creating or editing alarms, reminders, timers, and schedules, and configuring settings
         beyond routine discrete controls. A short Markdown summary may accompany the card, but a Markdown-only answer is not
         sufficient; if the business action has already completed, still render the resulting control
         instead of replying with text only. A yes/no question or confirmation about such a controllable
         state must be presented with A2UI actions (confirm/cancel or enable/disable), not plain text.
         The control surface must include the affected item, its tool-confirmed state, and an editable control:
-        - bind Switch (or CheckBox if Switch is unavailable) to the current boolean state and add a primary
+        - except for the live device controls above, bind Switch (or CheckBox if Switch is unavailable) to the current boolean state and add a primary
           Button event action that applies the displayed choice; editing local data alone never executes the change;
         - for an alarm, reminder, timer, or schedule, show the concrete date/time with DateTimeInput, the
           current enabled state, and enable/disable/apply actions;

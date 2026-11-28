@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:appupdate"))
     implementation(project(":domain:logging"))
+    implementation(project(":domain:workspace"))
     implementation(libs.androidx.activity.compose)
     implementation(project(":domain:conversation"))
     implementation(platform(libs.androidx.compose.bom))

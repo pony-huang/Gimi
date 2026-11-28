@@ -19,7 +19,11 @@ import org.junit.Test
 class ValidateChatAttachmentsUseCaseTest {
     private val validate = ValidateChatAttachmentsUseCase()
     private val selection = ModelSelection("instance", "connection", "model")
-    private val model = Model("model", "Model")
+    private val model = Model(
+        "model",
+        "Model",
+        multimodal = MultimodalCapabilities(documentInput = DocumentInputCapability()),
+    )
     private val instance = ModelServiceInstance(
         id = "instance", name = "Service", templateId = "openai",
         isEnabled = true, isOfficialToolsEnabled = false, sharedApiKey = "key",
@@ -70,6 +74,18 @@ class ValidateChatAttachmentsUseCaseTest {
         )
         assertEquals(ChatAttachmentValidationFailure.CategoryUnsupported,
             validate(selection, listOf(source), listOf(draft("a.pdf", 100))))
+    }
+
+    @Test
+    fun modelWithoutDeclaredVisionStillAcceptsImagesWithDefaultMimes() {
+        // fixture 的 model 未声明视觉能力：按「假定支持」放行默认 MIME 内的图片，
+        // 不因目录缺模态元数据而拒绝；MIME 之外的类型仍按不支持拦截。
+        val image = draft("a.jpg", 100).copy(mimeType = "image/jpeg", category = AttachmentCategory.IMAGE)
+        assertNull(validate(selection, listOf(instance), listOf(image)))
+        val unsupported = draft("a.bin", 100)
+            .copy(mimeType = "application/octet-stream", category = AttachmentCategory.IMAGE)
+        assertEquals(ChatAttachmentValidationFailure.UnsupportedOrTooLarge(unsupported.displayName),
+            validate(selection, listOf(instance), listOf(unsupported)))
     }
 
     @Test

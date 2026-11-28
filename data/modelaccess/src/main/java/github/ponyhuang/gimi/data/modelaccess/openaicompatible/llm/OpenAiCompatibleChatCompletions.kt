@@ -101,7 +101,7 @@ internal constructor(
     generate(request, stream).catch { error ->
       // Add mitigation advice to a quota error, as the Gemini model does.
       if (error is ChatCompletionsApiException && error.statusCode == 429) {
-        throw ChatCompletionsApiException("$RESOURCE_EXHAUSTED_FIX\n\n${error.message}", error, 429)
+        throw ChatCompletionsApiException("$RESOURCE_EXHAUSTED_FIX\n\n${error.message}", error, 429, error.providerCode)
       }
       throw error
     }
@@ -217,7 +217,8 @@ private class ChatCompletionsStreamState {
   fun onChunk(chunk: ChatCompletionResponse): List<LlmResponse> {
     chunk.error?.let {
       throw ChatCompletionsApiException(
-        "Chat Completions stream error: ${it.type ?: it.code ?: "error"}"
+        "Chat Completions stream error: ${it.type ?: it.code ?: "error"}",
+        providerCode = it.code ?: it.type,
       )
     }
     chunk.model?.let { modelVersion = it }

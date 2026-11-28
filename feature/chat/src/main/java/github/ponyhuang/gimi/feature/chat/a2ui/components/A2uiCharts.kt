@@ -3,9 +3,12 @@ package github.ponyhuang.gimi.feature.chat.a2ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -39,6 +42,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.ponyhuang.gimi.feature.chat.R
@@ -681,82 +686,111 @@ internal fun CandlestickChart(values: CardValues, modifier: Modifier) {
             }
         },
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(chartHeight)
-                .pointerInput(candles) {
-                    detectTapGestures { offset ->
-                        if (candles.isEmpty()) return@detectTapGestures
-                        val leftPad = 52.dp.toPx()
-                        val plotW = (size.width - leftPad - 6.dp.toPx()).coerceAtLeast(1f)
-                        val idx = (((offset.x - leftPad) / plotW) * candles.size).toInt().coerceIn(0, candles.lastIndex)
-                        selectedIndex = if (selectedIndex == idx) null else idx
-                    }
-                },
-        ) {
-            if (size.width <= 0f || size.height <= 0f || candles.isEmpty()) return@Canvas
-            val leftPad = 52.dp.toPx()
-            val bottomPad = 24.dp.toPx()
-            val topPad = 8.dp.toPx()
-            val plotW = (size.width - leftPad - 6.dp.toPx()).coerceAtLeast(1f)
-            val plotH = (size.height - topPad - bottomPad).coerceAtLeast(1f)
-            val dashEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f)
-
-            ticks.forEach { tick ->
-                val frac = ((tick - axisMin) / axisSpan).toFloat().coerceIn(0f, 1f)
-                val y = topPad + plotH - frac * plotH
-                drawLine(gridColor, Offset(leftPad, y), Offset(leftPad + plotW, y), strokeWidth = 1.dp.toPx(), pathEffect = dashEffect)
-                val label = formatAxisTick(tick, format, unit)
-                val measured = textMeasurer.measure(label, axisLabelStyle)
-                drawText(
-                    measured,
-                    topLeft = Offset((leftPad - measured.size.width - 8.dp.toPx()).coerceAtLeast(0f), y - measured.size.height / 2f),
-                )
-            }
-
-            val slotW = plotW / candles.size
-            val candleW = (slotW * 0.64f).coerceIn(2.dp.toPx(), 14.dp.toPx())
-            val xStep = max(1, ceil(candles.size / 5.0).toInt())
-
-            candles.forEachIndexed { idx, c ->
-                val centerX = leftPad + (idx + 0.5f) * slotW
-                if (idx % xStep == 0 || idx == candles.lastIndex) {
-                    val measuredDate = textMeasurer.measure(c.date, axisLabelStyle, maxLines = 1)
-                    val labelX = (centerX - measuredDate.size.width / 2f).coerceIn(leftPad, size.width - measuredDate.size.width)
-                    drawText(measuredDate, topLeft = Offset(labelX, topPad + plotH + 6.dp.toPx()))
-                }
-
-                if (selectedIndex == idx) {
-                    drawLine(
-                        color = colors.onSurface.copy(alpha = 0.2f),
-                        start = Offset(centerX, topPad),
-                        end = Offset(centerX, topPad + plotH),
-                        strokeWidth = 1.dp.toPx(),
+        if (candles.isNotEmpty()) {
+            val density = LocalDensity.current
+            val scrollState = rememberScrollState()
+            val dates = remember(candles, textMeasurer, axisLabelStyle, density) {
+                candles.map { candle ->
+                    textMeasurer.measure(
+                        candle.date,
+                        axisLabelStyle,
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = with(density) { 128.dp.roundToPx() }),
                     )
                 }
+            }
+            val priceLabels = ticks.map { textMeasurer.measure(formatAxisTick(it, format, unit), axisLabelStyle) }
+            val labelHeight = with(density) { dates.maxOf { it.size.height }.toDp() }
+            val priceLabelWidth = with(density) { (priceLabels.maxOfOrNull { it.size.width } ?: 0).toDp() }
+            val topPadding = with(density) { (priceLabels.maxOfOrNull { it.size.height } ?: 0).toDp() / 2 } + 2.dp
+            val bottomPadding = labelHeight + 10.dp
+            val minSlotWidth = with(density) { dates.maxOf { it.size.width }.toDp() } + 12.dp
 
-                val color = if (c.isUp) positiveColor else negativeColor
-                fun yFor(v: Double) = topPad + plotH - (((v - axisMin) / axisSpan).toFloat().coerceIn(0f, 1f) * plotH)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val axisWidth = (priceLabelWidth + 8.dp).coerceAtMost(maxWidth / 3)
+                val plotWidth = maxOf(maxWidth - axisWidth, minSlotWidth * candles.size)
+                Row {
+                    // 价格刻度固定，蜡烛和日期共享一个滚动区域与点击坐标。
+                    Canvas(Modifier.width(axisWidth).height(chartHeight)) {
+                        val topPad = topPadding.toPx()
+                        val plotH = (size.height - topPad - bottomPadding.toPx()).coerceAtLeast(1f)
+                        ticks.forEachIndexed { index, tick ->
+                            val fraction = ((tick - axisMin) / axisSpan).toFloat().coerceIn(0f, 1f)
+                            val y = topPad + plotH - fraction * plotH
+                            val label = priceLabels[index]
+                            drawText(
+                                label,
+                                topLeft = Offset(size.width - label.size.width - 6.dp.toPx(), y - label.size.height / 2f),
+                            )
+                        }
+                    }
+                    Canvas(
+                        modifier = Modifier
+                            .weight(1f)
+                            .horizontalScroll(scrollState)
+                            .width(plotWidth)
+                            .height(chartHeight)
+                            .pointerInput(candles) {
+                                detectTapGestures { offset ->
+                                    val index = (offset.x / size.width * candles.size).toInt()
+                                        .coerceIn(0, candles.lastIndex)
+                                    selectedIndex = if (selectedIndex == index) null else index
+                                }
+                            },
+                    ) {
+                        val topPad = topPadding.toPx()
+                        val plotH = (size.height - topPad - bottomPadding.toPx()).coerceAtLeast(1f)
+                        val slotW = size.width / candles.size
+                        val dashEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f)
+                        ticks.forEach { tick ->
+                            val fraction = ((tick - axisMin) / axisSpan).toFloat().coerceIn(0f, 1f)
+                            val y = topPad + plotH - fraction * plotH
+                            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx(), pathEffect = dashEffect)
+                        }
 
-                val highY = yFor(c.high)
-                val lowY = yFor(c.low)
-                drawLine(color, Offset(centerX, highY), Offset(centerX, lowY), strokeWidth = 1.25.dp.toPx(), cap = StrokeCap.Round)
+                        val candleW = (slotW * 0.64f).coerceIn(2.dp.toPx(), 14.dp.toPx())
+                        candles.forEachIndexed { idx, c ->
+                            val centerX = (idx + 0.5f) * slotW
+                            val date = dates[idx]
+                            drawText(
+                                date,
+                                topLeft = Offset(centerX - date.size.width / 2f, topPad + plotH + 6.dp.toPx()),
+                            )
 
-                val adjustedClose = if (abs(c.close - c.open) < minBody) {
-                    c.open + if (c.isUp) minBody else -minBody
-                } else c.close
-                val openY = yFor(c.open)
-                val closeY = yFor(adjustedClose)
-                val topY = min(openY, closeY)
-                val bodyH = abs(closeY - openY).coerceAtLeast(1.5.dp.toPx())
+                            if (selectedIndex == idx) {
+                                drawLine(
+                                    color = colors.onSurface.copy(alpha = 0.2f),
+                                    start = Offset(centerX, topPad),
+                                    end = Offset(centerX, topPad + plotH),
+                                    strokeWidth = 1.dp.toPx(),
+                                )
+                            }
 
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(centerX - candleW / 2f, topY),
-                    size = Size(candleW, bodyH),
-                    cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
-                )
+                            val color = if (c.isUp) positiveColor else negativeColor
+                            fun yFor(v: Double) = topPad + plotH - (((v - axisMin) / axisSpan).toFloat().coerceIn(0f, 1f) * plotH)
+
+                            val highY = yFor(c.high)
+                            val lowY = yFor(c.low)
+                            drawLine(color, Offset(centerX, highY), Offset(centerX, lowY), strokeWidth = 1.25.dp.toPx(), cap = StrokeCap.Round)
+
+                            val adjustedClose = if (abs(c.close - c.open) < minBody) {
+                                c.open + if (c.isUp) minBody else -minBody
+                            } else c.close
+                            val openY = yFor(c.open)
+                            val closeY = yFor(adjustedClose)
+                            val topY = min(openY, closeY)
+                            val bodyH = abs(closeY - openY).coerceAtLeast(1.5.dp.toPx())
+
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(centerX - candleW / 2f, topY),
+                                size = Size(candleW, bodyH),
+                                cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
+                            )
+                        }
+                    }
+                }
             }
         }
 

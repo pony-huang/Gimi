@@ -193,6 +193,9 @@
     <string name="chat_attachment_close_preview">关闭图片预览</string>
     <string name="chat_attachment_file_missing">文件已丢失</string>
     <string name="chat_attachment_open_unsupported">厂商文件不支持下载，无法打开</string>
+    <string name="chat_attachment_open_download_failed">文件下载失败，无法打开</string>
+    <string name="chat_uploaded_files_refresh">刷新</string>
+    <string name="chat_uploaded_files_refresh_failed">刷新失败，请稍后重试</string>
     <string name="chat_remote_image">远程图片 %1$d</string>
     <string name="chat_remote_image_swipe_hint">左右滑动查看图片</string>
     <string name="chat_recommendations_title">为你推荐</string>

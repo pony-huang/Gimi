@@ -183,6 +183,9 @@
     <string name="chat_attachment_close_preview">Close image preview</string>
     <string name="chat_attachment_file_missing">File missing</string>
     <string name="chat_attachment_open_unsupported">Vendor files can\'t be downloaded to open</string>
+    <string name="chat_attachment_open_download_failed">Couldn\'t download the file to open</string>
+    <string name="chat_uploaded_files_refresh">Refresh</string>
+    <string name="chat_uploaded_files_refresh_failed">Couldn\'t refresh uploaded files. Try again later.</string>
     <string name="chat_remote_image">Remote image %1$d</string>
     <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
     <string name="chat_recommendations_title">Recommended for you</string>

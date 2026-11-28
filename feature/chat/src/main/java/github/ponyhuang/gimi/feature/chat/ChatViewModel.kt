@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -88,6 +90,8 @@ class ChatViewModel @Inject constructor(
     private val attachments: ChatAttachmentRepository,
     private val fileUploadGateway: github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway,
     private val fileUploadRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
+    private val vendorAttachmentResolver: github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver,
+    private val refreshUploadedFilesUseCase: github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase,
     private val prepareChatSend: PrepareChatSendUseCase,
     private val validateChatAttachments: ValidateChatAttachmentsUseCase,
     officialFunctionCatalog: OfficialToolFunctionCatalog,
@@ -118,6 +122,10 @@ class ChatViewModel @Inject constructor(
         transcribe = speechRecognitionRepository::transcribe,
         onModeChange = { mode -> _uiState.update { it.copy(voiceTranscriptionMode = mode) } },
     )
+
+    /** 「上传的文件」强制刷新进行中；防重复请求并驱动抽屉刷新按钮转圈。 */
+    private val _uploadedFilesRefreshing = MutableStateFlow(false)
+    val uploadedFilesRefreshing: StateFlow<Boolean> = _uploadedFilesRefreshing.asStateFlow()
 
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
 
@@ -554,6 +562,35 @@ class ChatViewModel @Inject constructor(
     fun uploadDocumentDraft(draft: DraftAttachment) {
         val selection = _uiState.value.currentModelSelection ?: return
         fileUploads.upload(draft, selection)
+    }
+
+    /** 打开厂商引用文档附件：先查本地绑定（离线直开），绑定缺失或悬空时走厂商下载兜底。 */
+    suspend fun openVendorDocument(attachment: FileAttachment): VendorAttachmentResolution =
+        vendorAttachmentResolver.resolveVendorPayload(
+            attachment,
+            _uiState.value.currentModelSelection?.let { selection -> modelServices.resolveConnection(selection) },
+        )
+
+    /**
+     * 强制刷新「上传的文件」列表：仅由用户点击刷新按钮触发；listFiles 对账写回注册表，
+     * 成功后 Room Flow 自动驱动列表，失败弹一次性提示且列表保持不动。进行中的刷新
+     * 直接忽略，避免重复请求。
+     */
+    fun refreshUploadedFiles() {
+        val selection = _uiState.value.currentModelSelection ?: return
+        if (_uploadedFilesRefreshing.value) return
+        val resolved = modelServices.resolveConnection(selection) ?: run {
+            emitNotice(ChatNotice.UploadedFilesRefreshFailed)
+            return
+        }
+        _uploadedFilesRefreshing.value = true
+        viewModelScope.launch {
+            val result = refreshUploadedFilesUseCase(resolved.templateId.orEmpty(), resolved)
+            _uploadedFilesRefreshing.value = false
+            if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
+                emitNotice(ChatNotice.UploadedFilesRefreshFailed)
+            }
+        }
     }
 
     /** 清理上传状态：附件移除或发送完成后调用。 */

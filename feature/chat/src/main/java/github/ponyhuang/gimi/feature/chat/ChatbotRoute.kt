@@ -4,6 +4,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,7 +30,9 @@ internal fun ChatbotRouteContent(
     active: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val uploadedFilesRefreshing by viewModel.uploadedFilesRefreshing.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val sourceOpenFailed = stringResource(R.string.chat_web_citations_open_failed)
     val configure = stringResource(R.string.chat_notice_configure_chat_model)
@@ -40,12 +43,16 @@ internal fun ChatbotRouteContent(
     val refused = stringResource(R.string.chatbot_refused)
     val stopped = stringResource(R.string.chatbot_interrupted)
     val voiceInterrupted = stringResource(R.string.chatbot_voice_interrupted)
+    val uploadedFilesRefreshFailed = stringResource(R.string.chat_uploaded_files_refresh_failed)
+    val uploadedFileDeleteFailed = stringResource(R.string.chat_uploaded_file_delete_failed)
     val noticeMessage = when (state.notice) {
         ChatbotNotice.CONFIGURE_MODEL -> configure
         ChatbotNotice.SEND_BUSY -> sendBusy
         ChatbotNotice.PROTECTED_SESSION -> protected
         ChatbotNotice.FAILED -> failure
         ChatbotNotice.ALREADY_NEW_CONVERSATION -> alreadyNewConversation
+        ChatbotNotice.UPLOADED_FILES_REFRESH_FAILED -> uploadedFilesRefreshFailed
+        ChatbotNotice.UPLOADED_FILE_DELETE_FAILED -> uploadedFileDeleteFailed
         null -> null
     }
     LaunchedEffect(state.notice, noticeMessage, active) {
@@ -80,7 +87,11 @@ internal fun ChatbotRouteContent(
         onCancelVoiceTranscription = viewModel::cancelTranscription,
         onToggleSpeechPlayback = viewModel::togglePlayback,
         onOpenVoice = onOpenVoice,
-        onOpenDocument = { openDocumentAttachment(context, it) },
+        onOpenDocument = { attachment ->
+            scope.openChatDocument(context, attachment) {
+                viewModel.openVendorDocument(attachment)
+            }
+        },
         onOpenWebSource = { url ->
             try {
                 uriHandler.openUri(url)
@@ -109,6 +120,9 @@ internal fun ChatbotRouteContent(
         uploadedFiles = state.uploadedFiles,
         onAttachUploadedFile = viewModel::attachFile,
         attachFileRequests = viewModel.attachFileRequests,
+        onUploadedFileDelete = viewModel::deleteUploadedFile,
+        onRefreshUploadedFiles = viewModel::refreshUploadedFiles,
+        isRefreshingUploadedFiles = uploadedFilesRefreshing,
         chatMode = ChatMode.CHATBOT,
         onChatModeChange = onModeChange,
         headerVisible = headerVisible,

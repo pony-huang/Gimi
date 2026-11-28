@@ -160,6 +160,9 @@ fun ChatScaffold(
     uploadedFiles: List<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = emptyList(),
     onAttachUploadedFile: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
     onUploadedFileDelete: (github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) -> Unit = {},
+    /** 抽屉"上传的文件"强制刷新；点击才发厂商请求，对账写回注册表。 */
+    onRefreshUploadedFiles: () -> Unit = {},
+    isRefreshingUploadedFiles: Boolean = false,
     /** 草稿附件变化后回收不再被引用的上传状态（取消在途任务）；由宿主转发给 ViewModel。 */
     onUploadedFilePrune: (Collection<String>) -> Unit = {},
     attachFileRequests: Flow<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry> = kotlinx.coroutines.flow.emptyFlow(),
@@ -478,6 +481,8 @@ fun ChatScaffold(
                                 uploadedFiles = uploadedFiles,
                                 onAttachUploadedFile = onAttachUploadedFile,
                                 onUploadedFileDelete = onUploadedFileDelete,
+                                onRefreshUploadedFiles = onRefreshUploadedFiles,
+                                isRefreshingUploadedFiles = isRefreshingUploadedFiles,
                                 attachmentUploadStates = state.draftUploadStates,
                                 isFileUploadEnabled = isFileUploadEnabled,
                                 showPermissionOption = chatMode != github.ponyhuang.gimi.domain.conversation.model.ChatMode.CHATBOT,

@@ -35,6 +35,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatSendUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
@@ -2149,6 +2150,8 @@ class ChatViewModelCharacterizationTest {
                 attachments = attachments,
                 fileUploadGateway = FakeVendorFileUploadGateway(),
                 fileUploadRegistry = FakeUploadedFileRegistry(),
+                vendorAttachmentResolver = mockk(relaxed = true),
+                refreshUploadedFilesUseCase = RefreshUploadedFilesUseCase(FakeVendorFileUploadGateway(), FakeUploadedFileRegistry()),
                 prepareChatSend = PrepareChatSendUseCase(sessionResolver, conversations, prepareChatTurn, agent),
                 validateChatAttachments = ValidateChatAttachmentsUseCase(),
                 toolAuthorization = toolAuthorization,
@@ -2384,6 +2387,13 @@ private class FakeUploadedFileRegistry : UploadedFileRegistry {
     }
     override fun entriesFor(vendor: String): Flow<List<UploadedFileEntry>> =
         MutableStateFlow(entries.filter { it.vendor == vendor })
+    override suspend fun localPathFor(vendor: String, fileId: String): String? =
+        entries.lastOrNull { it.vendor == vendor && it.fileId == fileId }?.localPath
+    override suspend fun bindLocalFile(vendor: String, fileId: String, localPath: String) {
+        entries.replaceAll { entry ->
+            if (entry.vendor == vendor && entry.fileId == fileId) entry.copy(localPath = localPath) else entry
+        }
+    }
     override suspend fun remove(vendor: String, fileId: String) {
         entries.removeAll { it.vendor == vendor && it.fileId == fileId }
     }

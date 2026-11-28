@@ -89,6 +89,14 @@ class DefaultVendorFileGateway @Inject constructor(
         apiKey: String,
         fileId: String,
     ): VendorFileContentResult {
+        // 厂商没有 content 下载端点时不发请求，直接归 UNSUPPORTED_VENDOR（与协议族不支持同义），
+        // 让打开链路弹准确的"厂商文件不支持下载"而非"下载失败"。
+        if (!FileClientSupport.supportsContentDownload(vendor)) {
+            return VendorFileContentResult.Failure(
+                VendorFileFailureReason.UNSUPPORTED_VENDOR,
+                "vendor $vendor has no content download endpoint",
+            )
+        }
         val client = resolve(protocol)
             ?: return VendorFileContentResult.Failure(VendorFileFailureReason.UNSUPPORTED_VENDOR, "protocol=$protocol")
         return client.getContent(vendor, endpoint, apiKey, fileId)

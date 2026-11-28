@@ -87,6 +87,8 @@ class DefaultVendorFileGatewayTest {
         val removed = mutableListOf<Pair<String, String>>()
         override suspend fun record(entry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry) = Unit
         override fun entriesFor(vendor: String) = kotlinx.coroutines.flow.flowOf(emptyList<github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry>())
+        override suspend fun localPathFor(vendor: String, fileId: String): String? = null
+        override suspend fun bindLocalFile(vendor: String, fileId: String, localPath: String) = Unit
         override suspend fun remove(vendor: String, fileId: String) {
             removed += vendor to fileId
         }
@@ -115,8 +117,18 @@ class DefaultVendorFileGatewayTest {
             gateway.getContent(vendor, ApiProtocol.Anthropic, endpoint, "key", "f1")
         }
         assertEquals(listOf("deepseek", "openai", "future-vendor"), claudeClient.uploads)
-        assertEquals(List(15) { endpoint }, claudeClient.endpoints)
+        // DeepSeek 无 content 下载端点：getContent 不达客户端（4+5+5=14），其余厂商透传。
+        assertEquals(List(14) { endpoint }, claudeClient.endpoints)
         assertTrue(openAiClient.endpoints.isEmpty())
+    }
+
+    @Test
+    fun deepseekContentDownloadIsGatedAsUnsupportedWithoutNetwork() = runBlocking {
+        val result = gateway.getContent("deepseek", ApiProtocol.Anthropic, "https://api.deepseek.com", "key", "f1")
+
+        assertTrue(result is VendorFileContentResult.Failure)
+        assertEquals(VendorFileFailureReason.UNSUPPORTED_VENDOR, (result as VendorFileContentResult.Failure).reason)
+        assertTrue(claudeClient.endpoints.isEmpty())
     }
 
     @Test

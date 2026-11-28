@@ -495,10 +495,12 @@ private fun PersistedFileAttachment(
                         player.start()
                         isPlaying = true
                     }
-                } else if (attachment.payloadReference != null) {
+                } else if (attachment.payloadReference != null || attachment.fileId != null) {
+                    // 本地副本与厂商 file 引用都交给 Route 决策：有载荷直开本地副本，
+                    // 无载荷的厂商引用由 Route 先查绑定再走下载兜底。
                     onOpenDocument(attachment)
                 } else {
-                    // 厂商 file 引用附件没有本地副本，厂商侧也不提供下载，直接提示。
+                    // 既无本地载荷也无厂商引用（历史还原残缺）的附件无法打开，直接提示。
                     Toast.makeText(context, openUnsupportedMessage, Toast.LENGTH_SHORT).show()
                 }
             }

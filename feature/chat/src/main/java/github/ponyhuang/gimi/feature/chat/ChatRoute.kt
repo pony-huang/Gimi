@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -39,7 +40,11 @@ import github.ponyhuang.gimi.feature.chat.realtime.RealtimeVoiceHost
 import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ChatMode
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorFileFailureReason
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.core.net.toUri
 
 /**
@@ -98,8 +103,10 @@ fun ChatRoute(
     }
     val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()
     val uploadedFiles by viewModel.uploadedFiles.collectAsStateWithLifecycle()
+    val uploadedFilesRefreshing by viewModel.uploadedFilesRefreshing.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val chatNoticeConfigureChatModel = stringResource(R.string.chat_notice_configure_chat_model)
     val chatNoticeAlreadyNewConversation = stringResource(R.string.chat_notice_already_new_conversation)
     val chatNoticeModelSwitchBlocked = stringResource(R.string.chat_notice_model_switch_blocked)
@@ -118,6 +125,8 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_document_total_size_limit)
     val chatNoticeUploadedFileDeleteFailed =
         stringResource(R.string.chat_uploaded_file_delete_failed)
+    val chatNoticeUploadedFilesRefreshFailed =
+        stringResource(R.string.chat_uploaded_files_refresh_failed)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
     // 抽屉目标开关状态：手势提交（预测性返回、拖拽、遮罩点击）经 onOpenChange 回写，
@@ -218,6 +227,7 @@ fun ChatRoute(
             )
             ChatNotice.DocumentTotalSizeLimitExceeded -> chatNoticeDocumentTotalSizeLimit
             ChatNotice.UploadedFileDeleteFailed -> chatNoticeUploadedFileDeleteFailed
+            ChatNotice.UploadedFilesRefreshFailed -> chatNoticeUploadedFilesRefreshFailed
             is ChatNotice.McpServerSkipped -> context.getString(
                 R.string.chat_notice_mcp_server_skipped,
                 notice.serverName,
@@ -394,7 +404,9 @@ fun ChatRoute(
                                     viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
                                 },
                                 onOpenDocument = { attachment ->
-                                    openDocumentAttachment(context, attachment)
+                                    scope.openChatDocument(context, attachment) {
+                                        viewModel.openVendorDocument(attachment)
+                                    }
                                 },
                                 onToggleTimeline = { groupId ->
                                     viewModel.onAction(ChatAction.ToggleTimeline(groupId))
@@ -473,6 +485,8 @@ fun ChatRoute(
                                 onAttachUploadedFile = viewModel::requestAttachVendorFile,
                                 onUploadedFileDelete = { viewModel.onAction(ChatAction.DeleteUploadedFile(it)) },
                                 onUploadedFilePrune = viewModel::clearDocumentUploads,
+                                onRefreshUploadedFiles = viewModel::refreshUploadedFiles,
+                                isRefreshingUploadedFiles = uploadedFilesRefreshing,
                                 onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
                                 onRetryFailedTurn = {
                                     viewModel.onAction(ChatAction.RetryFailedTurn)
@@ -532,5 +546,42 @@ internal fun openDocumentAttachment(context: Context, attachment: FileAttachment
             context.getString(R.string.chat_attachment_open_failed),
             Toast.LENGTH_SHORT,
         ).show()
+    }
+}
+
+/**
+ * 打开文档消息附件的统一入口（助手 / Chatbot / 实时语音三个 surface 共用）。
+ *
+ * 本地载荷（归档副本或 inline 字节）直接走 [openDocumentAttachment]；厂商 file 引用
+ * 附件经 [resolve] 先查注册表绑定、缺失时走厂商下载兜底，成功后复用同一打开路径，
+ * 失败按原因提示：厂商协议不支持下载保留既有文案，其余失败提示下载失败。音频附件
+ * 的播放分支在组件内自行处理，不经本入口。
+ */
+internal fun CoroutineScope.openChatDocument(
+    context: Context,
+    attachment: FileAttachment,
+    resolve: suspend () -> VendorAttachmentResolution,
+) {
+    val hasLocalPayload = attachment.inlineData != null ||
+        attachment.payloadReference?.let(::File)?.isFile == true
+    if (hasLocalPayload) {
+        openDocumentAttachment(context, attachment)
+        return
+    }
+    launch {
+        when (val result = resolve()) {
+            is VendorAttachmentResolution.Resolved -> openDocumentAttachment(context, result.attachment)
+            is VendorAttachmentResolution.Failed -> Toast.makeText(
+                context,
+                context.getString(
+                    if (result.reason == VendorFileFailureReason.UNSUPPORTED_VENDOR) {
+                        R.string.chat_attachment_open_unsupported
+                    } else {
+                        R.string.chat_attachment_open_download_failed
+                    },
+                ),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 }

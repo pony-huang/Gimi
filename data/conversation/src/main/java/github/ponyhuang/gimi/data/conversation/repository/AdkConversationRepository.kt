@@ -14,9 +14,12 @@ import github.ponyhuang.gimi.data.conversation.mapper.EventMapper
 import github.ponyhuang.gimi.domain.conversation.model.CONVERSATION_TITLE_STATE_KEY
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
 import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +43,7 @@ class AdkConversationRepository(
     private val sessionService: SessionService,
     private val metadataDao: ConversationMetadataDao,
     private val context: Context,
+    private val uploadedFileRegistry: UploadedFileRegistry,
     private val subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository? = null,
     private val voiceOverrides: VoiceOverrideRepository? = null,
 ) : ConversationRepository {
@@ -158,6 +162,12 @@ class AdkConversationRepository(
                     author = "subtasks", timestamp = batch.createdAt,
                 ).copy(subtaskBatch = batch)
             }).sortedBy(Message::timestamp)
+                .let { messages ->
+                    // 厂商引用附件在此按注册表绑定补回本地归档副本，供点击打开先找本地。
+                    enrichVendorAttachments(messages) { vendor, fileId ->
+                        uploadedFileRegistry.localPathFor(vendor, fileId)
+                    }
+                }
         } catch (t: Throwable) {
             recover(t, "EventMapper.fromSession($sessionId)", emptyList())
         }
@@ -411,4 +421,51 @@ private fun <T> recover(failure: Throwable, operation: String, fallback: T): T {
         "$operation failed: ${failure::class.simpleName}: ${failure.message}",
     )
     return fallback
+}
+
+/**
+ * 用注册表绑定还原厂商引用附件的本地归档副本。
+ *
+ * 厂商上传的附件落盘时 fileUri 是 gimi-file:// 引用，本地归档路径不进事件；还原阶段
+ * 在此按 fileId 查注册表绑定补回 [FileAttachment.payloadReference]，让"点击打开附件"
+ * 先找到本地副本。绑定悬空（用户已删工作区文件）或查询失败时保持 payloadReference
+ * 为 null，且不标 isMissing——打开链路还有厂商下载兜底，缺失占位反而会禁掉点击。
+ */
+internal suspend fun enrichVendorAttachments(
+    messages: List<Message>,
+    localPathFor: suspend (vendor: String, fileId: String) -> String?,
+): List<Message> {
+    val pending = { message: Message ->
+        message.fileAttachments.any { it.fileId != null && it.payloadReference == null }
+    }
+    if (messages.none(pending)) return messages
+    return messages.map { message ->
+        if (!pending(message)) {
+            message
+        } else {
+            message.copy(fileAttachments = message.fileAttachments.map { attachment ->
+                enrichVendorAttachment(attachment, localPathFor)
+            })
+        }
+    }
+}
+
+private suspend fun enrichVendorAttachment(
+    attachment: FileAttachment,
+    localPathFor: suspend (vendor: String, fileId: String) -> String?,
+): FileAttachment {
+    val vendor = attachment.fileVendor ?: return attachment
+    val fileId = attachment.fileId ?: return attachment
+    if (attachment.payloadReference != null) return attachment
+    val localPath = try {
+        localPathFor(vendor, fileId)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        // 单个绑定查询失败不得吞掉整个会话历史（loadMessages 的 catch-all 会清空列表）。
+        null
+    } ?: return attachment
+    val file = File(localPath)
+    if (!file.isFile) return attachment
+    return attachment.copy(payloadReference = localPath, sizeBytes = file.length())
 }

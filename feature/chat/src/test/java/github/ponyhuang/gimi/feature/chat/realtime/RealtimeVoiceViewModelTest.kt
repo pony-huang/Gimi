@@ -714,6 +714,8 @@ class RealtimeVoiceViewModelTest {
             attachmentRepository = mockk(relaxed = true),
             fileGateway = fileGateway,
             uploadedFileRegistry = uploadedFileRegistry,
+            vendorAttachmentResolver = mockk(relaxed = true),
+            refreshUploadedFilesUseCase = mockk(relaxed = true),
             validateAttachments = ValidateChatAttachmentsUseCase(),
         )
     }

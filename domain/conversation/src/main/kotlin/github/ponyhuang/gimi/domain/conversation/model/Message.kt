@@ -162,8 +162,10 @@ data class FileAttachment(
         )
 
         /**
-         * 描述一个已上传到厂商文件服务的附件：本地无副本（厂商文件不可下载），会话内以
-         * [VendorFileReference] 私有引用传递，历史重放直通 file_id。
+         * 描述一个已上传到厂商文件服务的附件：构造时本地无副本，会话内以
+         * [VendorFileReference] 私有引用传递，历史重放直通 file_id。本地归档副本可经
+         * 注册表绑定还原或厂商下载兜底重建（见 [VendorAttachmentResolver]），届时
+         * [payloadReference] 与 [fileId] 并存。
          *
          * @param bytes 厂商响应的文件大小；未知时为 0。
          */

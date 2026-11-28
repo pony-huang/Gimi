@@ -10,6 +10,8 @@ import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolution
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileGateway
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
@@ -65,6 +67,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -249,6 +252,8 @@ class RealtimeVoiceViewModel @Inject constructor(
     private val attachmentRepository: ChatAttachmentRepository,
     private val fileGateway: VendorFileGateway,
     private val uploadedFileRegistry: UploadedFileRegistry,
+    private val vendorAttachmentResolver: VendorAttachmentResolver,
+    private val refreshUploadedFilesUseCase: github.ponyhuang.gimi.domain.conversation.usecase.RefreshUploadedFilesUseCase,
     private val validateAttachments: ValidateChatAttachmentsUseCase,
 ) : ViewModel() {
     private var navigationJob: Job? = null
@@ -298,6 +303,10 @@ class RealtimeVoiceViewModel @Inject constructor(
         resolveConnection = { selection -> latestSettings?.instances?.resolveConnection(selection) },
         isFileUploadEnabled = { composer.value.fileUploadEnabled },
     )
+
+    /** 「上传的文件」强制刷新进行中；防重复请求并驱动抽屉刷新按钮转圈。 */
+    private val _uploadedFilesRefreshing = MutableStateFlow(false)
+    val uploadedFilesRefreshing: StateFlow<Boolean> = _uploadedFilesRefreshing.asStateFlow()
 
     /** 已提交对话覆盖；会话绑定变化时切换观察目标。 */
     private val committedOverridesFlow: StateFlow<ConversationVoiceOverrides> =
@@ -481,6 +490,60 @@ class RealtimeVoiceViewModel @Inject constructor(
             latestSettings?.realtimeSelection
         } else {
             startArguments.value.selection ?: latestSettings?.assistantSelection
+        }
+    }
+
+    /** 打开厂商引用文档附件：先查本地绑定（离线直开），绑定缺失或悬空时走厂商下载兜底。 */
+    suspend fun openVendorDocument(attachment: FileAttachment): VendorAttachmentResolution =
+        vendorAttachmentResolver.resolveVendorPayload(
+            attachment,
+            inputSelection()?.let { selection ->
+                latestSettings?.instances?.resolveConnection(selection)
+            },
+        )
+
+    /**
+     * 强制刷新「上传的文件」列表：仅由用户点击刷新按钮触发；listFiles 对账写回注册表，
+     * 成功后 Room Flow 自动驱动列表，失败经输入栏一次性提示。进行中的刷新直接忽略。
+     */
+    fun refreshUploadedFiles() {
+        if (_uploadedFilesRefreshing.value) return
+        val selection = inputSelection()
+        val resolved = selection?.let { latestSettings?.instances?.resolveConnection(it) }
+        if (resolved == null) {
+            notifyInput(VoiceComposerError.UploadedFilesRefresh)
+            return
+        }
+        _uploadedFilesRefreshing.value = true
+        viewModelScope.launch {
+            val result = refreshUploadedFilesUseCase(resolved.templateId.orEmpty(), resolved)
+            _uploadedFilesRefreshing.value = false
+            if (result is github.ponyhuang.gimi.domain.conversation.usecase.UploadedFilesRefreshResult.Failed) {
+                notifyInput(VoiceComposerError.UploadedFilesRefresh)
+            }
+        }
+    }
+
+    /** 删除已上传厂商文件：厂商侧删除成功后网关同步移除本地注册表记录；失败经输入栏提示。 */
+    fun deleteUploadedFile(entry: UploadedFileEntry) {
+        val resolved = inputSelection()?.let { selection ->
+            latestSettings?.instances?.resolveConnection(selection)
+        }
+        if (resolved == null || resolved.templateId != entry.vendor) {
+            notifyInput(VoiceComposerError.UploadedFileDelete)
+            return
+        }
+        viewModelScope.launch {
+            val result = fileGateway.deleteFile(
+                entry.vendor,
+                resolved.protocol,
+                resolved.endpoint.trimEnd('/'),
+                resolved.apiKey,
+                entry.fileId,
+            )
+            if (result is github.ponyhuang.gimi.domain.conversation.repository.VendorFileDeleteResult.Failure) {
+                notifyInput(VoiceComposerError.UploadedFileDelete)
+            }
         }
     }
 

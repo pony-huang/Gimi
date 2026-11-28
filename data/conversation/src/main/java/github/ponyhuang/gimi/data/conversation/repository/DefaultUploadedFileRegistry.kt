@@ -12,8 +12,9 @@ import kotlinx.coroutines.flow.map
 /**
  * [UploadedFileRegistry] 的 Room 实现。
  *
- * 记录在 chip 上传成功时写入（无论草稿随后是否发送）；fileId 主键幂等覆盖同名重传。
- * 本地只存展示元数据（名字/大小/时间），不存文件字节也不缓存 file_id 映射之外的派生状态。
+ * 记录在 chip 上传成功时写入（无论草稿随后是否发送）；fileId 主键幂等覆盖重传。
+ * 本地存展示元数据与归档绑定（localPath）：绑定在上传时以草稿路径占位，发送归档或
+ * 下载兜底成功后回写为工作区路径，供历史还原与"点击打开附件"先找本地。
  */
 @Singleton
 class DefaultUploadedFileRegistry @Inject constructor(
@@ -29,6 +30,7 @@ class DefaultUploadedFileRegistry @Inject constructor(
                 mimeType = entry.mimeType,
                 bytes = entry.bytes,
                 createdAtEpochSeconds = entry.createdAtEpochSeconds,
+                localPath = entry.localPath,
             ),
         )
     }
@@ -43,9 +45,17 @@ class DefaultUploadedFileRegistry @Inject constructor(
                     mimeType = entity.mimeType,
                     bytes = entity.bytes,
                     createdAtEpochSeconds = entity.createdAtEpochSeconds,
+                    localPath = entity.localPath,
                 )
             }
         }
+
+    override suspend fun localPathFor(vendor: String, fileId: String): String? =
+        dao.localPath(fileId = fileId, vendor = vendor)
+
+    override suspend fun bindLocalFile(vendor: String, fileId: String, localPath: String) {
+        dao.bindLocalPath(fileId = fileId, vendor = vendor, localPath = localPath)
+    }
 
     override suspend fun remove(vendor: String, fileId: String) {
         dao.delete(fileId = fileId, vendor = vendor)

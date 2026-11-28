@@ -95,7 +95,7 @@ interface ConversationMetadataDao {
     }
 }
 
-/** 一条已上传到厂商文件服务的注册记录；fileId 是厂商侧真源，本地只存展示元数据。 */
+/** 一条已上传到厂商文件服务的注册记录；fileId 是厂商侧真源，本地另存归档绑定供打开兜底。 */
 @Entity(
     tableName = "uploaded_files",
     indices = [
@@ -110,6 +110,8 @@ data class UploadedFileEntity(
     val mimeType: String,
     val bytes: Long,
     val createdAtEpochSeconds: Long,
+    /** 绑定的本地归档副本路径；发送归档或下载兜底成功时回写，null 表示尚无绑定。 */
+    val localPath: String? = null,
 )
 
 @Dao
@@ -120,6 +122,14 @@ interface UploadedFileDao {
     @Query("SELECT * FROM uploaded_files WHERE vendor = :vendor ORDER BY createdAtEpochSeconds DESC")
     fun observeForVendor(vendor: String): Flow<List<UploadedFileEntity>>
 
+    /** 查询 fileId 绑定的本地归档副本路径；无记录或无绑定时返回 null。 */
+    @Query("SELECT localPath FROM uploaded_files WHERE fileId = :fileId AND vendor = :vendor")
+    suspend fun localPath(fileId: String, vendor: String): String?
+
+    /** 回写本地归档绑定；记录不存在时无行可改，静默幂等。 */
+    @Query("UPDATE uploaded_files SET localPath = :localPath WHERE fileId = :fileId AND vendor = :vendor")
+    suspend fun bindLocalPath(fileId: String, vendor: String, localPath: String)
+
     /** 厂商侧文件被删除后移除本地记录；不存在时静默幂等。 */
     @Query("DELETE FROM uploaded_files WHERE fileId = :fileId AND vendor = :vendor")
     suspend fun delete(fileId: String, vendor: String)
@@ -127,7 +137,7 @@ interface UploadedFileDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class, UploadedFileEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {

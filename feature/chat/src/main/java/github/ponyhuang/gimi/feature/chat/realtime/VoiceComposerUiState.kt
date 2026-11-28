@@ -22,4 +22,4 @@ data class VoiceComposerUiState(
 )
 
 /** 输入区可翻译的操作反馈，底层异常不直接展示。 */
-enum class VoiceComposerError { StartCall, Unavailable, Unsupported, Attachment, Submit }
+enum class VoiceComposerError { StartCall, Unavailable, Unsupported, Attachment, Submit, UploadedFilesRefresh, UploadedFileDelete }

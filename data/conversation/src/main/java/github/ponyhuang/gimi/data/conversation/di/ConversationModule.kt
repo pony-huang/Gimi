@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.domain.conversation.export.ConversationExportReposi
 import github.ponyhuang.gimi.data.conversation.local.UploadedFileDao
 import github.ponyhuang.gimi.data.conversation.repository.DefaultUploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.VendorAttachmentResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
@@ -83,6 +84,12 @@ object ConversationModule {
 
     @Provides
     @Singleton
+    fun provideVendorAttachmentResolver(
+        implementation: AndroidChatAttachmentRepository,
+    ): VendorAttachmentResolver = implementation
+
+    @Provides
+    @Singleton
     fun provideToolApprovalRepository(
         implementation: ToolApprovalPreferences,
     ): ToolApprovalRepository = implementation
@@ -111,6 +118,7 @@ object ConversationModule {
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
+        uploadedFileRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
         subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository,
         voiceOverrides: VoiceOverrideRepository,
     ): ConversationRepository = AdkConversationRepository(
@@ -119,6 +127,7 @@ object ConversationModule {
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
+        uploadedFileRegistry = uploadedFileRegistry,
         subtasks = subtasks,
         voiceOverrides = voiceOverrides,
     )
@@ -130,6 +139,7 @@ object ConversationModule {
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
+        uploadedFileRegistry: github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry,
         voiceOverrides: VoiceOverrideRepository,
     ): ConversationRepository = AdkConversationRepository(
         appName = AgentSessionIdentity.APP_NAME,
@@ -137,6 +147,7 @@ object ConversationModule {
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
+        uploadedFileRegistry = uploadedFileRegistry,
         subtasks = null,
         voiceOverrides = voiceOverrides,
     )

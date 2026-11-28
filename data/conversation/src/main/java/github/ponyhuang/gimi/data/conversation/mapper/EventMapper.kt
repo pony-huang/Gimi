@@ -207,7 +207,9 @@ object EventMapper {
                 Log.w(TAG, "Dropping file attachment without mime/reference: ${file.displayName.orEmpty()}")
                 return null
             }
-            // 厂商 file 引用（gimi-file://）：本地无副本，按引用附件映射，重放直通 file_id。
+            // 厂商 file 引用（gimi-file://）：按引用附件映射，重放直通 file_id。本地归档
+            // 副本不进事件，还原后由仓储层按注册表绑定补回 payloadReference（见
+            // enrichVendorAttachments）。
             VendorFileReference.parse(reference)?.let { (vendor, fileId) ->
                 return FileAttachment.fromVendorReference(
                     vendor = vendor,

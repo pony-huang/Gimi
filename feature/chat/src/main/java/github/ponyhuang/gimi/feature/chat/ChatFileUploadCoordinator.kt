@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import github.ponyhuang.gimi.domain.conversation.model.VendorFileReference
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileEntry
 import github.ponyhuang.gimi.domain.conversation.repository.UploadedFileRegistry
 import github.ponyhuang.gimi.domain.conversation.repository.VendorFileUpload
@@ -139,6 +140,9 @@ class ChatFileUploadCoordinator(
                             mimeType = draft.mimeType,
                             bytes = result.bytes,
                             createdAtEpochSeconds = result.createdAtEpochSeconds,
+                            // 上传时草稿必为本地路径（chip 阶段是 cache 草稿，发送归档后由
+                            // 归档收口回写为工作区路径）；作为打开附件的本地绑定初始值。
+                            localPath = draft.reference.takeUnless { it.startsWith(VendorFileReference.SCHEME) },
                         ),
                     )
                     _states.update {

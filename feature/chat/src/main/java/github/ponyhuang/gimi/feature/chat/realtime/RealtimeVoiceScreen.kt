@@ -29,8 +29,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -1103,15 +1101,20 @@ private fun VoiceSwitchingIndicator(scene: VoiceSceneColors, modifier: Modifier 
 }
 
 /**
- * 底部语音配置微胶囊组（方案 B）：按当前语音模式动态展示「链路 + 各角色模型 + 音色」。
+ * 底部语音配置微胶囊组（方案 B · 固定两行布局）：按当前语音模式动态展示「链路 + 各角色模型 + 音色」。
  *
- * - 级联：链路 + 对话模型 + 识别模型 (STT) + 合成模型 (TTS) + 音色（3 模型 + 音色）
- * - 半级联：链路 + 理解模型 (Omni) + 合成模型 (TTS) + 音色（2 模型 + 音色）
- * - 实时：链路 + 实时模型 + 音色（1 模型 + 音色）
+ * - 级联（3 模型 + 音色）：
+ *   第 1 行：`[级联]` + `[对话模型]` + `[音色]`
+ *   第 2 行：`[识别模型 (STT)]` + `[合成模型 (TTS)]`
+ * - 半级联（2 模型 + 音色）：
+ *   第 1 行：`[半级联]` + `[理解模型 (Omni)]` + `[音色]`
+ *   第 2 行：`[合成模型 (TTS)]`
+ * - 实时（1 模型 + 音色）：
+ *   第 1 行：`[实时模型]`
+ *   第 2 行：`[实时]` + `[音色]`
  *
- * 每个胶囊限制最大宽度并对超长名称单行省略（Ellipsis），不再展示音频设备与挂断锁定提示。
+ * 每行采用单行 `Row` 居中排布，长文案胶囊按权重自适应收缩并单行省略（Ellipsis），严格占用两行、不折出第三行。
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VoiceConfigMicroPills(
     uiState: RealtimeVoiceUiState,
@@ -1121,61 +1124,124 @@ internal fun VoiceConfigMicroPills(
     val defaultVoice = stringResource(R.string.voice_settings_default_voice)
     val primaryModelName = uiState.modelName.ifBlank { uiState.chatModelName }.ifBlank { notConfigured }
     val primaryTemplateId = uiState.modelTemplateId.ifBlank { uiState.chatModelTemplateId }
+        .takeIf { uiState.modelName.isNotBlank() || uiState.chatModelName.isNotBlank() }
     val sttName = uiState.sttModelName.ifBlank { notConfigured }
+    val sttTemplateId = uiState.sttModelTemplateId.takeIf { uiState.sttModelName.isNotBlank() }
     val ttsName = uiState.ttsModelName.ifBlank { notConfigured }
+    val ttsTemplateId = uiState.ttsModelTemplateId.takeIf { uiState.ttsModelName.isNotBlank() }
     val voiceDisplay = uiState.voiceName.ifBlank { defaultVoice }
+    val pipelineText = stringResource(pipelineTitleRes(uiState.pipeline))
 
-    FlowRow(
+    Column(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        VoicePipelineBadgePill(text = stringResource(pipelineTitleRes(uiState.pipeline)))
         when (uiState.pipeline) {
             VoicePipeline.CASCADED -> {
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_chat),
-                    valueText = primaryModelName,
-                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() || uiState.chatModelName.isNotBlank() },
-                )
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_recognition),
-                    valueText = sttName,
-                    serviceTemplateId = uiState.sttModelTemplateId.takeIf { uiState.sttModelName.isNotBlank() },
-                )
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_synthesis),
-                    valueText = ttsName,
-                    serviceTemplateId = uiState.ttsModelTemplateId.takeIf { uiState.ttsModelName.isNotBlank() },
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoicePipelineBadgePill(text = pipelineText)
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_chat),
+                        valueText = primaryModelName,
+                        serviceTemplateId = primaryTemplateId,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxPillWidth = 176.dp,
+                    )
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_voice),
+                        valueText = voiceDisplay,
+                        serviceTemplateId = null,
+                        maxPillWidth = 116.dp,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_recognition),
+                        valueText = sttName,
+                        serviceTemplateId = sttTemplateId,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxPillWidth = 172.dp,
+                    )
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_synthesis),
+                        valueText = ttsName,
+                        serviceTemplateId = ttsTemplateId,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxPillWidth = 172.dp,
+                    )
+                }
             }
             VoicePipeline.SEMI_CASCADED -> {
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_understanding),
-                    valueText = primaryModelName,
-                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() || uiState.chatModelName.isNotBlank() },
-                )
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_synthesis),
-                    valueText = ttsName,
-                    serviceTemplateId = uiState.ttsModelTemplateId.takeIf { uiState.ttsModelName.isNotBlank() },
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoicePipelineBadgePill(text = pipelineText)
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_understanding),
+                        valueText = primaryModelName,
+                        serviceTemplateId = primaryTemplateId,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxPillWidth = 176.dp,
+                    )
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_voice),
+                        valueText = voiceDisplay,
+                        serviceTemplateId = null,
+                        maxPillWidth = 116.dp,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_synthesis),
+                        valueText = ttsName,
+                        serviceTemplateId = ttsTemplateId,
+                        maxPillWidth = 240.dp,
+                    )
+                }
             }
             VoicePipeline.NATIVE_REALTIME -> {
-                VoiceRoleMicroPill(
-                    roleLabel = stringResource(R.string.voice_pill_role_realtime),
-                    valueText = primaryModelName,
-                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() },
-                    maxPillWidth = 220.dp,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_realtime),
+                        valueText = primaryModelName,
+                        serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() },
+                        maxPillWidth = 260.dp,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VoicePipelineBadgePill(text = pipelineText)
+                    VoiceRoleMicroPill(
+                        roleLabel = stringResource(R.string.voice_pill_role_voice),
+                        valueText = voiceDisplay,
+                        serviceTemplateId = null,
+                        maxPillWidth = 160.dp,
+                    )
+                }
             }
         }
-        VoiceRoleMicroPill(
-            roleLabel = stringResource(R.string.voice_pill_role_voice),
-            valueText = voiceDisplay,
-            serviceTemplateId = null,
-            maxPillWidth = 140.dp,
-        )
     }
 }
 

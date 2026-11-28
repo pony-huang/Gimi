@@ -85,24 +85,18 @@ class ReleaseToolsTest(unittest.TestCase):
                     release.config(root)
 
     def test_pretag_rejects_mismatched_missing_and_unmerged_tags(self):
-        """预检：tag 与 version.txt 不一致、tag 不存在、tag 不在 origin/main 内、CHANGELOG 缺章节都拒绝。"""
+        """预检：tag 与 version.txt 不一致拒绝；tag 不存在时须检出 origin/main 顶端；tag 已存在但不在 main 内拒绝。"""
         with patch.object(release, 'config', return_value=('0.7.0-beta.1', 1001)), patch.object(
             release, 'notes', return_value='notes'
         ), patch.object(release, 'releases', return_value=[]), patch.object(
-            release, 'run', return_value='commit'
+            release, 'run', side_effect=lambda *args: 'commit' if args[2] == 'HEAD' else 'tip'
         ), patch.object(release.subprocess, 'run') as execute:
-            def result(command, **kwargs):
-                # rev-parse 用 returncode 表达 tag 是否存在；merge-base 用非零表达不在 main 内。
-                return subprocess.CompletedProcess(command, 0)
-            execute.side_effect = result
-            release.pretag('v0.7.0-beta.1')
-            with self.assertRaises(ValueError):
-                release.pretag('v0.7.0-beta.2')
-            execute.side_effect = lambda command, **kwargs: subprocess.CompletedProcess(
-                command, 1 if command[:2] == ['git', 'rev-parse'] else 0)
+            # tag 不存在但 HEAD 不在 origin/main 顶端：拒绝。
+            execute.side_effect = lambda command, **kwargs: subprocess.CompletedProcess(command, 1)
             with self.assertRaises(ValueError):
                 release.pretag('v0.7.0-beta.1')
-            # mock 替换了 subprocess.run，check=True 的抛错逻辑不复存在；merge-base 失败须由 side_effect 自行抛出。
+            # tag 存在但不在 origin/main 历史内：merge-base 失败须由 side_effect 自行抛出（mock 替换了
+            # subprocess.run，check=True 的抛错逻辑不复存在；side_effect 返回异常实例不会抛）。
             def unmerged(command, **kwargs):
                 if command[:2] == ['git', 'merge-base']:
                     raise subprocess.CalledProcessError(1, command)

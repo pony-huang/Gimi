@@ -2,6 +2,21 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [1.0.0-beta.6](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.5...v1.0.0-beta.6) (2026-11-28)
+
+### 新功能与体验
+
+- A2UI 采用官方组件目录并渐进渲染，新增音乐播放器卡（网易云红主题+Spotify）、K 线图、ChipSelect、EntityCard、天气卡等信息卡片组件。
+- 模型选择页改版：选择卡片+摘要行+多模态徽标，支持全选。
+- 模型服务详情页新增 Realtime 默认模型音色配置。
+- 自定义音色 ID 跨厂商可用。
+
+### 修复
+
+- 实时语音稳定性：本地 VAD 接管轮次判定、重连生命周期加固、启动失败后完成清理、租约冲突与历史错误兜底、OpenAI/Qwen 助手历史按 output text 编码；修复打断后旧回答可能续播的竞态。
+- 语音通话中居中当前角色、重选语音时保留 Realtime 配置。
+- 聊天：流式回复滚动跟随、composer 胶囊高度收紧。
+
 ## [1.0.0-beta.5](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.4.0.1...v1.0.0-beta.5) (2026-11-23)
 
 ### 新功能与体验

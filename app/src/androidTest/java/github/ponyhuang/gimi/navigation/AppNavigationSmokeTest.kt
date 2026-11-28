@@ -24,7 +24,6 @@ import github.ponyhuang.gimi.feature.recommendation.RecommendationDestination
 import github.ponyhuang.gimi.feature.settings.SettingsDestination
 import github.ponyhuang.gimi.feature.sandbox.SandboxDestination
 import github.ponyhuang.gimi.feature.skills.SkillsDestination
-import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -76,7 +75,6 @@ class AppNavigationSmokeTest {
         MemoryDestination.History,
         PermissionDestination.Settings,
         SkillsDestination.Settings,
-        WorkspaceDestination.Manager,
     )
 
     @Test

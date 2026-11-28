@@ -26,6 +26,7 @@
 
     <string name="settings_workspace_title">Cache</string>
     <string name="settings_workspace_subtitle">Chat attachment files</string>
+    <string name="settings_workspace_files_unavailable">No file manager app is available</string>
 
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">System access permissions</string>

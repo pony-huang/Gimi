@@ -1,0 +1,4 @@
+<resources>
+    <string name="workspace_documents_title">缓存区</string>
+    <string name="workspace_documents_summary">聊天附件文件</string>
+</resources>

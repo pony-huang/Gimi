@@ -68,8 +68,6 @@ import github.ponyhuang.gimi.feature.settings.SettingsEntryProvider
 import github.ponyhuang.gimi.feature.settings.SettingsNavigationCallbacks
 import github.ponyhuang.gimi.feature.skills.SkillsDestination
 import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
-import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
-import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import androidx.compose.ui.platform.LocalContext
@@ -285,7 +283,6 @@ internal fun AppEntryContent(
             onNavigateToMobileUse = { navigate(MobileUseDestination.Settings) },
             onNavigateToPlugins = { navigate(PluginDestination.Settings) },
             onNavigateToSkills = { navigate(SkillsDestination.Settings) },
-            onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
             onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
             onNavigateToRecommendations = {
                 navigate(RecommendationDestination.Settings)
@@ -322,8 +319,7 @@ internal fun AppEntryContent(
         ) ||
         MemoryEntryProvider(destination, goBack, navigate) ||
         PermissionEntryProvider(destination, goBack) ||
-        SkillsEntryProvider(destination, goBack) ||
-        WorkspaceEntryProvider(destination, goBack)
+        SkillsEntryProvider(destination, goBack)
 
     check(handled) { "No feature entry provider for $destination" }
 }

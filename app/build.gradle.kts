@@ -213,7 +213,6 @@ dependencies {
     implementation(project(":feature:assistant"))
     implementation(project(":feature:recommendation"))
     implementation(project(":feature:memory"))
-    implementation(project(":feature:workspace"))
     implementation(project(":feature:mobileuse"))
     testImplementation(project(":core:testing"))
     testImplementation(project(":data:modelaccess"))

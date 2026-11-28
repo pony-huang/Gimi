@@ -10,8 +10,8 @@ import dagger.multibindings.IntoSet
  * 附件工作区的逻辑目录 id。
  *
  * 工作区由两个 capability 共同消费：`:data:conversation` 把发送的附件归档进工作区，
- * `:data:workspace` 提供文件管理（列表/删除/占用）。目录声明放在 core 是因为 id 常量
- * 与 [ManagedDirectorySpec] 必须对双方可见，跨能力互相依赖属于捷径依赖。
+ * `:data:workspace` 通过 `DocumentsProvider` 向系统文件管理器暴露浏览与删除能力。目录声明
+ * 放在 core 是因为 id 常量与 [ManagedDirectorySpec] 必须对双方可见，跨能力互相依赖属于捷径依赖。
  */
 object WorkspaceStorageIds {
     /** 全局共享附件工作区：跨会话公用、用户自管生命周期。 */

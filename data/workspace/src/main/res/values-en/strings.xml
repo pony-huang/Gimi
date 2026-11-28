@@ -1,0 +1,4 @@
+<resources>
+    <string name="workspace_documents_title">Cache</string>
+    <string name="workspace_documents_summary">Chat attachment files</string>
+</resources>

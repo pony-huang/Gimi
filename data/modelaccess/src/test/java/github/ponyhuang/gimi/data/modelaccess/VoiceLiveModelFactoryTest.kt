@@ -45,7 +45,7 @@ class VoiceLiveModelFactoryTest {
     private val configuration = mockk<AgentModelConfigurationSource>()
     private val modelCatalog = mockk<ModelCatalogRepository>()
     private val recognition = mockk<SpeechRecognitionRepository> {
-        every { availability } returns MutableStateFlow(false)
+        every { isAvailable() } returns false
     }
     private val synthesis = mockk<SpeechSynthesisRepository> {
         every { isAvailable() } returns false

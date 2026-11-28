@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.StateFlow
  *   原生实时链路为其实时模型。
  * @property realtimeVoice 原生实时链路的自定义会话音色；null 表示使用所选模型在该厂商下的缺省音色。
  *   音色与模型强绑定（跨代际的音色集互不相同），因此覆盖值由调用方按当前模型解析后传入。
- * @property synthesisVoice 级联链路的合成音色覆盖；null 表示沿用全局合成音色或厂商默认。
+ * @property synthesisVoice 会话合成音色；null 表示使用所选模型适用的全局音色或厂商默认。
+ * @property synthesisModel 级联与半级联使用的合成模型；null 表示使用全局合成模型。
+ * @property recognitionModel 级联使用的识别模型；null 表示使用全局识别模型。
  */
 data class RealtimeVoiceConfiguration(
     val style: VoiceConversationStyle = VoiceConversationStyle.CHATBOT,
@@ -26,6 +28,7 @@ data class RealtimeVoiceConfiguration(
     val realtimeVoice: String? = null,
     val synthesisVoice: String? = null,
     val synthesisModel: ModelSelection? = null,
+    val recognitionModel: ModelSelection? = null,
 ) {
     init {
         require(style != VoiceConversationStyle.ASSISTANT || pipeline != VoicePipeline.CASCADED ||

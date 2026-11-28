@@ -14,7 +14,6 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeModel
 import github.ponyhuang.gimi.data.modelaccess.qwen.realtime.QwenRealtimeProtocol
@@ -57,14 +56,18 @@ class VoiceLiveModelFactory @Inject constructor(
         return capabilities.realtimeSupport(templateId)?.uplink
     }
 
-    suspend fun isAvailable(selection: ModelSelection? = null): Boolean {
+    suspend fun isAvailable(
+        selection: ModelSelection? = null,
+        recognitionModel: ModelSelection? = null,
+        synthesisModel: ModelSelection? = null,
+    ): Boolean {
         configuration.awaitReady()
         if (realtimeConnectionFor(selection) != null) {
             // resolveConnection 已校验启用状态、凭据与模型存在性。
             return true
         }
         return (selection == null || configuration.resolveChatModel(selection) != null) &&
-            synthesis.isAvailable() && recognition.availability.first()
+            synthesis.isAvailable(synthesisModel) && recognition.isAvailable(recognitionModel)
     }
 
     suspend fun isSemiCascadedAvailable(
@@ -81,12 +84,16 @@ class VoiceLiveModelFactory @Inject constructor(
      *
      * @param selection 模型选择；null 表示用当前配置里的默认聊天模型。
      * @param voice Realtime 会话音色的自定义覆盖；null 表示使用所选模型在该厂商下的缺省音色。
-     * @param synthesisVoice 级联链路的合成音色覆盖；null 表示沿用全局合成音色。
+     * @param synthesisVoice 级联链路的合成音色覆盖。
+     * @param recognitionModel 级联识别模型；null 表示使用全局选择。
+     * @param synthesisModel 级联合成模型；null 表示使用全局选择。
      */
     suspend fun create(
         selection: ModelSelection? = null,
         voice: String? = null,
         synthesisVoice: String? = null,
+        recognitionModel: ModelSelection? = null,
+        synthesisModel: ModelSelection? = null,
     ): Model {
         configuration.awaitReady()
         val connection = realtimeConnectionFor(selection)
@@ -112,10 +119,10 @@ class VoiceLiveModelFactory @Inject constructor(
                 )
                 // 未知厂商的实时模型无原生适配器；防御性回落级联（其模型未声明
                 // STT/TTS 能力，实际会话会在级联可用性检查处失败并暴露配置问题）。
-                else -> cascadedModel(selection, synthesisVoice)
+                else -> cascadedModel(selection, synthesisVoice, recognitionModel, synthesisModel)
             }
         }
-        return cascadedModel(selection, synthesisVoice)
+        return cascadedModel(selection, synthesisVoice, recognitionModel, synthesisModel)
     }
 
     /**
@@ -148,13 +155,20 @@ class VoiceLiveModelFactory @Inject constructor(
         )
     }
 
-    private suspend fun cascadedModel(selection: ModelSelection?, synthesisVoice: String? = null): Model {
+    private suspend fun cascadedModel(
+        selection: ModelSelection?,
+        synthesisVoice: String?,
+        recognitionModel: ModelSelection?,
+        synthesisModel: ModelSelection?,
+    ): Model {
         check(selection == null || configuration.resolveChatModel(selection) != null) { "Chat model unavailable" }
         return CascadedVoiceModel(
             models.createModel(models.selectModelConfig(selection)),
             recognition,
             synthesis,
             synthesisVoice,
+            recognitionModel,
+            synthesisModel,
         )
     }
 }

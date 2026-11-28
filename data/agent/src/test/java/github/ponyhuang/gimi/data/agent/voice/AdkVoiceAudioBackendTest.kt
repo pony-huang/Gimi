@@ -11,6 +11,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceConfiguration
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 import github.ponyhuang.gimi.domain.conversation.repository.ChatbotRolePreset
@@ -188,9 +190,14 @@ class AdkVoiceAudioBackendTest {
     }
 
     @Test
-    fun pcmInputTextDeltasAndLazySynthesisKeepTheirExistingBehavior(): Unit = runBlocking {
+    fun cascadedChatbotUsesSelectedSpeechModelsForInputAndLazySynthesis(): Unit = runBlocking {
         withTimeout(5_000) {
-            every { recognition.transcribeStreaming(pcm) } returns flowOf(RecognitionEvent.Final(" 用户输入 "))
+            val qwenAsr = ModelSelection("qwen", "speech", "qwen-audio-3.1-asr-flash-message")
+            val qwenTts = ModelSelection("qwen", "speech", "qwen-audio-3.1-tts-flash")
+            val voice = "baianran_v3.1"
+            every { recognition.transcribeStreaming(pcm, selection = qwenAsr) } returns
+                flowOf(RecognitionEvent.Final(" 用户输入 "))
+            every { synthesis.openSession(voice, qwenTts) } returns null
             every { textModel.name } returns "fake"
             every { textModel.generateContent(any(), true) } answers {
                 // 实时语音不能关闭模型必需的思考模式；thought 内容仍由语音层过滤。
@@ -203,13 +210,23 @@ class AdkVoiceAudioBackendTest {
                 )
             }
             val requested = mutableListOf<String>()
-            every { synthesis.synthesize(any()) } answers {
+            every { synthesis.synthesize(any(), voice, qwenTts) } answers {
                 requested += firstArg<String>()
                 flowOf(pcm)
             }
-            coEvery { models.create() } answers { CascadedVoiceModel(textModel, recognition, synthesis) }
+            coEvery { models.isAvailable(recognitionModel = qwenAsr, synthesisModel = qwenTts) } returns true
+            coEvery { models.create(synthesisVoice = voice, recognitionModel = qwenAsr, synthesisModel = qwenTts) } answers {
+                CascadedVoiceModel(textModel, recognition, synthesis, voice, qwenAsr, qwenTts)
+            }
             val persistence = mockk<ChatbotConversationWriter.Call>(relaxed = true)
-            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open()
+            val session = AdkVoiceAudioBackend(models, recognition, synthesis, emptyChatbotPrompts(), unusedAgentVoice(), unusedAssistantTools(), stubSimpleVoice(persistence)).open(
+                RealtimeVoiceConfiguration(
+                    recognitionModel = qwenAsr,
+                    synthesisModel = qwenTts,
+                    synthesisVoice = voice,
+                ),
+            )
+            assertTrue(session.isAvailable())
             val text = StringBuilder()
             val spoken = mutableListOf<String>()
             var firstAudio = true

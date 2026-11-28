@@ -218,8 +218,10 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
                     pipeline = startPipeline,
                     conversationId = targetId,
                     modelSelection = cascadedModel,
-                    // 级联合成音色的对话覆盖；null 表示沿用全局合成音色或厂商默认。
+                    // 音色按生效的合成模型解析，建会话时必须把两者一起下传。
                     synthesisVoice = config.cascadedVoice.voiceId,
+                    synthesisModel = config.cascadedSynthesisModel,
+                    recognitionModel = config.cascadedRecognitionModel,
                 )
             }
         }

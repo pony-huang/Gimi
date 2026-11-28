@@ -15,6 +15,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
@@ -51,8 +52,10 @@ class CascadedVoiceModel(
     private val llmModel: Model,
     private val recognition: SpeechRecognitionRepository,
     private val synthesis: SpeechSynthesisRepository,
-    /** 合成音色的会话级覆盖；null 表示沿用全局合成音色或厂商默认。 */
+    /** 合成音色的会话级覆盖；null 表示使用所选合成模型适用的全局音色或厂商默认。 */
     private val synthesisVoice: String? = null,
+    private val recognitionModel: ModelSelection? = null,
+    private val synthesisModel: ModelSelection? = null,
 ) : Model {
     override val name: String = "cascaded:${llmModel.name}"
 
@@ -234,7 +237,7 @@ class CascadedVoiceModel(
             }
             val answer = StringBuilder()
             // 服务支持会话式合成时用它：文本随模型增量投递，首包不必等整句。
-            val session = synthesis.openSession(synthesisVoice)
+            val session = synthesis.openSession(synthesisVoice, synthesisModel)
             var completed = false
             try {
                 if (session != null) {
@@ -341,7 +344,7 @@ class CascadedVoiceModel(
                     send(LlmResponse(outputTranscription = if (request.liveConnectConfig.outputAudioTranscription != null)
                         Transcription(text = sentence, finished = false) else null,
                         customMetadata = mapOf(VoiceAudioMarkers.SEGMENT_START to true)))
-                    flow { synthesis.synthesize(sentence, synthesisVoice).collect { emit(it) } }.catch { cause ->
+                    flow { synthesis.synthesize(sentence, synthesisVoice, synthesisModel).collect { emit(it) } }.catch { cause ->
                         if (cause is CancellationException) throw cause
                         throw VoiceAudioBackendException(RealtimeVoiceFailure.Synthesis, cause = cause)
                     }.collect { bytes ->
@@ -375,7 +378,7 @@ class CascadedVoiceModel(
         private suspend fun transcribe(pcm16: ByteArray, send: suspend (LlmResponse) -> Unit): String {
             val wantsTranscript = request.liveConnectConfig.inputAudioTranscription != null
             var final = ""
-            recognition.transcribeStreaming(pcm16).collect { event ->
+            recognition.transcribeStreaming(pcm16, selection = recognitionModel).collect { event ->
                 when (event) {
                     is RecognitionEvent.Partial -> if (wantsTranscript) {
                         send(LlmResponse(inputTranscription = Transcription(text = event.text.trim(), finished = false)))

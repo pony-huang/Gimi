@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.voice.repository
 
 import github.ponyhuang.gimi.data.voice.remote.VoiceCapabilityRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedServiceConnection
 import github.ponyhuang.gimi.domain.modelcatalog.model.recognitionCapability
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -26,8 +27,10 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
         modelCatalog.observeInstances(),
         modelCatalog.observeSpeechSelection(),
     ) { _, _ ->
-        currentConfig() != null
+        isAvailable()
     }.distinctUntilChanged()
+
+    override fun isAvailable(selection: ModelSelection?): Boolean = currentConfig(selection) != null
 
     override suspend fun transcribe(
         pcm16: ByteArray,
@@ -59,9 +62,10 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     override fun transcribeStreaming(
         pcm16: ByteArray,
         context: List<SpeechContextMessage>,
+        selection: ModelSelection?,
     ): Flow<RecognitionEvent> = flow {
         require(pcm16.isNotEmpty()) { "没有录制到语音，请重试" }
-        val config = currentConfig() ?: error("请先在设置中选择可用的语音识别模型")
+        val config = currentConfig(selection) ?: error("请先在设置中选择可用的语音识别模型")
         val request = RecognitionRequest(
             pcm16 = pcm16,
             modelId = config.modelId,
@@ -82,8 +86,8 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     }
 
     /** 当前选中的识别连接；能力校验在连接视图解析后进行。 */
-    private fun currentConfig(): ResolvedServiceConnection? =
-        modelCatalog.resolveVoiceConnection(modelCatalog.currentSpeechSelection()) { model ->
+    private fun currentConfig(selection: ModelSelection? = null): ResolvedServiceConnection? =
+        modelCatalog.resolveVoiceConnection(selection ?: modelCatalog.currentSpeechSelection()) { model ->
             model.recognitionCapability != null
         }
 }

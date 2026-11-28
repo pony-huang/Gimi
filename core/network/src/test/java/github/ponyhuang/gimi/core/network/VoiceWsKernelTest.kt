@@ -107,4 +107,28 @@ class VoiceWsKernelTest {
         assertTrue(detail!!.length < 16 * 1024)
         kernel.close()
     }
+
+    @Test
+    fun sendControlAfterHandshakeFailureDoesNotPreemptTypedFailure() = runBlocking {
+        // 回归：握手被拒后 socket.send() 返回 false，发送路径不得抢先抛普通 IOException——
+        // 高负载下握手失败可先于发送协程执行，抢先抛错会把 frames 通道里已就绪的
+        // 类型化握手失败（401→认证类）掩盖成网络错误，让用户看到错误的失败分类。
+        server.enqueue(MockResponse().setResponseCode(401))
+        val kernel = VoiceWsKernel(
+            client = client,
+            request = Request.Builder().url(server.url("/ws")).build(),
+            handshakeFailure = { statusCode, _, _ -> IllegalStateException("mapped $statusCode") },
+        )
+
+        val failure = withTimeout(5_000) {
+            var last = kernel.frames().receive()
+            while (last !is VoiceWsKernel.WsFrame.Failure) last = kernel.frames().receive()
+            last
+        }
+        assertEquals("mapped 401", failure.error.message)
+
+        // 连接已终局（此时 send 必然返回 false）：发送不再抛错，失败报告由 frames 负责。
+        kernel.sendControl(com.google.gson.JsonObject().apply { addProperty("probe", true) })
+        kernel.close()
+    }
 }

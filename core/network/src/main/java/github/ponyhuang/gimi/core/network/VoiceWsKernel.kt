@@ -3,7 +3,6 @@ package github.ponyhuang.gimi.core.network
 import android.util.Log
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import java.io.IOException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -40,16 +39,22 @@ class VoiceWsKernel(
     /** 事件通道；调用方消费完后直接退出循环即可，关闭会话会一并结束通道。 */
     fun frames(): ReceiveChannel<WsFrame> = frames
 
-    /** 发送一个控制事件；连接已断开抛 [IOException]，让失败映射归入网络类而非 Unknown。 */
+    /**
+     * 发送一个控制事件。
+     *
+     * 发送失败（连接已终局）不在此处抛错：真实原因——如握手 401/403 的类型化失败——
+     * 必然已经或即将经由 [frames] 送达，由消费方按分类抛出。若此处抢先抛 [IOException]，
+     * 会把认证失败掩盖成普通网络错误（高负载下握手被拒可快于发送协程的调度）。
+     */
     suspend fun sendControl(payload: JsonObject) {
-        if (!socket.send(payload.toString())) throw IOException("语音服务连接已断开")
+        socket.send(payload.toString())
     }
 
-    /** 发送一段二进制音频。 */
+    /** 发送一段二进制音频；发送失败的报告路径同 [sendControl]，交由 [frames] 报告真实原因。 */
     suspend fun sendAudio(bytes: ByteArray) {
         // OkHttp 的发送队列有上限；接近上限时先等一会儿，避免直接丢帧。
         while (socket.queueSize() > MAX_PENDING_AUDIO_BYTES) delay(SEND_BACKPRESSURE_DELAY_MS.milliseconds)
-        if (!socket.send(bytes.toByteString())) throw IOException("语音服务连接已断开")
+        socket.send(bytes.toByteString())
     }
 
     /**

@@ -57,6 +57,14 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 - **异步创建**：`A2uiCreateScope` 立即返回 `pending`，生成在旁路 scope 进行。预览和最终状态就绪后按卡片分别投递，即使主回复还在生成。runner 流结束后最终结果归档为事件——取消经 `NonCancellable` 持久化为 CANCELLED，失败持久化为 FAILED（保留重试入口）。
 - **重试**：仅限 FAILED/CANCELLED 任务；从归档的 `changes` 重跑生成，无父运行、无业务工具。
 
+## 直出与延迟
+
+- **首个有用内容**是用户首次看到可操作的控件或可直接阅读的结果。对设备控件来说，实际状态已显示且控件可操作时才计入。加载占位单独计时。
+- `generate_a2ui` 可通过 `template_id=device_controls` 直出，也可接收 `components` 和可选 `data` JSON 字符串。两条路径沿用 A2UI 0.9.1 校验和历史链路，UI 子模型请求数均为零，通过校验后立即向渲染器提交完整组件树。
+- 直接组合校验失败时，返回校验错误和单次有效的 `repair_id`，限定在同一轮的同一张卡。修正仍失败时，如果有 `changes` 和受支持的 `component_names`，回退到现有 UI 生成链路并沿用其校验和重试上限。无效草稿不会成为卡片文档。
+- 用 `adb shell setprop log.tag.GimiA2uiTiming DEBUG` 启用本地计时。耗时从聊天提交开始，覆盖进入工具、UI 模型请求和首个输出、格式纠错、占位与卡片帧、最终更新交付。可见且可操作的设备控件另记 `first_useful_device_frame`。日志只含阶段、耗时和用于关联的 surface 短后缀。
+- 先取得基线，再以天气卡试点增量更新。天气卡的首个有用结果包含地点和已确认的当前温度。
+
 ## 校验链路（data/a2ui）
 
 `AndroidxA2uiProtocol.validate` 依次：surfaceId 非空 → 官方消息解析器 → 各消息 surfaceId 一致 → 删除修订只含一条删除消息 → 否则恰好 `createSurface`/`updateDataModel`（根 `/`）/`updateComponents` → catalogId 匹配（无协商——单一 catalog）→ 1..256 个唯一组件 id 且有 `root` → 图完整性（子引用存在、无环）→ 经官方 `A2uiCoreMessageProcessor` 做 5 秒超时保护的全量 schema 校验。**超时被归一化为 `IllegalArgumentException`**，让它进入子代理的纠错循环而不是静默取消调用方 scope。`replay(records)` 把修订/提交折叠成最终文档（提交覆写 data-model 根，恢复的历史保留最后提交的表单值）。

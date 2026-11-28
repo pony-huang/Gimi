@@ -5,6 +5,7 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.types.*
 import github.ponyhuang.gimi.domain.a2ui.*
 import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.*
 
@@ -25,6 +26,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
             try {
                 return streamSurface(surfaceId, capabilities, scoped, allowedTypes, inputRouting, instruction, publishPreview)
             } catch (invalid: InvalidA2uiStream) {
+                A2uiTiming.mark(surfaceId, "format_correction", repeatable = true)
                 correction = "\nPrevious output was invalid: ${invalid.message}. Generate a corrected complete surface."
             }
         }
@@ -72,7 +74,12 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                 ),
             )
             // 网络或 SDK 错误不进入格式纠错循环，避免失败时额外付费调用。
-            val responses = model.generateContent(request, stream = false).toList()
+            A2uiTiming.mark(surfaceId, "ui_model_request", repeatable = true)
+            val responses = model.generateContent(request, stream = false).onEach { response ->
+                if (response.content?.parts.orEmpty().any { it.thought != true && (it.text != null || it.functionCall != null) }) {
+                    A2uiTiming.mark(surfaceId, "ui_model_first_output")
+                }
+            }.toList()
             responses.firstOrNull { it.errorCode != null || !it.errorMessage.isNullOrBlank() }?.let {
                 error(it.errorMessage ?: it.errorCode.orEmpty())
             }
@@ -88,6 +95,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                 return document
             } catch (invalid: IllegalArgumentException) {
                 if (attempt == attempts - 1) throw invalid
+                A2uiTiming.mark(surfaceId, "format_correction", repeatable = true)
                 correction = "\nPrevious output was invalid: ${invalid.message}. Generate a corrected complete surface."
             }
         }
@@ -150,12 +158,14 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                 publishPreview(document)
             }
         }
+        A2uiTiming.mark(surfaceId, "ui_model_request", repeatable = true)
         model.generateContent(request, stream = true).takeWhile { response ->
             if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
                 error(response.errorMessage ?: response.errorCode.orEmpty())
             }
             for (part in response.content?.parts.orEmpty()) {
                 val text = part.text?.takeIf { it.isNotEmpty() && part.thought != true } ?: continue
+                A2uiTiming.mark(surfaceId, "ui_model_first_output")
                 // ADK 适配器可能在增量之后再发一次完整聚合文本，不能重复拼接。
                 if (response.partial != true && sawTextDelta) continue
                 if (response.partial == true) sawTextDelta = true
@@ -176,7 +186,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
         return final ?: throw InvalidA2uiStream("Missing final snapshot")
     }
 
-    private fun surfaceDocument(
+    internal fun surfaceDocument(
         surfaceId: String,
         capabilities: A2uiCapabilities,
         allowedTypes: Set<String>?,

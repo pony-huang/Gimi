@@ -57,6 +57,14 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 - **Async create**: `A2uiCreateScope` returns `pending` immediately and generates on a side scope; after the runner flow ends, results are archived as events — cancellation persists CANCELLED via `NonCancellable`, failures persist FAILED (so the retry entry stays).
 - **Retry**: only for FAILED/CANCELLED tasks; reruns generation from the archived `changes` with no parent run and no business tools.
 
+## Direct creation and latency
+
+- **First useful content** is the first visible card content a user can act on or read as a result. For a device control, it means the live state is visible and the control is usable. A loading placeholder has its own timestamp.
+- `generate_a2ui` can create a card directly from `template_id=device_controls` or from `components` and optional `data` JSON strings. Both paths use the normal A2UI 0.9.1 validation and history paths, make zero UI model requests, and submit the entire valid tree to the renderer immediately.
+- An invalid direct composition returns a validation error and a single-use `repair_id` for the same surface and turn. A failed correction falls back to the existing UI generation path when `changes` and supported `component_names` are available. The existing generation validation and retry limits apply. Invalid drafts never become card documents.
+- Enable local timing with `adb shell setprop log.tag.GimiA2uiTiming DEBUG`. Elapsed times are relative to chat submission and include tool entry, UI model requests and first output, format correction, placeholder and surface frames, and final update delivery. A visible, actionable device control additionally records `first_useful_device_frame`. The log includes only stages, durations and a short surface correlation suffix.
+- Use the measurements before piloting incremental updates on weather cards. A useful first weather result contains a location and confirmed current temperature.
+
 ## Validation chain (data/a2ui)
 
 `AndroidxA2uiProtocol.validate`, in order: non-blank surfaceId → official message parser → shared surfaceId → delete revisions carry exactly one delete message → otherwise exactly `createSurface`/`updateDataModel`(root `/`)/`updateComponents` → catalogId match (no negotiation — one catalog) → 1..256 unique component ids with `root` → graph integrity (children exist, no cycles) → full schema validation through the official `A2uiCoreMessageProcessor` under a 5 s timeout. **Timeouts are normalized to `IllegalArgumentException`** so they feed the sub-agent's correction loop instead of silently cancelling the caller's scope. `replay(records)` folds revisions/submissions into final documents (a submission overwrites the data-model root so restored history keeps last submitted form values).

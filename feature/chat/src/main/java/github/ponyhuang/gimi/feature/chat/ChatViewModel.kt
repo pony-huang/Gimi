@@ -832,6 +832,11 @@ class ChatViewModel @Inject constructor(
         runtime.attention = SessionResultAttention.NONE
         val navigationAtSend = sessionNavigationCoordinator.navigationVersion
         var preparedTurn: ChatTurn? = null
+        if (runCatching { Log.isLoggable("GimiA2uiTiming", Log.DEBUG) }.getOrDefault(false)) {
+            github.ponyhuang.gimi.domain.a2ui.A2uiTiming.submitted(sessionId) { entry ->
+                Log.d("GimiA2uiTiming", entry)
+            }
+        }
         val job = runLifecycleCoordinator.launchRun(runtime, onFailure = { failure ->
             preparedTurn?.let { turnRecoveryCoordinator.recordFailure(sessionId, it) }
         }) { runToken ->

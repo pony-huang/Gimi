@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -23,8 +25,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.a2ui.A2uiFlashlightState
 import github.ponyhuang.gimi.domain.a2ui.A2uiMediaVolume
+import github.ponyhuang.gimi.domain.a2ui.A2uiTiming
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.feature.chat.a2ui.LocalA2uiDeviceActions
+import github.ponyhuang.gimi.feature.chat.a2ui.LocalChatA2uiSurfaceId
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlin.math.roundToInt
 
@@ -38,7 +42,12 @@ internal object ChatMediaVolumeSlider : A2uiComponent {
     override fun A2uiComponentScope.Content(properties: A2uiComponentProperties, modifier: Modifier) {
         val actions = LocalA2uiDeviceActions.current
         val volume = actions?.volume?.collectAsStateWithLifecycle(minActiveState = Lifecycle.State.RESUMED)?.value
-        MediaVolumeControl(volume, actions?.changingVolume == true, actions?.setVolume ?: {}, modifier)
+        val ready = volume != null && volume.adjustable && volume.maximum > volume.minimum &&
+            actions?.changingVolume != true
+        MediaVolumeControl(
+            volume, actions?.changingVolume == true, actions?.setVolume ?: {},
+            modifier.reportUsefulDeviceControl(LocalChatA2uiSurfaceId.current, ready),
+        )
     }
 }
 
@@ -52,14 +61,23 @@ internal object ChatFlashlightSwitch : A2uiComponent {
     override fun A2uiComponentScope.Content(properties: A2uiComponentProperties, modifier: Modifier) {
         val actions = LocalA2uiDeviceActions.current
         val state = actions?.flashlight?.collectAsStateWithLifecycle(minActiveState = Lifecycle.State.RESUMED)?.value
+        val ready = (state == A2uiFlashlightState.On || state == A2uiFlashlightState.Off) &&
+            actions?.changingFlashlight != true
         FlashlightControl(
             state = state ?: A2uiFlashlightState.Disabled,
             changing = actions?.changingFlashlight == true,
             onChange = actions?.setFlashlight ?: {},
             requestPermission = actions?.requestFlashlightPermission ?: {},
             openSettings = actions?.permissionNeedsSettings == true,
-            modifier = modifier,
+            modifier = modifier.reportUsefulDeviceControl(LocalChatA2uiSurfaceId.current, ready),
         )
+    }
+}
+
+private fun Modifier.reportUsefulDeviceControl(surfaceId: String?, ready: Boolean): Modifier {
+    if (surfaceId == null || !ready) return this
+    return onGloballyPositioned { coordinates ->
+        if (!coordinates.boundsInWindow().isEmpty) A2uiTiming.mark(surfaceId, "first_useful_device_frame")
     }
 }
 

@@ -12,9 +12,14 @@ import kotlinx.serialization.json.put
 @Serializable
 data class A2uiCapabilities(val catalogId: String, val schemaJson: String)
 
-/** 一次经过校验的完整 surface 修订；删除修订仅包含 deleteSurface 消息。 */
+/** 一次经过校验的完整 surface 修订；immediate 表示宿主可直接提交完整组件树。 */
 @Serializable
-data class A2uiDocument(val surfaceId: String, val messages: List<String>, val deleted: Boolean = false)
+data class A2uiDocument(
+    val surfaceId: String,
+    val messages: List<String>,
+    val deleted: Boolean = false,
+    val immediate: Boolean = false,
+)
 
 /** 用户提交给 Agent 的结构化事件；data 为提交时的绑定数据，草稿不进入历史。 */
 @Serializable

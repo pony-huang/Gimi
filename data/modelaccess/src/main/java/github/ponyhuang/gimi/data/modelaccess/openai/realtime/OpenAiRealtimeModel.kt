@@ -309,7 +309,8 @@ internal class OpenAiRealtimeModel(
                                     sendMutex.withLock {
                                         responseActive = false
                                         responseRequested = responseRequested && manualResponseRequested
-                                        cancelPending = false
+                                        // done 只属于更早的响应（done 必然晚于它自己的 created），
+                                        // 不得否决针对未来 created 的待取消——否则打断丢失、旧回答续播。
                                         suppressAudio = suppressAudio || disposition == RealtimeResponseDisposition.DISCARD
                                     }
                                     if (suppressManualResponse) {

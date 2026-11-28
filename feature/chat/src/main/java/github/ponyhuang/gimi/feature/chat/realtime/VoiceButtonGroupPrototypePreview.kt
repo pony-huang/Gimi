@@ -193,11 +193,19 @@ private fun VoiceScreenM3FullPreview() {
                         .padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    val previewState = RealtimeVoiceUiState(
+                        active = true,
+                        voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, muted = true),
+                        modelName = "DeepSeek V4",
+                        modelTemplateId = "deepseek",
+                        sttModelName = "Speech-02",
+                        sttModelTemplateId = "minimax",
+                        ttsModelName = "MiMo TTS",
+                        ttsModelTemplateId = "mimo",
+                        voiceName = "童童",
+                    )
                     VoiceInputDock(
-                        state = RealtimeVoiceUiState(
-                            active = true,
-                            voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, muted = true),
-                        ),
+                        state = previewState,
                         onSettings = {},
                         onChat = {},
                         onCall = {},
@@ -206,11 +214,9 @@ private fun VoiceScreenM3FullPreview() {
                         composerContent = {},
                         settingsEnabled = true,
                     )
-                    Text(
-                        text = "DeepSeek V4 · 扬声器",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scene.inkDim,
-                        modifier = Modifier.padding(top = 8.dp),
+                    VoiceConfigMicroPills(
+                        uiState = previewState,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                     )
                 }
             }

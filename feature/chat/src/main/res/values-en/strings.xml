@@ -347,6 +347,12 @@
     <string name="voice_pipeline_cascaded">Cascaded</string>
     <string name="voice_pipeline_semi_cascaded">Semi-cascaded</string>
     <string name="voice_pipeline_native_realtime">Realtime</string>
+    <string name="voice_pill_role_chat">Chat</string>
+    <string name="voice_pill_role_understanding">Omni</string>
+    <string name="voice_pill_role_recognition">STT</string>
+    <string name="voice_pill_role_synthesis">TTS</string>
+    <string name="voice_pill_role_realtime">Realtime</string>
+    <string name="voice_pill_role_voice">Voice</string>
     <string name="voice_pipeline_cascaded_detail">Recognize first, then respond with a synthesis model; requires recognition and synthesis models</string>
     <string name="voice_pipeline_semi_detail">Audio goes straight into the understanding model; answers are read by the synthesis model</string>
     <string name="voice_pipeline_native_detail">Vendor full-duplex realtime session with audio in and out</string>

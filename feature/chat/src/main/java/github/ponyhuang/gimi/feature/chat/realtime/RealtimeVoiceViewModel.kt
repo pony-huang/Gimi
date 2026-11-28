@@ -207,7 +207,11 @@ data class RealtimeVoiceUiState(
     val modelTemplateId: String = "",
     val chatModelTemplateId: String = "",
     val ttsModelName: String = "",
+    val ttsModelTemplateId: String = "",
     val sttModelName: String = "",
+    val sttModelTemplateId: String = "",
+    /** 当前生效链路的音色显示名；空串表示回落到默认音色文案。 */
+    val voiceName: String = "",
     /** 从连接开始到通话清理完成期间锁定设置。 */
     val settingsLocked: Boolean = false,
     /** 通话正在释放音频与会话资源。 */
@@ -619,18 +623,44 @@ class RealtimeVoiceViewModel @Inject constructor(
             val availability = pipelineAvailability(settingsSnapshot.effective, modelSettings, chatSelection)
             val committedConfig = VoiceConfigResolver.resolve(defaultsRepository.defaults.value, committedOverrides, lookup)
             val settingsUi = voiceSettingsState(settingsSnapshot)
+            val activePipeline = if (callSnapshot.active) call.pipeline else committedConfig.pipeline
             val primarySelection = if (committedConfig.pipeline == VoicePipeline.NATIVE_REALTIME) {
                 settingsUi.realtimeRows.selectionRow(committedConfig.realtimeModel)?.selection()
             } else {
                 chatSelection
             }
             val displayedSelection = if (callSnapshot.active) call.modelSelection else primarySelection
+            val sttSelection = committedConfig.cascadedRecognitionModel
+                ?.takeIf { VoiceConfigField.CASCADED_RECOGNITION_MODEL !in committedConfig.missingRequired }
+            val ttsSelection = when (activePipeline) {
+                VoicePipeline.SEMI_CASCADED -> committedConfig.semiCascadedSynthesisModel
+                    ?.takeIf { VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL !in committedConfig.missingRequired }
+                VoicePipeline.CASCADED -> committedConfig.cascadedSynthesisModel
+                    ?.takeIf { VoiceConfigField.CASCADED_SYNTHESIS_MODEL !in committedConfig.missingRequired }
+                VoicePipeline.NATIVE_REALTIME -> null
+            }
+            val resolvedSttName = modelSettings.voiceModelName(sttSelection)
+            val resolvedTtsName = modelSettings.voiceModelName(ttsSelection)
+            val resolvedVoiceId = when (activePipeline) {
+                VoicePipeline.CASCADED -> committedConfig.cascadedVoice.voiceId
+                VoicePipeline.SEMI_CASCADED -> committedConfig.semiCascadedVoice.voiceId
+                VoicePipeline.NATIVE_REALTIME -> committedConfig.realtimeVoice.voiceId
+                    ?: settingsUi.realtimeDefaultVoice
+            }.orEmpty()
+            val activeVoiceOptions = if (activePipeline == VoicePipeline.NATIVE_REALTIME) {
+                settingsUi.realtimeVoiceOptions
+            } else {
+                settingsUi.synthesisVoiceOptions
+            }
+            val resolvedVoiceName = resolvedVoiceId.takeIf { it.isNotBlank() }?.let { id ->
+                activeVoiceOptions.firstOrNull { it.id == id }?.name ?: id
+            }.orEmpty()
             RealtimeVoiceUiState(
                 voice = call.voice,
                 composer = composerState,
                 active = callSnapshot.active,
                 style = style,
-                pipeline = if (callSnapshot.active) call.pipeline else committedConfig.pipeline,
+                pipeline = activePipeline,
                 switching = call.switching || call.ending,
                 cascadedAvailable = availability.cascaded,
                 semiCascadedAvailable = availability.semiCascaded,
@@ -640,8 +670,11 @@ class RealtimeVoiceViewModel @Inject constructor(
                 modelTemplateId = modelSettings.instances.resolveConnection(displayedSelection)?.templateId.orEmpty(),
                 chatModelTemplateId = modelSettings.instances.resolveConnection(chatSelection)?.templateId.orEmpty(),
                 chatModelName = modelSettings.voiceModelName(chatSelection),
-                ttsModelName = call.ttsModelName,
-                sttModelName = call.sttModelName,
+                ttsModelName = if (callSnapshot.active) call.ttsModelName.ifBlank { resolvedTtsName } else resolvedTtsName,
+                ttsModelTemplateId = modelSettings.instances.resolveConnection(ttsSelection)?.templateId.orEmpty(),
+                sttModelName = if (callSnapshot.active) call.sttModelName.ifBlank { resolvedSttName } else resolvedSttName,
+                sttModelTemplateId = modelSettings.instances.resolveConnection(sttSelection)?.templateId.orEmpty(),
+                voiceName = resolvedVoiceName,
                 settingsLocked = call.configurationLocked,
                 ending = call.ending,
                 settingsSaving = saving,

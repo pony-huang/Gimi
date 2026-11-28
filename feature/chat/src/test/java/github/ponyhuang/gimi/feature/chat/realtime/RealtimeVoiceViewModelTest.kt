@@ -94,6 +94,8 @@ class RealtimeVoiceViewModelTest {
             val state = awaitItem()
             assertTrue(state.cascadedAvailable)
             assertTrue(state.realtimeAvailable)
+            assertEquals("speech-model", state.sttModelName)
+            assertEquals("tts-model", state.ttsModelName)
             cancelAndIgnoreRemainingEvents()
         }
     }

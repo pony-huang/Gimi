@@ -18,7 +18,7 @@ private val previewRouting = VoiceAudioRouting(
     currentDeviceId = 2,
 )
 
-/** 通话中：底栏下方小字展示实际播放设备，无手动选择入口。 */
+/** 通话中：底栏下方展示链路、模型与音色微胶囊组（不展示播放设备文案）。 */
 @Preview(name = "Device Header Light", widthDp = 390, heightDp = 844, locale = "zh-rCN")
 @Preview(name = "Device Header Dark", widthDp = 390, heightDp = 844, locale = "zh-rCN", uiMode = 0x20)
 @Composable
@@ -27,7 +27,10 @@ private fun VoiceDevicesPreview() {
         RealtimeVoiceScreen(
             uiState = RealtimeVoiceUiState(voice = RealtimeVoiceState(phase = RealtimeVoicePhase.Listening,
                 listening = true, audioRouting = previewRouting), modelName = "GPT-5.4",
-                ttsModelName = "mimo-v2-tts", sttModelName = "speech-2.8"),
+                modelTemplateId = "openai",
+                ttsModelName = "mimo-v2-tts", ttsModelTemplateId = "mimo",
+                sttModelName = "speech-2.8", sttModelTemplateId = "minimax",
+                voiceName = "童童"),
             started = true, onStartCall = {}, onToggleMute = {}, onEnd = {},
         )
     }

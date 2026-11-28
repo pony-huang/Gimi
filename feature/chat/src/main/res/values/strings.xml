@@ -357,6 +357,12 @@
     <string name="voice_pipeline_cascaded">级联</string>
     <string name="voice_pipeline_semi_cascaded">半级联</string>
     <string name="voice_pipeline_native_realtime">实时</string>
+    <string name="voice_pill_role_chat">对话</string>
+    <string name="voice_pill_role_understanding">理解</string>
+    <string name="voice_pill_role_recognition">识别</string>
+    <string name="voice_pill_role_synthesis">合成</string>
+    <string name="voice_pill_role_realtime">实时</string>
+    <string name="voice_pill_role_voice">音色</string>
     <string name="voice_pipeline_cascaded_detail">先识别再理解，回答由合成模型朗读，需配置识别与合成模型</string>
     <string name="voice_pipeline_semi_detail">音频直接进入理解模型，回答由合成模型朗读</string>
     <string name="voice_pipeline_native_detail">厂商全双工实时会话，音频直进直出</string>

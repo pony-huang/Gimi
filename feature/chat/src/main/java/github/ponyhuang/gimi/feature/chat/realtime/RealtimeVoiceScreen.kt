@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,6 +48,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -341,8 +344,6 @@ fun RealtimeVoiceScreen(
         state.phase == RealtimeVoicePhase.Speaking -> R.string.voice_speaking
         else -> R.string.voice_listening
     }
-    // 通话设备固定自动路由；设备名称以平台确认的实际输出设备为准。
-    val currentDevice = state.audioRouting.devices.firstOrNull { it.id == state.audioRouting.currentDeviceId }
     val scene = voiceScene(colors)
     val draft = uiState.draft
     // M3 Emphasized decelerate 曲线：进入时前段快、尾段柔和落位；顶栏几何与聊天页一致，保持静止。
@@ -391,41 +392,9 @@ fun RealtimeVoiceScreen(
                     composerContent = composerContent,
                     settingsEnabled = !uiState.settingsLocked && !started && !uiState.switching,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (uiState.modelName.isNotBlank()) {
-                        LLMModelServiceIcon(
-                            serviceId = uiState.modelTemplateId,
-                            modifier = Modifier.size(14.dp),
-                            contentPadding = 0.dp,
-                        )
-                    }
-                    Text(
-                        text = listOf(uiState.modelName, voiceAudioDeviceName(currentDevice))
-                            .filter(String::isNotBlank)
-                            .joinToString(" · "),
-                        modifier = Modifier.weight(1f, fill = false),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scene.inkDim,
-                    )
-                    if (uiState.settingsLocked || started) {
-                        Text(
-                            text = stringResource(R.string.voice_settings_after_hangup),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = scene.inkDim,
-                        )
-                    }
-                }
-                Text(
-                    text = stringResource(pipelineTitleRes(uiState.pipeline)),
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scene.inkDim,
+                VoiceConfigMicroPills(
+                    uiState = uiState,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 )
             }
         },
@@ -1130,6 +1099,156 @@ private fun VoiceSwitchingIndicator(scene: VoiceSceneColors, modifier: Modifier 
         Spacer(Modifier.width(10.dp))
         Text(stringResource(R.string.voice_switch_hint), style = MaterialTheme.typography.bodyMedium,
             color = scene.inkDim)
+    }
+}
+
+/**
+ * 底部语音配置微胶囊组（方案 B）：按当前语音模式动态展示「链路 + 各角色模型 + 音色」。
+ *
+ * - 级联：链路 + 对话模型 + 识别模型 (STT) + 合成模型 (TTS) + 音色（3 模型 + 音色）
+ * - 半级联：链路 + 理解模型 (Omni) + 合成模型 (TTS) + 音色（2 模型 + 音色）
+ * - 实时：链路 + 实时模型 + 音色（1 模型 + 音色）
+ *
+ * 每个胶囊限制最大宽度并对超长名称单行省略（Ellipsis），不再展示音频设备与挂断锁定提示。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun VoiceConfigMicroPills(
+    uiState: RealtimeVoiceUiState,
+    modifier: Modifier = Modifier,
+) {
+    val notConfigured = stringResource(R.string.voice_settings_not_configured)
+    val defaultVoice = stringResource(R.string.voice_settings_default_voice)
+    val primaryModelName = uiState.modelName.ifBlank { uiState.chatModelName }.ifBlank { notConfigured }
+    val primaryTemplateId = uiState.modelTemplateId.ifBlank { uiState.chatModelTemplateId }
+    val sttName = uiState.sttModelName.ifBlank { notConfigured }
+    val ttsName = uiState.ttsModelName.ifBlank { notConfigured }
+    val voiceDisplay = uiState.voiceName.ifBlank { defaultVoice }
+
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        VoicePipelineBadgePill(text = stringResource(pipelineTitleRes(uiState.pipeline)))
+        when (uiState.pipeline) {
+            VoicePipeline.CASCADED -> {
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_chat),
+                    valueText = primaryModelName,
+                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() || uiState.chatModelName.isNotBlank() },
+                )
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_recognition),
+                    valueText = sttName,
+                    serviceTemplateId = uiState.sttModelTemplateId.takeIf { uiState.sttModelName.isNotBlank() },
+                )
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_synthesis),
+                    valueText = ttsName,
+                    serviceTemplateId = uiState.ttsModelTemplateId.takeIf { uiState.ttsModelName.isNotBlank() },
+                )
+            }
+            VoicePipeline.SEMI_CASCADED -> {
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_understanding),
+                    valueText = primaryModelName,
+                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() || uiState.chatModelName.isNotBlank() },
+                )
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_synthesis),
+                    valueText = ttsName,
+                    serviceTemplateId = uiState.ttsModelTemplateId.takeIf { uiState.ttsModelName.isNotBlank() },
+                )
+            }
+            VoicePipeline.NATIVE_REALTIME -> {
+                VoiceRoleMicroPill(
+                    roleLabel = stringResource(R.string.voice_pill_role_realtime),
+                    valueText = primaryModelName,
+                    serviceTemplateId = primaryTemplateId.takeIf { uiState.modelName.isNotBlank() },
+                    maxPillWidth = 220.dp,
+                )
+            }
+        }
+        VoiceRoleMicroPill(
+            roleLabel = stringResource(R.string.voice_pill_role_voice),
+            valueText = voiceDisplay,
+            serviceTemplateId = null,
+            maxPillWidth = 140.dp,
+        )
+    }
+}
+
+/** 链路模式微胶囊：实心次级高对比底色，突出当前所处链路。 */
+@Composable
+private fun VoicePipelineBadgePill(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier.widthIn(max = 96.dp),
+        shape = CircleShape,
+        color = colors.surfaceContainerHighest,
+        tonalElevation = 0.dp,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * 角色化微胶囊：可选品牌图标 + 角色前缀（次级墨灰） + 模型/音色名称（主色，超长单行省略）。
+ */
+@Composable
+private fun VoiceRoleMicroPill(
+    roleLabel: String,
+    valueText: String,
+    serviceTemplateId: String?,
+    modifier: Modifier = Modifier,
+    maxPillWidth: Dp = 172.dp,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier.widthIn(max = maxPillWidth),
+        shape = CircleShape,
+        color = colors.surfaceContainer,
+        border = BorderStroke(0.8.dp, colors.outlineVariant),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (serviceTemplateId != null) {
+                LLMModelServiceIcon(
+                    serviceId = serviceTemplateId,
+                    modifier = Modifier.size(13.dp),
+                    contentPadding = 0.dp,
+                )
+            }
+            Text(
+                text = roleLabel,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = colors.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Text(
+                text = valueText,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

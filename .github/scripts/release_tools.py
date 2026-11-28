@@ -125,14 +125,18 @@ def config(root=ROOT):
 
 
 def pretag(tag):
-    """本地打 tag 前的预检：tag 形态、与 version.txt 一致、tag 已提交且在 origin/main 历史内、CHANGELOG 章节就绪、版本超过全部已发布版本。"""
+    """本地打 tag 前的预检（先预检后打 tag，NewPipe 式）：tag 形态、与 version.txt 一致、
+    目标提交（已有 tag 或当前 HEAD）在 origin/main 顶端历史内、CHANGELOG 章节就绪、版本超过全部已发布版本。"""
     version, _ = config()
     if tag != f'v{version}':
         raise ValueError('Tag does not match version.txt')
     if subprocess.run(['git', 'rev-parse', '--verify', '--quiet', f'{tag}^{{commit}}'],
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
-        raise ValueError(f'Tag {tag} does not exist; tag the version PR merge commit on main first')
-    subprocess.run(['git', 'merge-base', '--is-ancestor', f'{tag}^{{commit}}', 'origin/main'], check=True)
+        # tag 尚未创建：校验的就是当前 HEAD（打 tag 后与 origin/main 顶端的同一提交）。
+        if run('git', 'rev-parse', 'HEAD') != run('git', 'rev-parse', 'refs/remotes/origin/main'):
+            raise ValueError(f'Tag {tag} does not exist; check out the origin/main tip to pretag it')
+    else:
+        subprocess.run(['git', 'merge-base', '--is-ancestor', f'{tag}^{{commit}}', 'origin/main'], check=True)
     notes((ROOT / 'CHANGELOG.md').read_text(encoding='utf-8'), version)
     previous = latest_release(releases())
     if previous and version_key(version) <= version_key(previous['tag_name'].removeprefix('v')):
@@ -154,9 +158,15 @@ def notes(text, version):
     return body + '\n'
 
 
+def repository():
+    """仓库名 owner/name：CI 取 GITHUB_REPOSITORY，本地回退到 gh 推断的 origin。"""
+    return os.environ.get('GITHUB_REPOSITORY') or run(
+        'gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner')
+
+
 def releases():
     """经 gh api 分页拉取仓库全部 Release 并摊平为列表。"""
-    pages = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{os.environ["GITHUB_REPOSITORY"]}/releases'))
+    pages = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{repository()}/releases'))
     return [release for page in pages for release in page]
 
 

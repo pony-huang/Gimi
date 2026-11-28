@@ -284,6 +284,68 @@ class RealtimeVoiceViewModelTest {
     }
 
     @Test
+    fun switchingSynthesisModelClearsDraftVoiceOverride() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture())
+        val overrides = FakeOverridesRepository()
+        val viewModel = viewModel(defaults = defaults, overrides = overrides)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+        viewModel.prepare("conversation", selection, "当前聊天")
+
+        viewModel.uiState.test {
+            awaitItem()
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectPipelineVoice(VoicePipeline.CASCADED, "voice-1")
+            var draft = awaitItem().draft
+            while (draft.cascadedVoice.value != "voice-1") {
+                draft = awaitItem().draft
+            }
+            assertTrue(draft.cascadedVoice.overridden)
+
+            // 换合成模型：旧音色与新模型不绑定，覆盖同步清空回到继承（厂商默认音色）。
+            viewModel.selectFieldModel(VoiceConfigField.CASCADED_SYNTHESIS_MODEL, ModelSelection("i", "c", "m"))
+            var switched = awaitItem().draft
+            while (switched.cascadedSynthesisModel.value != ModelSelection("i", "c", "m") ||
+                switched.cascadedVoice.overridden
+            ) {
+                switched = awaitItem().draft
+            }
+            assertFalse(switched.cascadedVoice.overridden)
+            assertNull(switched.cascadedVoice.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun repickingSameSynthesisModelKeepsDraftVoiceOverride() = runTest {
+        val defaults = FakeDefaultsRepository(defaultsFixture())
+        val overrides = FakeOverridesRepository()
+        val viewModel = viewModel(defaults = defaults, overrides = overrides)
+        val selection = ModelSelection("instance-qwen", "chat", "chat-model")
+        viewModel.prepare("conversation", selection, "当前聊天")
+
+        viewModel.uiState.test {
+            awaitItem()
+            awaitItem()
+            viewModel.openVoiceSettings()
+            viewModel.selectPipelineVoice(VoicePipeline.CASCADED, "voice-1")
+            var draft = awaitItem().draft
+            while (draft.cascadedVoice.value != "voice-1") {
+                draft = awaitItem().draft
+            }
+            // 重选当前有效合成模型不算变化：音色覆盖保留，不被误清。
+            viewModel.selectFieldModel(VoiceConfigField.CASCADED_SYNTHESIS_MODEL, defaultsFixture().cascadedSynthesisModel)
+            var latest = awaitItem().draft
+            while (latest.cascadedSynthesisModel.value != defaultsFixture().cascadedSynthesisModel) {
+                latest = awaitItem().draft
+            }
+            assertTrue(latest.cascadedVoice.overridden)
+            assertEquals("voice-1", latest.cascadedVoice.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun callCannotStartUntilAutomaticSaveFinishes() = runTest {
         val saveGate = CompletableDeferred<Unit>()
         val overrides = FakeOverridesRepository().apply { beforeApply = { saveGate.await() } }

@@ -260,4 +260,10 @@ object QwenAudioTtsVoices {
     /** 按模型取音色；未收录的模型没有可用系统音色。 */
     fun forModel(modelId: String): List<TtsVoice> =
         voicesByModel[modelId].orEmpty()
+
+    /**
+     * 全部模型的系统音色并集；只用于跨厂商音色归属判定这类封闭集查询。
+     * 音色选择仍必须走 [forModel] 按模型收窄，跨模型使用会被服务端拒绝。
+     */
+    val all: List<TtsVoice> = voicesByModel.values.flatten().distinctBy { it.id }
 }

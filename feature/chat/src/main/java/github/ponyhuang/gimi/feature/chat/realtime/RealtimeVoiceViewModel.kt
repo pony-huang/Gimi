@@ -50,7 +50,9 @@ import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
 import github.ponyhuang.gimi.domain.voice.repository.VoiceOverrideRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceApplyResult
 import github.ponyhuang.gimi.domain.voice.repository.VoicePipeline
+import github.ponyhuang.gimi.domain.voice.repository.effectiveSemiCascadedSynthesisModel
 import github.ponyhuang.gimi.domain.voice.repository.isOverridden
+import github.ponyhuang.gimi.domain.voice.repository.orElse
 import github.ponyhuang.gimi.feature.chat.AttachmentSelectionResult
 import github.ponyhuang.gimi.feature.chat.ChatFileUploadCoordinator
 import github.ponyhuang.gimi.feature.chat.ChatSubmissionResult
@@ -694,6 +696,10 @@ class RealtimeVoiceViewModel @Inject constructor(
     /**
      * 选择链路模型；null 表示恢复继承（移除对话覆盖）。
      * 若目标链路仍缺必需模型，则和其余选择一起等到补齐再保存。
+     *
+     * 合成模型变化时同步清掉该链路的音色覆盖：音色与合成模型强绑定，旧音色跨
+     * 厂商或跨代际沿用必被服务端拒绝；清空回到继承，由音色解析回落厂商默认。
+     * 音色集不封闭（复刻音色不在内置表），不能靠目录校验兜底，必须在写入时斩断。
      */
     fun selectFieldModel(field: VoiceConfigField, selection: ModelSelection?) {
         val override = if (selection == null) VoiceFieldOverride.Inherit else VoiceFieldOverride.Value(selection)
@@ -701,12 +707,23 @@ class RealtimeVoiceViewModel @Inject constructor(
             when (field) {
                 VoiceConfigField.CASCADED_RECOGNITION_MODEL ->
                     overrides.copy(cascadedRecognitionModel = override)
-                VoiceConfigField.CASCADED_SYNTHESIS_MODEL ->
-                    overrides.copy(cascadedSynthesisModel = override)
+                VoiceConfigField.CASCADED_SYNTHESIS_MODEL -> {
+                    val unchanged = selection == overrides.cascadedSynthesisModel
+                        .orElse(defaultsRepository.defaults.value.cascadedSynthesisModel)
+                    if (unchanged) overrides.copy(cascadedSynthesisModel = override)
+                    else overrides.copy(cascadedSynthesisModel = override, cascadedVoice = VoiceFieldOverride.Inherit)
+                }
                 VoiceConfigField.SEMI_CASCADED_UNDERSTANDING_MODEL ->
                     overrides.copy(semiCascadedUnderstandingModel = override)
-                VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL ->
-                    overrides.copy(semiCascadedSynthesisModel = override)
+                VoiceConfigField.SEMI_CASCADED_SYNTHESIS_MODEL -> {
+                    val unchanged = selection == overrides.semiCascadedSynthesisModel
+                        .orElse(defaultsRepository.defaults.value.effectiveSemiCascadedSynthesisModel)
+                    if (unchanged) overrides.copy(semiCascadedSynthesisModel = override)
+                    else overrides.copy(
+                        semiCascadedSynthesisModel = override,
+                        semiCascadedVoice = VoiceFieldOverride.Inherit,
+                    )
+                }
                 VoiceConfigField.REALTIME_MODEL -> overrides.copy(realtimeModel = override)
                 else -> overrides
             }

@@ -29,4 +29,19 @@ class VoiceCatalog @Inject constructor() : VoiceCatalogResolver {
         "qwen" -> modelId?.let { QwenAudioTtsVoices.forModel(it) }.orEmpty().firstOrNull()
         else -> builtInVoices(serviceId).firstOrNull()
     }
+
+    /**
+     * 音色归属判定用的各厂商命名空间并集；与 [builtInVoices] 的差异是千问——
+     * 服务级内置表为空（默认音色必须按模型收窄），但音色 ID 命名空间覆盖全部模型。
+     */
+    private val voiceOwnerTables: Map<String, List<TtsVoice>> = mapOf(
+        "deepseek" to DeepSeekTtsVoices.all,
+        "minimax" to MinimaxTtsVoices.all,
+        "mimo" to MiMoTtsVoices.all,
+        "openai" to OpenAiTtsVoices.all,
+        "qwen" to QwenAudioTtsVoices.all,
+    )
+
+    override fun builtInVoiceOwner(voiceId: String): String? =
+        voiceOwnerTables.entries.firstOrNull { (_, voices) -> voices.any { it.id == voiceId } }?.key
 }

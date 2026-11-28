@@ -447,7 +447,10 @@ class QwenRealtimeModelTest {
 
     @Test
     fun `server handshake failure is thrown to the collector for classification`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"code":"provider_auth_failed","message":"Authentication failed."}"""),
+        )
         val connection = model().connect(connectRequest())
         val error = withContext(Dispatchers.IO) {
             runCatching { withTimeoutOrNull(5_000) { connection.receive().first() } }.exceptionOrNull()
@@ -455,6 +458,9 @@ class QwenRealtimeModelTest {
         assertNotNull(error)
         assertTrue(error is VoiceHandshakeException)
         assertEquals(401, (error as VoiceHandshakeException).statusCode)
+        assertEquals(401, error.requestError?.httpStatus)
+        assertEquals("provider_auth_failed", error.requestError?.code)
+        assertEquals("Authentication failed.", error.requestError?.message)
         connection.closeSession()
     }
 

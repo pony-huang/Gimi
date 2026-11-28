@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class VoiceWsKernel(
     client: OkHttpClient,
     request: Request,
-    private val handshakeFailure: (statusCode: Int, cause: Throwable, detail: String?) -> Throwable,
+    private val handshakeFailure: (statusCode: Int, cause: Throwable, detail: String, body: String) -> Throwable,
 ) {
     // 无界通道：音频消费方（播放器）背压变慢时帧会在内存积压（24 kHz PCM 约 48 KB/s）。
     // 有界+丢弃会静默丢音频帧，比积压更难排查，故保持无界并依赖调用方及时消费。
@@ -102,9 +102,11 @@ class VoiceWsKernel(
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             val code = response?.code
             if (code != null) {
-                val detail = handshakeDetail(response)
+                val body = runCatching { response.peekBody(MAX_HANDSHAKE_BODY_BYTES).string().trim() }
+                    .getOrDefault("")
+                val detail = handshakeDetail(response, body)
                 Log.w(TAG, "语音服务握手被拒（HTTP $code）$detail", t)
-                frames.trySend(WsFrame.Failure(handshakeFailure(code, t, detail)))
+                frames.trySend(WsFrame.Failure(handshakeFailure(code, t, detail, body)))
             } else {
                 frames.trySend(WsFrame.Failure(t))
             }
@@ -115,14 +117,12 @@ class VoiceWsKernel(
          * 握手被拒时服务端返回的原始详情：响应头（脱敏）与响应体（截断）。
          * 厂商的错误码与 request-id 通常只在这里出现，是向服务方反馈问题的凭据。
          */
-        private fun handshakeDetail(response: Response): String {
+        private fun handshakeDetail(response: Response, body: String): String {
             val headers = response.headers.names()
                 .filter { it.lowercase() in LOGGED_RESPONSE_HEADERS }
                 .joinToString(", ") { "${it}: ${response.header(it)}" }
                 .ifEmpty { "-" }
-            val body = runCatching { response.peekBody(MAX_HANDSHAKE_BODY_BYTES).string().trim() }
-                .getOrNull()?.takeIf { it.isNotEmpty() } ?: "-"
-            return "headers=[$headers], body=$body"
+            return "headers=[$headers], body=${body.ifEmpty { "-" }}"
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {

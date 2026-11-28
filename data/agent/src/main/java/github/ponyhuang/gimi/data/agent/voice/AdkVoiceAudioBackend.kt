@@ -30,6 +30,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackend
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioEvent
 import github.ponyhuang.gimi.domain.voice.repository.VoiceConversationStyle
@@ -230,9 +231,10 @@ class AdkVoiceAudioBackend @Inject constructor(
                     var hasModelText = false
                     connection.receive().takeWhile { response ->
                         if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
-                            throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation,
-                                message = "Live voice model request failed: " +
-                                    "${response.errorCode} ${response.errorMessage}")
+                            throw VoiceAudioBackendException(
+                                RealtimeVoiceFailure.Generation,
+                                requestError = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage),
+                            )
                         }
                         if (response.interrupted) {
                             interrupted = true

@@ -8,7 +8,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.SpeechEndpoints
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers

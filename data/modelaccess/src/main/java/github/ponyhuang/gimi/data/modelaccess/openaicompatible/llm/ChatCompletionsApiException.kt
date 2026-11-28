@@ -21,5 +21,10 @@ package github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm
  * never include a request or response body, so they stay free of customer content.
  */
 class ChatCompletionsApiException
-internal constructor(message: String, cause: Throwable? = null, val statusCode: Int? = null) :
+internal constructor(
+  message: String,
+  cause: Throwable? = null,
+  val statusCode: Int? = null,
+  val providerCode: String? = null,
+) :
   RuntimeException(message, cause)

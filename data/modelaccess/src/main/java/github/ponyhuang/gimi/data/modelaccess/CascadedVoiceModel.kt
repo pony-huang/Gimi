@@ -14,6 +14,7 @@ import com.google.adk.kt.types.Modality
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.ChatCompletionsApiException
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionEvent
@@ -23,6 +24,7 @@ import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlinx.coroutines.CancellationException
@@ -293,7 +295,12 @@ class CascadedVoiceModel(
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = cause)
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        cause = cause,
+                        requestError = (cause as? ChatCompletionsApiException)
+                            ?.let { VoiceRequestError.fromProvider(code = it.providerCode, httpStatus = it.statusCode) },
+                    )
                 }
                 try {
                     // 让服务端把缓冲里的文本合成并下发完毕，此后本轮音频才算完整。
@@ -417,8 +424,11 @@ class CascadedVoiceModel(
             ))
             llmModel.generateContent(textRequest, stream = true).collect { response ->
                 // 带上厂商错误码与原文：Chatbot 路径外层不留完整异常，真机只能靠这条消息定位。
-                check(response.errorCode == null && response.errorMessage.isNullOrBlank()) {
-                    "Voice model request failed: ${response.errorCode} ${response.errorMessage}"
+                if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        requestError = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage),
+                    )
                 }
                 val body = response.content?.parts.orEmpty().filter { it.thought != true }
                     .mapNotNull { it.text }.joinToString("")

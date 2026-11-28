@@ -15,11 +15,13 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Transcription
 import github.ponyhuang.gimi.core.audio.encodePcm16Wav
+import github.ponyhuang.gimi.data.modelaccess.openaicompatible.llm.ChatCompletionsApiException
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisRepository
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesisSession
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioMarkers
 import github.ponyhuang.gimi.domain.voice.repository.VoiceSentenceBuffer
 import java.io.ByteArrayOutputStream
@@ -290,7 +292,12 @@ class SemiCascadedVoiceModel(
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw VoiceAudioBackendException(RealtimeVoiceFailure.Generation, cause = cause)
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        cause = cause,
+                        requestError = (cause as? ChatCompletionsApiException)
+                            ?.let { VoiceRequestError.fromProvider(code = it.providerCode, httpStatus = it.statusCode) },
+                    )
                 }
                 try {
                     session.flush()
@@ -383,8 +390,11 @@ class SemiCascadedVoiceModel(
                 responseModalities = null,
             ))
             llmModel.generateContent(textRequest, stream = true).collect { response ->
-                check(response.errorCode == null && response.errorMessage.isNullOrBlank()) {
-                    "Voice model request failed: ${response.errorCode} ${response.errorMessage}"
+                if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
+                    throw VoiceAudioBackendException(
+                        RealtimeVoiceFailure.Generation,
+                        requestError = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage),
+                    )
                 }
                 val body = response.content?.parts.orEmpty().filter { it.thought != true }
                     .mapNotNull { it.text }.joinToString("")

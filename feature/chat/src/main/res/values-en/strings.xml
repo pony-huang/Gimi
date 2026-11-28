@@ -315,7 +315,7 @@
     <string name="voice_thinking">Thinking</string>
     <string name="voice_speaking">Speaking</string>
     <string name="voice_muted">Microphone muted</string>
-    <string name="voice_failed">Voice chat failed</string>
+    <string name="voice_failed">Voice request failed</string>
     <string name="voice_retry">Retry</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute">Mute</string>
@@ -331,7 +331,9 @@
     <string name="voice_audio_error">Voice processing could not start. Check device echo cancellation and noise suppression support.</string>
     <string name="voice_microphone_error">Microphone unavailable. Check recording permission and other microphone users.</string>
     <string name="voice_recognition_error">Transcription failed. Check your connection and recognition model, then retry.</string>
-    <string name="voice_generation_error">The model request failed. Check your connection and chat model, then retry.</string>
+    <string name="voice_request_client_error">Provider rejected the request</string>
+    <string name="voice_request_server_error">Provider could not process the request</string>
+    <string name="voice_generation_error">The model request failed. Try again.</string>
     <string name="voice_synthesis_error">Speech output failed. Check your connection and synthesis model, then retry.</string>
     <string name="voice_open_call">Open voice conversation</string>
     <string name="voice_connecting">Connecting</string>

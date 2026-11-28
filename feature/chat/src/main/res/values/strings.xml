@@ -325,7 +325,7 @@
     <string name="voice_thinking">正在生成</string>
     <string name="voice_speaking">正在播报</string>
     <string name="voice_muted">麦克风已静音</string>
-    <string name="voice_failed">暂时没有连上</string>
+    <string name="voice_failed">本次语音请求失败</string>
     <string name="voice_retry">重试</string>
     <string name="voice_unmute">取消静音</string>
     <string name="voice_mute">静音</string>
@@ -341,7 +341,10 @@
     <string name="voice_audio_error">此设备未能启用语音处理，请检查回声消除和降噪支持</string>
     <string name="voice_microphone_error">无法使用麦克风，请检查录音权限及设备占用</string>
     <string name="voice_recognition_error">语音识别失败，请检查网络和识别模型后重试</string>
-    <string name="voice_generation_error">模型回复失败，请检查网络和聊天模型后重试</string>
+    <string name="voice_request_http_status" translatable="false">HTTP %1$d</string>
+    <string name="voice_request_client_error">服务商拒绝请求</string>
+    <string name="voice_request_server_error">服务商处理请求失败</string>
+    <string name="voice_generation_error">模型回复失败，请重试</string>
     <string name="voice_synthesis_error">语音合成或播放失败，请检查网络和合成模型后重试</string>
     <string name="voice_open_call">打开语音对话</string>
     <string name="voice_connecting">正在连接</string>

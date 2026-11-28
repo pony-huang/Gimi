@@ -7,7 +7,7 @@ import github.ponyhuang.gimi.core.network.VoiceWsKernel
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesizer
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisRequest
 

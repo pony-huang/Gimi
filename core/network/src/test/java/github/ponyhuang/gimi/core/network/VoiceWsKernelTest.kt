@@ -46,7 +46,7 @@ class VoiceWsKernelTest {
         val kernel = VoiceWsKernel(
             client = client,
             request = Request.Builder().url(server.url("/ws")).build(),
-            handshakeFailure = { statusCode, _, detail ->
+            handshakeFailure = { statusCode, _, detail, _ ->
                 received += statusCode to detail
                 IllegalStateException("mapped $statusCode")
             },
@@ -75,7 +75,7 @@ class VoiceWsKernelTest {
         val kernel = VoiceWsKernel(
             client = client,
             request = Request.Builder().url("http://127.0.0.1:1/ws").build(),
-            handshakeFailure = { _, _, _ -> throw AssertionError("无响应的传输失败不应触发握手映射") },
+            handshakeFailure = { _, _, _, _ -> throw AssertionError("无响应的传输失败不应触发握手映射") },
         )
         val frame = withTimeout(10_000) {
             var last = kernel.frames().receive()
@@ -97,7 +97,7 @@ class VoiceWsKernelTest {
         val kernel = VoiceWsKernel(
             client = client,
             request = Request.Builder().url(server.url("/ws")).build(),
-            handshakeFailure = { _, _, d -> detail = d; IllegalStateException("mapped") },
+            handshakeFailure = { _, _, d, _ -> detail = d; IllegalStateException("mapped") },
         )
         withTimeout(5_000) {
             var last = kernel.frames().receive()
@@ -117,7 +117,7 @@ class VoiceWsKernelTest {
         val kernel = VoiceWsKernel(
             client = client,
             request = Request.Builder().url(server.url("/ws")).build(),
-            handshakeFailure = { statusCode, _, _ -> IllegalStateException("mapped $statusCode") },
+            handshakeFailure = { statusCode, _, _, _ -> IllegalStateException("mapped $statusCode") },
         )
 
         val failure = withTimeout(5_000) {

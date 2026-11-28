@@ -108,7 +108,23 @@ fun RealtimeVoiceRoute(
             }
         }
     }
-    LaunchedEffect(state.voice.failure) {
+    LaunchedEffect(state.voice.failure, state.voice.failureNotice) {
+        val notice = state.voice.failureNotice
+        if (notice != null && !viewModel.consumeVoiceFailure(notice)) return@LaunchedEffect
+        if (!active) return@LaunchedEffect
+        val error = notice?.requestError
+        if (error != null) {
+            val message = listOfNotNull(
+                error.httpStatus?.let { context.getString(R.string.voice_request_http_status, it) },
+                error.code,
+                error.httpStatus?.let {
+                    context.getString(if (it < 500) R.string.voice_request_client_error else R.string.voice_request_server_error)
+                },
+                error.message,
+            ).joinToString(" · ")
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            return@LaunchedEffect
+        }
         val message = when (state.voice.failure) {
             RealtimeVoiceFailure.Configuration -> R.string.voice_configuration_error
             RealtimeVoiceFailure.Microphone -> R.string.voice_microphone_error
@@ -120,7 +136,7 @@ fun RealtimeVoiceRoute(
             RealtimeVoiceFailure.ConversationBusy -> R.string.voice_conversation_busy
             null -> null
         }
-        if (message != null && active) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
     LaunchedEffect(state.voice.reconnectNotice) {
         if (state.voice.reconnectNotice && active) Toast.makeText(context, R.string.voice_reconnect_notice, Toast.LENGTH_SHORT).show()

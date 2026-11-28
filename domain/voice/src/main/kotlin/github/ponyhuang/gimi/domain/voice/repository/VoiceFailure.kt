@@ -54,19 +54,26 @@ open class VoiceException(
     val kind: VoiceFailureKind,
     message: String,
     cause: Throwable? = null,
+    val requestError: VoiceRequestError? = null,
 ) : IOException(message, cause)
 
 /** 密钥无效或权限不足。 */
-class VoiceAuthenticationException(message: String, cause: Throwable? = null) :
-    VoiceException(VoiceFailureKind.Authentication, message, cause)
+class VoiceAuthenticationException(
+    message: String,
+    cause: Throwable? = null,
+    requestError: VoiceRequestError? = null,
+) : VoiceException(VoiceFailureKind.Authentication, message, cause, requestError)
 
 /** 网络不可达、连接中断或超时。 */
 class VoiceNetworkException(message: String, cause: Throwable? = null) :
     VoiceException(VoiceFailureKind.Network, message, cause)
 
 /** 服务返回了业务级错误。 */
-class VoiceServiceException(message: String, cause: Throwable? = null) :
-    VoiceException(VoiceFailureKind.Service, message, cause)
+class VoiceServiceException(
+    message: String,
+    cause: Throwable? = null,
+    requestError: VoiceRequestError? = null,
+) : VoiceException(VoiceFailureKind.Service, message, cause, requestError)
 
 /**
  * 语音服务握手阶段失败。
@@ -79,26 +86,14 @@ class VoiceServiceException(message: String, cause: Throwable? = null) :
 class VoiceHandshakeException(
     val statusCode: Int,
     message: String,
+    requestError: VoiceRequestError? = VoiceRequestError.fromProvider(httpStatus = statusCode),
+    cause: Throwable? = null,
 ) : VoiceException(
     if (statusCode == 401 || statusCode == 403) VoiceFailureKind.Authentication else VoiceFailureKind.Service,
     message,
+    cause = cause,
+    requestError = requestError,
 )
-
-/**
- * 语音服务握手失败的统一分类映射。
- *
- * 传输内核只上报 HTTP 状态码与服务端原始响应详情（headers/body），不知道领域语义；
- * 各语音模块构造内核时统一传入本函数，保证握手失败在识别、合成、连接测试三个入口
- * 归为同一类失败。服务端详情只进日志，不改变分类。
- */
-fun voiceHandshakeFailure(statusCode: Int, cause: Throwable, detail: String? = null): Throwable =
-    VoiceHandshakeException(
-        statusCode,
-        buildString {
-            append("语音服务握手失败（HTTP $statusCode）")
-            if (!detail.isNullOrBlank()) append("：$detail")
-        },
-    )
 
 /**
  * 把底层异常归类为语音失败。

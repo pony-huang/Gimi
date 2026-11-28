@@ -8,8 +8,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognizer
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesizer
 import github.ponyhuang.gimi.domain.voice.repository.SynthesisRequest
-import github.ponyhuang.gimi.domain.voice.repository.VoiceAuthenticationException
-import github.ponyhuang.gimi.domain.voice.repository.VoiceServiceException
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHttpFailure
 import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -82,10 +81,7 @@ class MiMoSpeechProtocol(
                     val message = "语音合成失败（HTTP ${response.code}）" +
                         detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
                     // 401/403 是密钥问题，与服务端业务错误是两类不同的用户问题。
-                    if (response.code == 401 || response.code == 403) {
-                        throw VoiceAuthenticationException(message)
-                    }
-                    throw VoiceServiceException(message)
+                    throw voiceHttpFailure(response.code, detail, message)
                 }
                 val source = response.body?.source() ?: throw IOException("语音合成响应为空")
                 var emittedAudio = false

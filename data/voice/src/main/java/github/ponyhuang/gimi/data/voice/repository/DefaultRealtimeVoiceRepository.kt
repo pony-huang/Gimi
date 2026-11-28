@@ -201,11 +201,11 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 )) { "Microphone unavailable" }
                 // 通话刚建立：AEC 滤波器从零开始收敛，同样给一段保护窗口。
                 echoGuard.onAecReset()
-                mutableState.update { it.copy(phase = RealtimeVoicePhase.Listening, listening = !it.muted && !it.inputPaused, failure = null) }
+                mutableState.update { it.copy(phase = RealtimeVoicePhase.Listening, listening = !it.muted && !it.inputPaused, failure = null, failureNotice = null) }
                 if (duplexMode) startDuplex()
             }.onFailure { error ->
                 android.util.Log.w(TAG, "Voice start failed", error)
-                fail((error as? VoiceAudioBackendException)?.failure ?: startupFailure)
+                fail((error as? VoiceAudioBackendException)?.failure ?: startupFailure, error.voiceRequestError())
             }
             Unit
         }
@@ -222,7 +222,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     session.events().collect { event -> handleDuplexEvent(event) }
                 }.onFailure { error ->
                     android.util.Log.w(TAG, "Duplex event stream failed", error)
-                    fail((error as? VoiceAudioBackendException)?.failure ?: RealtimeVoiceFailure.Generation)
+                    fail((error as? VoiceAudioBackendException)?.failure ?: RealtimeVoiceFailure.Generation, error.voiceRequestError())
                 }
             }
             synchronized(inputLock) { duplex = session }
@@ -407,7 +407,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 RealtimeVoiceEvent.TurnCommitted -> {
                     val turn = state.value.revision + 1
                     mutableState.update { it.copy(
-                        phase = RealtimeVoicePhase.Thinking, revision = turn, failure = null,
+                        phase = RealtimeVoicePhase.Thinking, revision = turn, failure = null, failureNotice = null,
                         responseText = "", spokenText = "", speakingText = "", reconnectNotice = false,
                         toolNotice = null,
                     ) }
@@ -430,7 +430,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                 is RealtimeVoiceEvent.AssistantAudio -> onAssistantAudio(event.pcm24k)
                 RealtimeVoiceEvent.Interrupted -> stopDuplexPlayback()
                 RealtimeVoiceEvent.TurnCompleted -> finishDuplexPlayback()
-                is RealtimeVoiceEvent.Failed -> fail(event.failure)
+                is RealtimeVoiceEvent.Failed -> fail(event.failure, event.requestError)
             }
         }
 
@@ -518,7 +518,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                             speakingText = "",
                             phase = RealtimeVoicePhase.Thinking,
                             revision = turn,
-                            failure = null,
+                            failure = null, failureNotice = null,
                         )
                     }
                     replyJob = scope.launch {
@@ -589,11 +589,11 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     val previousSpokenText = state.value.spokenText
                     val turn = state.value.revision + 1
                     mutableState.update { it.copy(inputText = text, inputAttachments = emptyList(), responseText = "", spokenText = "", speakingText = "",
-                        phase = RealtimeVoicePhase.Thinking, revision = turn, failure = null) }
+                        phase = RealtimeVoicePhase.Thinking, revision = turn, failure = null, failureNotice = null) }
                     replyJob = scope.launch { reply(text, turn, previousSpokenText) }
-                }.onFailure { if (revision == inputRevision) {
+                }.onFailure { error -> if (revision == inputRevision) {
                     android.util.Log.w(TAG, "Voice recognition failed")
-                    fail(RealtimeVoiceFailure.Recognition)
+                    fail(RealtimeVoiceFailure.Recognition, error.voiceRequestError())
                 } }
             }
         }
@@ -637,7 +637,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                         android.util.Log.w(TAG, "Voice reply failed", error)
                         val failure = (error as? VoiceAudioBackendException)?.failure
                             ?: if (error is VoiceException) RealtimeVoiceFailure.Synthesis else RealtimeVoiceFailure.Generation
-                        fail(failure)
+                        fail(failure, error.voiceRequestError())
                     }
                 }
             } finally {
@@ -676,7 +676,8 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                     }
                 }.getOrElse { error ->
                     throw VoiceAudioBackendException(
-                        (error as? VoiceAudioBackendException)?.failure ?: RealtimeVoiceFailure.Playback,
+                        (error as? VoiceAudioBackendException)?.failure
+                            ?: if (error.voiceRequestError() != null) RealtimeVoiceFailure.Synthesis else RealtimeVoiceFailure.Playback,
                         cause = error,
                     )
                 }
@@ -767,7 +768,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             }
         }
 
-        private fun fail(failure: RealtimeVoiceFailure) {
+        private fun fail(failure: RealtimeVoiceFailure, requestError: VoiceRequestError? = null) {
             if (closed) return
             started = false
             inputRevision++
@@ -793,7 +794,8 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
             recorder.stop()
             restoreAudioRouting()
             mutableState.update { it.copy(phase = RealtimeVoicePhase.Failed, listening = false, failure = failure,
-                speakingText = "", inputLevel = 0f, outputLevel = 0f) }
+                speakingText = "", inputLevel = 0f, outputLevel = 0f,
+                failureNotice = RealtimeVoiceFailureNotice(requestError)) }
         }
 
         override suspend fun retry() {
@@ -887,7 +889,7 @@ class DefaultRealtimeVoiceRepository @Inject constructor(
                             // 退出仍尝试提交；存储失败不能阻止麦克风、路由及会话租约的释放。
                             withContext(Dispatchers.IO) { session.close() }
                         } catch (_: VoiceAudioBackendException) {
-                            mutableState.update { it.copy(failure = RealtimeVoiceFailure.Persistence) }
+                            mutableState.update { it.copy(failure = RealtimeVoiceFailure.Persistence, failureNotice = null) }
                         }
                     }
                 } finally {

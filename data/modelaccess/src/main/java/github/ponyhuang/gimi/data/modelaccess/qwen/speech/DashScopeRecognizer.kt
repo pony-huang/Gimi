@@ -8,7 +8,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.voice.model.SpeechContextRole
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognizer
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
-import github.ponyhuang.gimi.domain.voice.repository.voiceHandshakeFailure
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHandshakeFailure
 
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.voice.repository.QWEN_SPEECH_SERVICE_ID

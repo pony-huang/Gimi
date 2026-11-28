@@ -36,6 +36,7 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallState
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailureNotice
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCatalogResolver
@@ -290,6 +291,14 @@ class RealtimeVoiceViewModel @Inject constructor(
 
     private val settingsFlow = observeSettings()
     private val composer = MutableStateFlow(VoiceComposerUiState())
+    private var consumedVoiceFailure: RealtimeVoiceFailureNotice? = null
+
+    /** 同一次失败跨重组或重新进入 Route 时只提示一次。 */
+    fun consumeVoiceFailure(notice: RealtimeVoiceFailureNotice): Boolean {
+        if (consumedVoiceFailure === notice) return false
+        consumedVoiceFailure = notice
+        return true
+    }
 
     /** 草稿合成音色选项与加载标记；与合成模型解耦以便按模型重新取表。 */
     private val composerSynthesisVoiceOptions = MutableStateFlow<List<TtsVoice>>(emptyList())

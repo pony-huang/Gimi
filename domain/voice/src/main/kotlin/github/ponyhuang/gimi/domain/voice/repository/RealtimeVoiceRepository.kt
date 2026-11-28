@@ -75,8 +75,11 @@ interface RealtimeVoiceSession {
 /** 播报与推理的阶段；监听状态独立保存，因为播放时仍需收音以支持打断。 */
 enum class RealtimeVoicePhase { Idle, Listening, Transcribing, Thinking, Speaking, Failed, Closed }
 
-/** 可翻译的失败分类；界面将分类映射到所属模块资源，不直接显示底层异常。 */
+/** 可翻译的失败分类；界面将分类映射到所属模块资源。 */
 enum class RealtimeVoiceFailure { Configuration, Microphone, AudioProcessing, Recognition, Generation, Synthesis, Playback, Persistence, ConversationBusy }
+
+/** 一次通话失败的提示实例；相同错误在显式重试后也可再次提示。 */
+class RealtimeVoiceFailureNotice(val requestError: VoiceRequestError? = null)
 
 /** 通话输出设备类别；输入设备由平台匹配，无麦耳机回退到手机麦克风。 */
 enum class VoiceAudioDeviceKind { Speaker, Earpiece, Bluetooth, Wired, Usb, Other }
@@ -131,4 +134,5 @@ data class RealtimeVoiceState(
     val reconnectNotice: Boolean = false,
     /** 正在执行的工具名（实时助手模式）；工具执行完成或新一轮开始时清除。 */
     val toolNotice: String? = null,
+    val failureNotice: RealtimeVoiceFailureNotice? = null,
 )

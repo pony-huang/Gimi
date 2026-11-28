@@ -132,7 +132,7 @@ For every configured synthesis or native Realtime model, the settings picker acc
 
 ### Failure classification
 
-Failures form a **translatable** taxonomy — the UI shows mapped copy, never a raw exception.
+Failures have localized categories. A terminal service request failure may also carry an HTTP status, a provider code, and a sanitized short provider message. The call shows those details once in a Toast and keeps a generic failure label with Retry.
 
 | Category | Origin |
 |---|---|

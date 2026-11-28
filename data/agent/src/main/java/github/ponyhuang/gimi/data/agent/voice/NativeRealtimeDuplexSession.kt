@@ -25,6 +25,8 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceEvent
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceFailure
 import github.ponyhuang.gimi.domain.voice.repository.VoiceAudioBackendException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceHandshakeException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
+import github.ponyhuang.gimi.domain.voice.repository.voiceRequestError
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeInstructionSink
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeTurnControlSink
 import github.ponyhuang.gimi.domain.voice.repository.VoiceManualInput
@@ -98,7 +100,7 @@ internal class NativeRealtimeDuplexSession(
             throw e
         } catch (e: VoiceAudioBackendException) {
             Log.w(TAG, "初始化 Realtime 会话失败", e)
-            emit(RealtimeVoiceEvent.Failed(e.failure))
+            emit(RealtimeVoiceEvent.Failed(e.failure, e.voiceRequestError()))
             return@flow
         } catch (e: Exception) {
             Log.w(TAG, "解析 Realtime 上行或历史失败", e)
@@ -133,20 +135,20 @@ internal class NativeRealtimeDuplexSession(
             } catch (e: VoiceHandshakeException) {
                 // 密钥无效/权限不足重试无意义：直接进入失败态。
                 Log.w(TAG, "Realtime 握手失败，不重试", e)
-                emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Configuration))
+                emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Configuration, e.requestError))
                 return@flow
             } catch (e: CancellationException) {
                 throw e
             } catch (e: VoiceAudioBackendException) {
                 Log.w(TAG, "Realtime 会话失败，不重试", e)
-                emit(RealtimeVoiceEvent.Failed(e.failure))
+                emit(RealtimeVoiceEvent.Failed(e.failure, e.voiceRequestError()))
                 return@flow
             } catch (e: Exception) {
                 if (closed) return@flow
                 attempt++
                 if (attempt > MAX_RECONNECT_ATTEMPTS) {
                     Log.w(TAG, "Realtime 重连 $MAX_RECONNECT_ATTEMPTS 次仍失败，放弃", e)
-                    emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Generation))
+                    emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Generation, e.voiceRequestError()))
                     return@flow
                 }
                 Log.w(TAG, "Realtime 连接断开，第 $attempt 次重连前退避", e)
@@ -302,8 +304,9 @@ internal class NativeRealtimeDuplexSession(
         rounds: RealtimeToolRoundRunner,
     ) {
         if (response.errorCode != null || !response.errorMessage.isNullOrBlank()) {
-            Log.w(TAG, "Realtime 协议错误: ${response.errorCode} ${response.errorMessage}")
-            emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Generation))
+            val error = VoiceRequestError.fromProvider(response.errorCode, response.errorMessage)
+            Log.w(TAG, "Realtime 协议错误，服务商错误码: ${error?.code}")
+            emit(RealtimeVoiceEvent.Failed(RealtimeVoiceFailure.Generation, error))
             return
         }
         if (response.interrupted) {

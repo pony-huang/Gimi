@@ -9,10 +9,10 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.voice.repository.RecognitionRequest
 
 import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
-import github.ponyhuang.gimi.domain.voice.repository.VoiceAuthenticationException
+import github.ponyhuang.gimi.data.modelaccess.shared.voiceHttpFailure
 import github.ponyhuang.gimi.domain.voice.repository.VoiceException
 import github.ponyhuang.gimi.domain.voice.repository.VoiceFailureKind
-import github.ponyhuang.gimi.domain.voice.repository.VoiceServiceException
+import github.ponyhuang.gimi.domain.voice.repository.VoiceRequestError
 import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognizer
 
 import github.ponyhuang.gimi.domain.voice.repository.SpeechSynthesizer
@@ -246,10 +246,7 @@ class MinimaxSpeechProtocol(
         val message = "语音合成失败（HTTP ${response.code}）" +
             detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
         // 401/403 是密钥问题，与服务端业务错误、网络故障是三类完全不同的用户问题。
-        if (response.code == 401 || response.code == 403) {
-            throw VoiceAuthenticationException(message)
-        }
-        throw VoiceServiceException(message)
+        throw voiceHttpFailure(response.code, detail, message)
     }
 
     /**
@@ -330,6 +327,7 @@ internal class TtsSynthesisException(
 ) : VoiceException(
     VoiceFailureKind.Service,
     buildMessage(localizedMessage, statusMessage),
+    requestError = VoiceRequestError.fromProvider(statusCode.toString(), statusMessage),
 ) {
     private companion object {
         fun buildMessage(localized: String, serverMessage: String): String {
